@@ -1,56 +1,67 @@
-# Welcome to your Expo app 👋
+# GOTA — EPSEL Móvil
 
-This is an [Expo](https://expo.dev) project created with [`create-expo-app`](https://www.npmjs.com/package/create-expo-app).
+App (React Native + Expo, TypeScript) para gestión operacional, trazabilidad y atención
+de incidencias de agua y desagüe de EPSEL. Construida a partir del diseño en Penpot
+siguiendo un proceso de **Spec-Driven Development**: ver `specs/`.
 
-## Get started
+**La app corre como web responsive (PWA)**, no como build nativo — ver
+`docs/ESTADO_PROYECTO.md` § 2 para el porqué y el detalle completo.
 
-1. Install dependencies
+## Empezar aquí
 
-   ```bash
-   npm install
-   ```
+1. **`docs/ESTADO_PROYECTO.md`** — léelo primero. Decisiones de infraestructura (por qué
+   web y no nativo), bugs de compatibilidad ya resueltos y cómo se resolvieron, qué está
+   verificado y qué no. Pensado para que cualquier persona o IA que retome el proyecto
+   no tenga que reconstruir el contexto desde cero.
+2. **`specs/00-auditoria-diseno.md`** — qué había en el diseño, qué se corrigió y por
+   qué, y todas las decisiones de producto tomadas con Edgar.
+3. **`specs/01` a `specs/09`** — una Spec por funcionalidad (contexto, requisitos,
+   criterios de aceptación) con su sección **"Solución implementada"** documentando qué
+   se construyó de verdad, qué se simplificó y por qué. **Las 9 specs están
+   implementadas** (ver Estado dentro de cada una para el detalle/simplificaciones).
+4. **`docs/API.md`** — contrato completo de API que necesita el backend (no existe
+   todavía; la app corre sobre datos mock en `src/mocks/`).
+5. **`docs/EMULADOR.md`** — cómo compilar nativo (Android Studio/EAS) si el proyecto
+   retoma esa vía más adelante. No es el camino actual.
 
-2. Start the app
+## Arranque rápido
 
-   ```bash
-   npx expo start
-   ```
-
-In the output, you'll find options to open the app in a
-
-- [development build](https://docs.expo.dev/develop/development-builds/introduction/)
-- [Android emulator](https://docs.expo.dev/workflow/android-studio-emulator/)
-- [iOS simulator](https://docs.expo.dev/workflow/ios-simulator/)
-- [Expo Go](https://expo.dev/go), a limited sandbox for trying out app development with Expo
-
-You can start developing by editing the files inside the **app** directory. This project uses [file-based routing](https://docs.expo.dev/router/introduction).
-
-## Get a fresh project
-
-When you're ready, run:
-
-```bash
-npm run reset-project
+```powershell
+npm install
+npx expo start --web
 ```
 
-This command will move the starter code to the **app-example** directory and create a blank **app** directory where you can start developing.
+Login de prueba: `tecnico@epsel.gob.pe` / `epsel2026`.
 
-### Other setup steps
+## Estructura
 
-- To set up ESLint for linting, run `npx expo lint`, or follow our guide on ["Using ESLint and Prettier"](https://docs.expo.dev/guides/using-eslint/)
-- If you'd like to set up unit testing, follow our guide on ["Unit Testing with Jest"](https://docs.expo.dev/develop/unit-testing/)
-- Learn more about the TypeScript setup in this template in our guide on ["Using TypeScript"](https://docs.expo.dev/guides/typescript/)
+```
+src/
+  app/            # rutas (Expo Router, file-based) — incluye login, (app)/ (Drawer:
+                  # mapa/dashboard/incidencias) e incidencia/[id] (modal de detalle)
+  auth/           # sesión + contexto de autenticación
+  api/            # cliente HTTP (con refresh de token) — listo para el backend real
+  mocks/          # datos simulados mientras no exista backend
+  components/     # UI por dominio (map/, sheet/, dashboard/, incident-detail/,
+                  # incident-actions/, incidents/) + PhoneFrame (frame responsive web)
+  icons/          # íconos SVG propios (gota, alcantarilla)
+  navigation/     # drawer de navegación
+  state/          # estado global (Zustand)
+  hooks/          # data-fetching (React Query) por pantalla/acción
+  utils/          # clustering de incidencias para el mapa, etc.
+  constants/      # paleta de colores, spacing (derivados de specs/00-auditoria-diseno.md)
+assets/reference/ # PNG originales de íconos (solo referencia, no se usan en runtime)
+specs/            # Specs SDD (una por funcionalidad)
+docs/             # ESTADO_PROYECTO.md, API.md, EMULADOR.md
+patches/          # patch-package — necesario para que react-native-web funcione (ver
+                  # docs/ESTADO_PROYECTO.md § 3.1). No borrar ni saltarse `postinstall`.
+```
 
-## Learn more
+## Comandos útiles
 
-To learn more about developing your project with Expo, look at the following resources:
-
-- [Expo documentation](https://docs.expo.dev/): Learn fundamentals, or go into advanced topics with our [guides](https://docs.expo.dev/guides).
-- [Learn Expo tutorial](https://docs.expo.dev/tutorial/introduction/): Follow a step-by-step tutorial where you'll create a project that runs on Android, iOS, and the web.
-
-## Join the community
-
-Join our community of developers creating universal apps.
-
-- [Expo on GitHub](https://github.com/expo/expo): View our open source platform and contribute.
-- [Discord community](https://chat.expo.dev): Chat with Expo users and ask questions.
+| Objetivo | Comando |
+|---|---|
+| Correr en web | `npx expo start --web` |
+| Chequeo de tipos | `npx tsc --noEmit` |
+| Lint | `npx expo lint` |
+| Verificar que el bundle nativo empaqueta sin errores | `npx expo export --platform android` |

@@ -1,0 +1,106 @@
+import { useLocalSearchParams, useRouter } from 'expo-router';
+import { useState } from 'react';
+import { Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
+import { SafeAreaView } from 'react-native-safe-area-context';
+
+import { CambiarEstadoSheet } from '@/components/incident-actions/CambiarEstadoSheet';
+import { RegistrarAvanceSheet } from '@/components/incident-actions/RegistrarAvanceSheet';
+import { SeleccionarResponsableSheet } from '@/components/incident-actions/SeleccionarResponsableSheet';
+import { DetalleTab } from '@/components/incident-detail/DetalleTab';
+import { FocoTab } from '@/components/incident-detail/FocoTab';
+import { IncidentDetailHeader } from '@/components/incident-detail/IncidentDetailHeader';
+import { PredioTab } from '@/components/incident-detail/PredioTab';
+import { TabsBar, type DetailTab } from '@/components/incident-detail/TabsBar';
+import { TrazabilidadTab } from '@/components/incident-detail/TrazabilidadTab';
+import { Colors, Spacing } from '@/constants/theme';
+import { useIncidentDetail } from '@/hooks/useIncidentDetail';
+import type { TransicionEstado } from '@/mocks/estadoWorkflowMock';
+
+type ActiveSheet = 'estado' | 'avance' | 'responsable' | null;
+
+/** Detalle de Incidencia (Spec 06) — modal ruteado, accesible desde Mapa y Lista. */
+export default function IncidenciaDetalleScreen() {
+  const { id } = useLocalSearchParams<{ id: string }>();
+  const router = useRouter();
+  const [tab, setTab] = useState<DetailTab>('detalle');
+  const [activeSheet, setActiveSheet] = useState<ActiveSheet>(null);
+  const [pendingTransicion, setPendingTransicion] = useState<TransicionEstado | null>(null);
+
+  const { data: incidencia, isLoading, isError } = useIncidentDetail(id);
+
+  return (
+    <SafeAreaView style={styles.container} edges={['top', 'bottom']}>
+      {isLoading && (
+        <View style={styles.statusBox}>
+          <Text style={styles.statusText}>Cargando incidencia…</Text>
+        </View>
+      )}
+      {(isError || !incidencia) && !isLoading && (
+        <View style={styles.statusBox}>
+          <Text style={styles.statusText}>No se encontró la incidencia.</Text>
+          <Pressable onPress={() => router.back()}>
+            <Text style={styles.backLink}>Volver</Text>
+          </Pressable>
+        </View>
+      )}
+
+      {incidencia && (
+        <>
+          <View style={styles.headerWrap}>
+            <IncidentDetailHeader
+              incidencia={incidencia}
+              onClose={() => router.back()}
+              onChangeEstadoPress={() => setActiveSheet('estado')}
+              onReassignPress={() => setActiveSheet('responsable')}
+            />
+            <TabsBar active={tab} onChange={setTab} />
+          </View>
+          <ScrollView contentContainerStyle={styles.body}>
+            {tab === 'detalle' && <DetalleTab incidencia={incidencia} />}
+            {tab === 'trazabilidad' && <TrazabilidadTab incidencia={incidencia} />}
+            {tab === 'foco' && <FocoTab incidencia={incidencia} />}
+            {tab === 'predio' && <PredioTab incidencia={incidencia} />}
+          </ScrollView>
+
+          <CambiarEstadoSheet
+            visible={activeSheet === 'estado'}
+            incidenciaId={incidencia.id}
+            estado={incidencia.estado}
+            onClose={() => setActiveSheet(null)}
+            onAbrirAvance={(transicion) => {
+              setPendingTransicion(transicion);
+              setActiveSheet('avance');
+            }}
+          />
+          <RegistrarAvanceSheet
+            visible={activeSheet === 'avance'}
+            incidenciaId={incidencia.id}
+            incidenciaLabel={`${incidencia.tipo}  ·  ${incidencia.direccion}`}
+            transicion={pendingTransicion}
+            onClose={() => setActiveSheet(null)}
+            onRegistrado={(motivo) => {
+              // RF-07.7: "Reasignar técnico" encadena el selector de responsable.
+              setActiveSheet(motivo === 'REASIGNAR_TECNICO' ? 'responsable' : null);
+            }}
+          />
+          <SeleccionarResponsableSheet
+            visible={activeSheet === 'responsable'}
+            incidenciaId={incidencia.id}
+            tecnicoActualId={incidencia.tecnicoAsignado?.id}
+            onClose={() => setActiveSheet(null)}
+            onReasignado={() => setActiveSheet(null)}
+          />
+        </>
+      )}
+    </SafeAreaView>
+  );
+}
+
+const styles = StyleSheet.create({
+  container: { flex: 1, backgroundColor: Colors.background },
+  headerWrap: { paddingHorizontal: Spacing.md, paddingTop: Spacing.sm, gap: Spacing.sm },
+  body: { padding: Spacing.md, paddingTop: Spacing.md },
+  statusBox: { flex: 1, alignItems: 'center', justifyContent: 'center', gap: Spacing.sm },
+  statusText: { color: Colors.textMuted, fontSize: 13 },
+  backLink: { color: Colors.accent, fontWeight: '700' },
+});
