@@ -6,3 +6,6 @@ venv/
 .pytest_cache/
 .ruff_cache/
 *.egg-info/
+.deploy-keys/
+deploy/.env
+deploy/martin-config.yaml

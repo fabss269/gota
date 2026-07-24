@@ -1,0 +1,74 @@
+# Producción — este archivo vive también en el servidor (~/gota-backend-deploy/,
+# ver .github/workflows/deploy.yml). `postgres`/`redis` sin puertos publicados al host:
+# solo `backend` (API) y `martin` (tiles) necesitan ser alcanzables desde afuera.
+#
+# `martin-config.yaml` (no `.template.yaml`) se genera en el servidor con `envsubst`
+# antes de este `up` — Martin no soporta `${VAR}` en su propio config (verificado).
+
+services:
+  backend:
+    image: ${BACKEND_IMAGE:-ghcr.io/ivanedac/epsel-backend:latest}
+    restart: unless-stopped
+    ports:
+      - "${BACKEND_PORT:-8000}:8000"
+    environment:
+      PROPIA_DB_URL: postgresql+asyncpg://${POSTGRES_USER}:${POSTGRES_PASSWORD}@postgres:5432/${POSTGRES_DB:-gota}
+      SIG_DB_HOST: ${SIG_DB_HOST}
+      SIG_DB_PORT: ${SIG_DB_PORT:-5432}
+      SIG_DB_NAME: ${SIG_DB_NAME:-bd_conhydra}
+      SIG_DB_USER: ${SIG_DB_USER}
+      SIG_DB_PASSWORD: ${SIG_DB_PASSWORD}
+      JWT_SECRET: ${JWT_SECRET}
+      JWT_ACCESS_EXPIRES_SECONDS: ${JWT_ACCESS_EXPIRES_SECONDS:-3600}
+      JWT_REFRESH_EXPIRES_SECONDS: ${JWT_REFRESH_EXPIRES_SECONDS:-2592000}
+      REDIS_URL: redis://redis:6379/0
+    depends_on:
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_started
+    networks: [gota]
+
+  postgres:
+    image: postgres:16-alpine
+    restart: unless-stopped
+    environment:
+      POSTGRES_USER: ${POSTGRES_USER}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD}
+      POSTGRES_DB: ${POSTGRES_DB:-gota}
+    volumes:
+      - gota_postgres_data:/var/lib/postgresql/data
+      # Solo aplica en un volumen nuevo/vacío (comportamiento estándar de la imagen
+      # oficial) — deploys siguientes reusan el volumen, no reaplican el DDL.
+      - ./vp_gota_create.ddl:/docker-entrypoint-initdb.d/01-schema.sql:ro
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER} -d ${POSTGRES_DB:-gota}"]
+      interval: 5s
+      timeout: 5s
+      retries: 10
+    networks: [gota]
+
+  redis:
+    image: redis:7-alpine
+    restart: unless-stopped
+    volumes:
+      - gota_redis_data:/data
+    networks: [gota]
+
+  martin:
+    image: ghcr.io/maplibre/martin:latest
+    restart: unless-stopped
+    ports:
+      - "${MARTIN_PORT:-3000}:3000"
+    command: ["--config", "/config/martin-config.yaml", "--listen-addresses", "0.0.0.0:3000"]
+    volumes:
+      - ./martin-config.yaml:/config/martin-config.yaml:ro
+    networks: [gota]
+
+networks:
+  gota:
+    driver: bridge
+
+volumes:
+  gota_postgres_data:
+  gota_redis_data:

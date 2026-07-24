@@ -1,0 +1,87 @@
+# Plantilla — NO se monta directo en el contenedor. Martin no soporta `${VAR}` dentro
+# de su propio config.yaml (verificado en vivo: falla el parseo de connection_string
+# con una variable sin resolver). El script de deploy la resuelve con `envsubst` antes
+# de montarla: `envsubst < martin-config.template.yaml > martin-config.yaml`.
+#
+# Whitelist explícita de tablas de `sig` (bd_conhydra) — nunca `auto_publish: true`.
+# `sig` tiene otros schemas (adm, geoportal) con datos de usuarios/sesiones que NO deben
+# quedar expuestos como tiles públicos; y dentro de `sig` mismo hay tablas de catastro
+# (lotes, manzanas, vías) que el mapa de GOTA no necesita — solo se publican las que
+# specs/07-capas-red.md y EPSEL-MOVIL/src/components/map/MapView.web.tsx ya esperan
+# (CAPA_LAYER_IDS: agua, alcantarillado, buzones, cajaagua/cajadesague + sus conexiones).
+#
+# Estructura (schema/table/srid/geometry_column) verificada en vivo contra bd_conhydra
+# real con `martin --save-config` — no es una plantilla adivinada.
+
+postgres:
+  connection_string: '${SIG_DATABASE_URL}'
+  auto_publish: false
+  pool_size: 10
+  tables:
+    agua:
+      schema: sig
+      table: agua
+      srid: 32719
+      geometry_column: geom
+      properties:
+        codigo: varchar
+        aguatipoid: int4
+        materialid: int4
+        diametro: numeric
+        sectorid: int4
+        distritoid: int4
+    alcantarillado:
+      schema: sig
+      table: alcantarillado
+      srid: 32719
+      geometry_column: geom
+      properties:
+        codigo: varchar
+        alcantarilladotipoid: int4
+        materialid: int4
+        primaria: bool
+        sectorid: int4
+        distritoid: int4
+    buzones:
+      schema: sig
+      table: buzones
+      srid: 32719
+      geometry_column: geom
+      properties:
+        codigo: varchar
+        sectorid: int4
+        distritoid: int4
+    cajaagua:
+      schema: sig
+      table: cajaagua
+      srid: 32719
+      geometry_column: geom
+      properties:
+        inscripcion: varchar
+        sectorid: int4
+        distritoid: int4
+    cajadesague:
+      schema: sig
+      table: cajadesague
+      srid: 32719
+      geometry_column: geom
+      properties:
+        inscripcion: varchar
+        sectorid: int4
+        distritoid: int4
+    cajaaguaconexion:
+      schema: sig
+      table: cajaaguaconexion
+      srid: 32719
+      geometry_column: geom
+      properties:
+        cajaaguaid: int4
+        aguaid: int4
+    cajadesagueconexion:
+      schema: sig
+      table: cajadesagueconexion
+      srid: 32719
+      geometry_column: geom
+      properties:
+        cajadesagueid: int4
+        alcantarilladoid: int4
