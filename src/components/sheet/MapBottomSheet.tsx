@@ -8,16 +8,32 @@ import { FiltrosTab } from '@/components/sheet/FiltrosTab';
 
 type Tab = 'filtros' | 'capas';
 
+type Props = {
+  // Notifica el borde superior real (en px de pantalla) del sheet cada vez que cambia
+  // de snap point. La usa el padre (mapa/index.tsx) para que el botón de modo de mapa
+  // suba junto con el sheet en vez de quedar tapado por él.
+  // (`animatedPosition` de @gorhom/bottom-sheet solo se actualiza en el montaje inicial
+  // en la versión web de este stack — no en cambios de snap point posteriores — por eso
+  // se usa `onChange`, que sí es confiable ahí.)
+  onSheetPositionChange?: (position: number) => void;
+};
+
 /**
  * Bottom Sheet del Mapa (Spec 04). Estado "compressed" (snap point bajo, con las
  * pestañas Filtros/Capas) y estado expandido (snap point alto con el contenido).
  */
-export const MapBottomSheet = forwardRef<BottomSheet>((_props, ref) => {
+export const MapBottomSheet = forwardRef<BottomSheet, Props>(({ onSheetPositionChange }, ref) => {
   const [tab, setTab] = useState<Tab>('filtros');
   const snapPoints = useMemo(() => ['14%', '65%'], []);
 
   return (
-    <BottomSheet ref={ref} index={0} snapPoints={snapPoints} backgroundStyle={styles.sheetBackground}>
+    <BottomSheet
+      ref={ref}
+      index={0}
+      snapPoints={snapPoints}
+      backgroundStyle={styles.sheetBackground}
+      onChange={(_index, position) => onSheetPositionChange?.(position)}
+    >
       <View style={styles.tabsRow}>
         <TabButton label="Filtros" active={tab === 'filtros'} onPress={() => setTab('filtros')} />
         <TabButton label="Capas" active={tab === 'capas'} onPress={() => setTab('capas')} />

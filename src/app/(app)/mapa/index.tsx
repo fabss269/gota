@@ -1,7 +1,8 @@
 import BottomSheet from '@gorhom/bottom-sheet';
 import { useNavigation, useRouter } from 'expo-router';
 import { useMemo, useRef, useState } from 'react';
-import { Alert, Pressable, StyleSheet, Text, View } from 'react-native';
+import { Alert, Pressable, StyleSheet, Text, useWindowDimensions, View } from 'react-native';
+import Animated, { useAnimatedStyle, useSharedValue, withTiming } from 'react-native-reanimated';
 import { SafeAreaView } from 'react-native-safe-area-context';
 
 import { EpselMapView } from '@/components/map/MapView';
@@ -13,6 +14,8 @@ import { openDrawer } from '@/navigation/openDrawer';
 import { useFiltersStore } from '@/state/filtersStore';
 import { clusterIncidents, type IncidentCluster } from '@/utils/clusterIncidents';
 
+const AnimatedPressable = Animated.createAnimatedComponent(Pressable);
+
 /** Mapa de incidencias (Spec 03) — pantalla principal de la app. */
 export default function MapaScreen() {
   const navigation = useNavigation();
@@ -20,6 +23,23 @@ export default function MapaScreen() {
   const bottomSheetRef = useRef<BottomSheet>(null);
   const [mapModeVisible, setMapModeVisible] = useState(false);
   const mapMode = useFiltersStore((s) => s.mapMode);
+
+  // Distancia del botón de modo de mapa al fondo de la pantalla — se anima cada vez que
+  // el Bottom Sheet cambia de snap point (ver onSheetPositionChange), para que el botón
+  // suba junto con el sheet en vez de quedar tapado por él (antes tenía un `bottom` fijo).
+  const { height: windowHeight } = useWindowDimensions();
+  const GAP_SOBRE_SHEET = 16;
+  const SNAP_COLAPSADO = 0.14; // debe coincidir con el primer snapPoint de MapBottomSheet
+  const mapModeButtonBottom = useSharedValue(windowHeight * SNAP_COLAPSADO + GAP_SOBRE_SHEET);
+  const mapModeButtonAnimatedStyle = useAnimatedStyle(() => ({
+    bottom: mapModeButtonBottom.value,
+  }));
+  const handleSheetPositionChange = (sheetTopY: number) => {
+    // Mutar `.value` de un SharedValue es el patrón normal de Reanimated, pero el React
+    // Compiler no lo reconoce y lo marca como si fuera un valor inmutable.
+    // eslint-disable-next-line react-hooks/immutability
+    mapModeButtonBottom.value = withTiming(windowHeight - sheetTopY + GAP_SOBRE_SHEET, { duration: 250 });
+  };
 
   const { data: incidencias = [], isLoading, isError, refetch } = useIncidentsToday();
   const clusters = useMemo(() => clusterIncidents(incidencias), [incidencias]);
@@ -46,9 +66,12 @@ export default function MapaScreen() {
           <Text style={styles.menuIcon}>☰</Text>
         </Pressable>
 
-        <Pressable style={styles.mapModeButton} onPress={() => setMapModeVisible(true)}>
+        <AnimatedPressable
+          style={[styles.mapModeButton, mapModeButtonAnimatedStyle]}
+          onPress={() => setMapModeVisible(true)}
+        >
           <Text style={styles.mapModeIcon}>🗺️</Text>
-        </Pressable>
+        </AnimatedPressable>
 
         {mapMode !== 'normal' && (
           <View style={styles.modeBadge}>
@@ -71,7 +94,7 @@ export default function MapaScreen() {
       )}
 
       <MapModeSheet visible={mapModeVisible} onClose={() => setMapModeVisible(false)} />
-      <MapBottomSheet ref={bottomSheetRef} />
+      <MapBottomSheet ref={bottomSheetRef} onSheetPositionChange={handleSheetPositionChange} />
     </View>
   );
 }
@@ -99,8 +122,8 @@ const styles = StyleSheet.create({
   },
   menuIcon: { color: Colors.white, fontSize: 20 },
   mapModeButton: {
+    // `bottom` real lo controla mapModeButtonAnimatedStyle (sigue al Bottom Sheet).
     position: 'absolute',
-    bottom: 96,
     left: 16,
     width: 48,
     height: 48,

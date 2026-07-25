@@ -77,13 +77,19 @@ incidencias).
   - `src/state/filtersStore.ts` — estado global (Zustand) de categorías/prioridades/modo
     de mapa, consumido por `useIncidentsToday` (Spec 03).
 - **Implementado de verdad (filtra el mapa en vivo):** chips de Categoría (Agua/Desagüe)
-  y Prioridad (A tiempo/Alerta/Crítica) — RF-04.2 y RF-04.4.
+  y Prioridad (A tiempo/Alerta/Crítica) — RF-04.2 y RF-04.4 — y, desde 2026-07-23,
+  también **Tipo de atención** y **Estado** (RF-04.3): selectores de un solo valor
+  ("Todos" + opción), con modal de selección (mismo patrón visual que
+  `MapModeSheet.tsx`), alineados contra el frame `contenido-filtros` de Penpot. Usan
+  los valores reales ya presentes en el mock (`tipo`, `estado` de cada incidencia) y
+  los mismos labels que `src/components/incidents/FiltersOverlay.tsx` (Spec 05), así
+  que si aparece un catálogo real de tipos de atención, ese es el punto de contacto
+  a actualizar en ambos lados.
 - **Simplificado / no conectado (documentado, no implementado en esta sesión):**
-  - RF-04.1, RF-04.3, RF-04.5 (Distrito/Sector, Tipo de atención, Estado, Rango de
-    fechas): se muestran como filas de solo lectura ("Chiclayo · Todos…", "Hoy") porque
-    no existe el endpoint de catálogos (`docs/API.md` § 2) ni un `useCatalogos.ts` — no
-    se construyó para no mockear un catálogo de distritos/sectores inventado sin que el
-    usuario lo confirme.
+  - RF-04.1, RF-04.5 (Distrito/Sector, Rango de fechas): se muestran como filas de solo
+    lectura ("Chiclayo · Todos…", "Hoy") porque no existe el endpoint de catálogos
+    (`docs/API.md` § 2) ni un `useCatalogos.ts` — no se construyó para no mockear un
+    catálogo de distritos/sectores inventado sin que el usuario lo confirme.
   - RF-04.7–RF-04.10 (tab Capas): los checkboxes de Agua/Desagüe sí tienen estado local
     funcional, pero "Ver en el mapa" no dibuja nada sobre `MapView` — no hay geometría
     de red real ni mock creíble sin datos de EPSEL (ver `docs/API.md` § 7).

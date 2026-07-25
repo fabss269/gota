@@ -1,24 +1,28 @@
 import type { EstadoIncidencia } from '@/mocks/incidentsMock';
 
 export type MotivoAvance =
-  | 'CUADRILLA_EN_SITIO'
-  | 'SE_RESOLVIO'
   | 'REQUIERE_EQUIPO'
   | 'DERIVAR_OTRA_AREA'
   | 'REASIGNAR_TECNICO'
   | 'EN_ESPERA'
   | 'NO_SE_PUDO_ATENDER';
 
-/** RF-07.3 (docs/API.md § 5 `POST /incidencias/{id}/avances`, campo `motivo`). */
+/** RF-07.3 (docs/API.md § 5 `POST /incidencias/{id}/avances`, campo `motivo`).
+ * "Cuadrilla en sitio" y "Se resolvió" se quitaron del catálogo (ajuste de UI
+ * 2026-07-23, confirmado con Edgar) — ya no son opciones válidas de motivo. */
 export const MOTIVOS_AVANCE: { value: MotivoAvance; label: string }[] = [
-  { value: 'CUADRILLA_EN_SITIO', label: 'Cuadrilla en sitio' },
-  { value: 'SE_RESOLVIO', label: 'Se resolvió' },
   { value: 'REQUIERE_EQUIPO', label: 'Requiere equipo' },
   { value: 'DERIVAR_OTRA_AREA', label: 'Derivar a otra área' },
   { value: 'REASIGNAR_TECNICO', label: 'Reasignar técnico' },
   { value: 'EN_ESPERA', label: 'En espera' },
   { value: 'NO_SE_PUDO_ATENDER', label: 'No se pudo atender' },
 ];
+
+/** Opciones del selector anidado cuando motivo === 'REQUIERE_EQUIPO'. */
+export const EQUIPO_OPTIONS = ['Hidrojet', 'Bomba de succión', 'Retroexcavadora'];
+
+/** Opciones del selector anidado cuando motivo === 'DERIVAR_OTRA_AREA'. */
+export const AREA_OPTIONS = ['Comercial', 'Operacional'];
 
 export type TransicionEstado = {
   desde: EstadoIncidencia;

@@ -1,23 +1,16 @@
-import { useState } from 'react';
-import { Pressable, StyleSheet, Text, View } from 'react-native';
+import { useEffect, useState } from 'react';
+import { ActivityIndicator, Pressable, StyleSheet, Text, View } from 'react-native';
 
 import { Colors, Radius, Spacing } from '@/constants/theme';
+import { type CapaKey, useCapasStore } from '@/state/capasStore';
 
-type CapaKey =
-  | 'red_potable'
-  | 'valvulas'
-  | 'grifos_contra_incendio'
-  | 'red_primaria_desague'
-  | 'red_secundaria_desague'
-  | 'buzones';
-
-const AGUA_CAPAS: { key: CapaKey; label: string }[] = [
+const AGUA_CAPAS: { key: CapaKey; label: string; disabled?: boolean }[] = [
   { key: 'red_potable', label: 'Red potable' },
-  { key: 'valvulas', label: 'Válvulas' },
-  { key: 'grifos_contra_incendio', label: 'Grifos contra incendio' },
+  { key: 'valvulas', label: 'Válvulas', disabled: true },
+  { key: 'grifos_contra_incendio', label: 'Grifos contra incendio', disabled: true },
 ];
 
-const DESAGUE_CAPAS: { key: CapaKey; label: string }[] = [
+const DESAGUE_CAPAS: { key: CapaKey; label: string; disabled?: boolean }[] = [
   { key: 'red_primaria_desague', label: 'Red primaria' },
   { key: 'red_secundaria_desague', label: 'Red secundaria' },
   { key: 'buzones', label: 'Buzones' },
@@ -26,13 +19,20 @@ const DESAGUE_CAPAS: { key: CapaKey; label: string }[] = [
 /**
  * Tab "Capas" del Bottom Sheet (Spec 04, RF-04.7 a RF-04.10).
  *
- * Simplificación documentada: "Ver en el mapa" (RF-04.10) hoy solo cierra el sheet.
- * Dibujar las líneas de red reales sobre MapLibre requiere el endpoint
- * `GET /red/capas` (docs/API.md § 7), que aún no existe — no hay una geometría real
- * que mockear de forma creíble sin inventar trazados de red que no vienen del diseño.
+ * "Ver en el mapa" aplica la selección de verdad sobre las capas reales de catastro/red
+ * (servidas por Martin desde `sig`, ver docs/ESTADO_PROYECTO.md) mostrando/ocultando
+ * layers de MapLibre en MapView.web.tsx. "Válvulas" y "Grifos contra incendio" quedan
+ * deshabilitados a propósito: no existe ninguna tabla/tipo de accesorio para eso en la
+ * BD catastral (`sig.accesoriotipos` solo tiene conexiones/fittings de tubería) — no hay
+ * geometría real que mostrar, así que no se simula una capa falsa.
  */
 export function CapasTab({ onAplicar }: { onAplicar: () => void }) {
-  const [seleccion, setSeleccion] = useState<Set<CapaKey>>(new Set(['red_potable', 'valvulas']));
+  const capasVisibles = useCapasStore((s) => s.capasVisibles);
+  const isApplying = useCapasStore((s) => s.isApplying);
+  const aplicarCapas = useCapasStore((s) => s.aplicarCapas);
+  const setApplying = useCapasStore((s) => s.setApplying);
+
+  const [seleccion, setSeleccion] = useState<Set<CapaKey>>(new Set(capasVisibles));
 
   const toggle = (key: CapaKey) =>
     setSeleccion((prev) => {
@@ -44,6 +44,20 @@ export function CapasTab({ onAplicar }: { onAplicar: () => void }) {
       }
       return next;
     });
+
+  const handleAplicar = () => {
+    aplicarCapas(new Set(seleccion));
+    setApplying(true);
+    onAplicar();
+  };
+
+  // Red de seguridad: si el mapa (solo web hoy) no confirma que terminó de renderizar
+  // las capas nuevas, el botón no debe quedar cargando para siempre.
+  useEffect(() => {
+    if (!isApplying) return;
+    const timeout = setTimeout(() => setApplying(false), 4000);
+    return () => clearTimeout(timeout);
+  }, [isApplying, setApplying]);
 
   return (
     <View style={styles.container}>
@@ -61,8 +75,12 @@ export function CapasTab({ onAplicar }: { onAplicar: () => void }) {
         onToggle={toggle}
       />
 
-      <Pressable style={styles.applyButton} onPress={onAplicar}>
-        <Text style={styles.applyButtonLabel}>Ver en el mapa</Text>
+      <Pressable style={styles.applyButton} onPress={handleAplicar} disabled={isApplying}>
+        {isApplying ? (
+          <ActivityIndicator color={Colors.white} />
+        ) : (
+          <Text style={styles.applyButtonLabel}>Ver en el mapa</Text>
+        )}
       </Pressable>
     </View>
   );
@@ -77,7 +95,7 @@ function CapaGroup({
 }: {
   title: string;
   dotColor: string;
-  items: { key: CapaKey; label: string }[];
+  items: { key: CapaKey; label: string; disabled?: boolean }[];
   seleccion: Set<CapaKey>;
   onToggle: (key: CapaKey) => void;
 }) {
@@ -88,11 +106,25 @@ function CapaGroup({
         <Text style={styles.groupTitle}>{title}</Text>
       </View>
       {items.map((item) => (
-        <Pressable key={item.key} style={styles.checkboxRow} onPress={() => onToggle(item.key)}>
-          <View style={[styles.checkbox, seleccion.has(item.key) && styles.checkboxChecked]}>
-            {seleccion.has(item.key) && <Text style={styles.checkmark}>✓</Text>}
+        <Pressable
+          key={item.key}
+          style={styles.checkboxRow}
+          onPress={() => !item.disabled && onToggle(item.key)}
+          disabled={item.disabled}
+        >
+          <View
+            style={[
+              styles.checkbox,
+              seleccion.has(item.key) && !item.disabled && styles.checkboxChecked,
+              item.disabled && styles.checkboxDisabled,
+            ]}
+          >
+            {seleccion.has(item.key) && !item.disabled && <Text style={styles.checkmark}>✓</Text>}
           </View>
-          <Text style={styles.checkboxLabel}>{item.label}</Text>
+          <Text style={[styles.checkboxLabel, item.disabled && styles.checkboxLabelDisabled]}>
+            {item.label}
+            {item.disabled ? ' (sin datos aún)' : ''}
+          </Text>
         </Pressable>
       ))}
     </View>
@@ -131,8 +163,10 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
   },
   checkboxChecked: { backgroundColor: Colors.accent, borderColor: Colors.accent },
+  checkboxDisabled: { opacity: 0.4 },
   checkmark: { color: Colors.white, fontSize: 12, fontWeight: '700' },
   checkboxLabel: { fontSize: 14, color: Colors.textBody },
+  checkboxLabelDisabled: { color: Colors.textMuted, fontStyle: 'italic' },
   applyButton: {
     backgroundColor: Colors.primary,
     borderRadius: Radius.pill,

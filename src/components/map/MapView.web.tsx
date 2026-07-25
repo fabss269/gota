@@ -4,7 +4,20 @@ import { useEffect, useRef } from 'react';
 import { createRoot, type Root } from 'react-dom/client';
 
 import { IncidentMarker } from '@/components/map/IncidentMarker';
+import { type CapaKey, useCapasStore } from '@/state/capasStore';
 import type { IncidentCluster } from '@/utils/clusterIncidents';
+
+// Une cada checkbox de la pestaña "Capas" (Spec 04) con los layers reales del style.json
+// servido por Martin (docs/ESTADO_PROYECTO.md). "valvulas"/"grifos_contra_incendio" no
+// tienen entrada porque no existe esa geometría en `sig` — no hay layer que mostrar.
+const CAPA_LAYER_IDS: Record<CapaKey, string[]> = {
+  red_potable: ['agua-matriz', 'agua-distribucion', 'cajaaguaconexion-line', 'cajaagua-circle'],
+  valvulas: [],
+  grifos_contra_incendio: [],
+  red_primaria_desague: ['alcantarillado-primaria'],
+  red_secundaria_desague: ['alcantarillado-secundaria', 'cajadesagueconexion-line', 'cajadesague-circle'],
+  buzones: ['buzones-circle'],
+};
 
 // Chiclayo, Perú (Spec 03, RF-03.1 — centro por defecto si no hay incidencias).
 const DEFAULT_CENTER: [number, number] = [-79.8409, -6.7714];
@@ -69,6 +82,35 @@ export function EpselMapView({ clusters, onPressCluster }: Props) {
     // de la Cámara nativa (no se re-centra en updates posteriores).
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
+
+  const capasVisibles = useCapasStore((state) => state.capasVisibles);
+
+  useEffect(() => {
+    const map = mapRef.current;
+    if (!map) return;
+
+    const applyVisibility = () => {
+      for (const [key, layerIds] of Object.entries(CAPA_LAYER_IDS) as [CapaKey, string[]][]) {
+        const visible = capasVisibles.has(key);
+        for (const layerId of layerIds) {
+          if (map.getLayer(layerId)) {
+            map.setLayoutProperty(layerId, 'visibility', visible ? 'visible' : 'none');
+          }
+        }
+      }
+      // "idle" confirma que MapLibre terminó de pedir/dibujar los tiles de las capas
+      // recién mostradas — recién ahí se apaga el loader del botón "Ver en el mapa".
+      if (useCapasStore.getState().isApplying) {
+        map.once('idle', () => useCapasStore.getState().setApplying(false));
+      }
+    };
+
+    if (map.isStyleLoaded()) {
+      applyVisibility();
+    } else {
+      map.once('load', applyVisibility);
+    }
+  }, [capasVisibles]);
 
   useEffect(() => {
     const map = mapRef.current;

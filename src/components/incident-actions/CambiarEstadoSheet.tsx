@@ -1,4 +1,6 @@
-import { Alert, Modal, Pressable, StyleSheet, Text } from 'react-native';
+import { useEffect } from 'react';
+import { Alert, Modal, Pressable, StyleSheet, Text, View } from 'react-native';
+import Animated, { useAnimatedStyle, useSharedValue, withTiming } from 'react-native-reanimated';
 
 import { Colors, Radius, Spacing } from '@/constants/theme';
 import { getTransicionesDisponibles, type TransicionEstado } from '@/mocks/estadoWorkflowMock';
@@ -25,6 +27,24 @@ export function CambiarEstadoSheet({ visible, incidenciaId, estado, onClose, onA
   const cambiarEstado = useCambiarEstado();
   const transiciones = getTransicionesDisponibles(estado);
 
+  // El backdrop debe solo aparecer (fade), no deslizarse como rectángulo junto con la
+  // hoja — animationType="slide" de <Modal> animaba ambos juntos porque el backdrop
+  // (flex:1) es parte del mismo árbol que se traslada. Se separan con Reanimated:
+  // <Modal animationType="none"> + backdrop (opacity) y hoja (translateY) independientes.
+  const backdropOpacity = useSharedValue(0);
+  const sheetTranslateY = useSharedValue(400);
+  useEffect(() => {
+    if (visible) {
+      backdropOpacity.value = withTiming(1, { duration: 180 });
+      sheetTranslateY.value = withTiming(0, { duration: 280 });
+    } else {
+      backdropOpacity.value = 0;
+      sheetTranslateY.value = 400;
+    }
+  }, [visible, backdropOpacity, sheetTranslateY]);
+  const backdropAnimatedStyle = useAnimatedStyle(() => ({ opacity: backdropOpacity.value }));
+  const sheetAnimatedStyle = useAnimatedStyle(() => ({ transform: [{ translateY: sheetTranslateY.value }] }));
+
   const handlePress = (transicion: TransicionEstado) => {
     if (transicion.requiereFormulario) {
       onClose();
@@ -44,27 +64,34 @@ export function CambiarEstadoSheet({ visible, incidenciaId, estado, onClose, onA
   };
 
   return (
-    <Modal visible={visible} transparent animationType="slide" onRequestClose={onClose}>
-      <Pressable style={styles.backdrop} onPress={onClose}>
-        <Pressable style={styles.sheet}>
-          <Text style={styles.title}>Cambiar estado</Text>
-          {transiciones.length === 0 && <Text style={styles.emptyText}>Esta incidencia ya fue atendida.</Text>}
-          {transiciones.map((t, i) => (
-            <Pressable key={`${t.desde}-${t.hacia}-${i}`} style={styles.item} onPress={() => handlePress(t)}>
-              <Text style={styles.itemLabel}>{t.label}</Text>
-              <Text style={[styles.itemTarget, { color: ESTADO_COLOR[t.hacia] }]}>
-                → {t.hacia.replace('_', ' ')}
-              </Text>
+    <Modal visible={visible} transparent animationType="none" onRequestClose={onClose}>
+      <View style={styles.root}>
+        <Animated.View style={[styles.backdropColor, backdropAnimatedStyle]} />
+        <Pressable style={styles.backdropTouchable} onPress={onClose}>
+          <Animated.View style={sheetAnimatedStyle}>
+            <Pressable style={styles.sheet}>
+              <Text style={styles.title}>Cambiar estado</Text>
+              {transiciones.length === 0 && <Text style={styles.emptyText}>Esta incidencia ya fue atendida.</Text>}
+              {transiciones.map((t, i) => (
+                <Pressable key={`${t.desde}-${t.hacia}-${i}`} style={styles.item} onPress={() => handlePress(t)}>
+                  <Text style={styles.itemLabel}>{t.label}</Text>
+                  <Text style={[styles.itemTarget, { color: ESTADO_COLOR[t.hacia] }]}>
+                    → {t.hacia.replace('_', ' ')}
+                  </Text>
+                </Pressable>
+              ))}
             </Pressable>
-          ))}
+          </Animated.View>
         </Pressable>
-      </Pressable>
+      </View>
     </Modal>
   );
 }
 
 const styles = StyleSheet.create({
-  backdrop: { flex: 1, backgroundColor: 'rgba(13, 43, 82, 0.25)', justifyContent: 'flex-end' },
+  root: { flex: 1 },
+  backdropColor: { ...StyleSheet.absoluteFill, backgroundColor: 'rgba(13, 43, 82, 0.25)' },
+  backdropTouchable: { flex: 1, justifyContent: 'flex-end' },
   sheet: {
     backgroundColor: Colors.white,
     borderTopLeftRadius: Radius.lg,

@@ -12,7 +12,7 @@ import { IncidentDetailHeader } from '@/components/incident-detail/IncidentDetai
 import { PredioTab } from '@/components/incident-detail/PredioTab';
 import { TabsBar, type DetailTab } from '@/components/incident-detail/TabsBar';
 import { TrazabilidadTab } from '@/components/incident-detail/TrazabilidadTab';
-import { Colors, Spacing } from '@/constants/theme';
+import { Colors, Radius, Spacing } from '@/constants/theme';
 import { useIncidentDetail } from '@/hooks/useIncidentDetail';
 import type { TransicionEstado } from '@/mocks/estadoWorkflowMock';
 
@@ -29,7 +29,8 @@ export default function IncidenciaDetalleScreen() {
   const { data: incidencia, isLoading, isError } = useIncidentDetail(id);
 
   return (
-    <SafeAreaView style={styles.container} edges={['top', 'bottom']}>
+    <View style={styles.backdrop}>
+      <SafeAreaView style={styles.container} edges={['top', 'bottom']}>
       {isLoading && (
         <View style={styles.statusBox}>
           <Text style={styles.statusText}>Cargando incidencia…</Text>
@@ -77,11 +78,9 @@ export default function IncidenciaDetalleScreen() {
             incidenciaId={incidencia.id}
             incidenciaLabel={`${incidencia.tipo}  ·  ${incidencia.direccion}`}
             transicion={pendingTransicion}
+            tecnicoActualId={incidencia.tecnicoAsignado?.id}
             onClose={() => setActiveSheet(null)}
-            onRegistrado={(motivo) => {
-              // RF-07.7: "Reasignar técnico" encadena el selector de responsable.
-              setActiveSheet(motivo === 'REASIGNAR_TECNICO' ? 'responsable' : null);
-            }}
+            onRegistrado={() => setActiveSheet(null)}
           />
           <SeleccionarResponsableSheet
             visible={activeSheet === 'responsable'}
@@ -92,12 +91,31 @@ export default function IncidenciaDetalleScreen() {
           />
         </>
       )}
-    </SafeAreaView>
+      </SafeAreaView>
+    </View>
   );
 }
 
 const styles = StyleSheet.create({
-  container: { flex: 1, backgroundColor: Colors.background },
+  // El "modal" no se notaba porque ocupaba toda la pantalla — este backdrop + el
+  // margen/borderRadius de `container` son lo que lo hace leerse como modal, igual
+  // que el resto de overlays de la app (CambiarEstadoSheet, FiltersOverlay, etc.).
+  backdrop: {
+    flex: 1,
+    backgroundColor: 'rgba(13, 43, 82, 0.35)',
+    padding: Spacing.sm,
+  },
+  container: {
+    flex: 1,
+    backgroundColor: Colors.background,
+    borderRadius: Radius.lg,
+    overflow: 'hidden',
+    shadowColor: '#000',
+    shadowOpacity: 0.2,
+    shadowRadius: 20,
+    shadowOffset: { width: 0, height: 8 },
+    elevation: 12,
+  },
   headerWrap: { paddingHorizontal: Spacing.md, paddingTop: Spacing.sm, gap: Spacing.sm },
   body: { padding: Spacing.md, paddingTop: Spacing.md },
   statusBox: { flex: 1, alignItems: 'center', justifyContent: 'center', gap: Spacing.sm },

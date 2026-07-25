@@ -13,13 +13,19 @@ import { useFiltersStore } from '@/state/filtersStore';
 export function useIncidentsToday() {
   const categorias = useFiltersStore((s) => s.categorias);
   const prioridades = useFiltersStore((s) => s.prioridades);
+  const tipoAtencion = useFiltersStore((s) => s.tipoAtencion);
+  const estado = useFiltersStore((s) => s.estado);
 
   return useQuery({
-    queryKey: ['incidencias-hoy', categorias, prioridades],
+    queryKey: ['incidencias-hoy', categorias, prioridades, tipoAtencion, estado],
     queryFn: async () => {
       await new Promise((resolve) => setTimeout(resolve, 300));
       return INCIDENCIAS_HOY.filter(
-        (i) => categorias.includes(i.categoria) && prioridades.includes(i.prioridad),
+        (i) =>
+          categorias.includes(i.categoria) &&
+          prioridades.includes(i.prioridad) &&
+          (tipoAtencion === null || i.tipo === tipoAtencion) &&
+          (estado === null || i.estado === estado),
       );
     },
   });

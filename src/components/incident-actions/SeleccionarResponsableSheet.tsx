@@ -1,13 +1,9 @@
-import { Modal, Pressable, StyleSheet, Text, View } from 'react-native';
+import { Modal, Pressable, StyleSheet, Text } from 'react-native';
 
 import { Colors, Radius, Spacing } from '@/constants/theme';
 import { useReasignarResponsable } from '@/hooks/useReasignarResponsable';
-import { USUARIOS, type Usuario } from '@/mocks/usuariosMock';
-
-const ROL_LABEL: Record<Usuario['rol'], string> = {
-  tecnico: 'Técnico',
-  supervisor: 'Supervisora',
-};
+import { TecnicoOptionsList } from '@/components/incident-actions/TecnicoOptionsList';
+import type { Usuario } from '@/mocks/usuariosMock';
 
 type Props = {
   visible: boolean;
@@ -39,31 +35,7 @@ export function SeleccionarResponsableSheet({ visible, incidenciaId, tecnicoActu
       <Pressable style={styles.backdrop} onPress={onClose}>
         <Pressable style={styles.card}>
           <Text style={styles.title}>Reasignar responsable</Text>
-          {USUARIOS.map((usuario) => {
-            const initials = usuario.nombre
-              .split(' ')
-              .slice(0, 2)
-              .map((w) => w[0])
-              .join('');
-            const isCurrent = usuario.id === tecnicoActualId;
-            return (
-              <Pressable
-                key={usuario.id}
-                style={[styles.row, isCurrent && styles.rowCurrent]}
-                onPress={() => handleSelect(usuario)}
-              >
-                <View style={styles.avatar}>
-                  <Text style={styles.avatarLabel}>{initials}</Text>
-                </View>
-                <View style={styles.userCol}>
-                  <Text style={styles.userName}>{usuario.nombre}</Text>
-                  <Text style={styles.userRole}>
-                    {ROL_LABEL[usuario.rol]} · {usuario.cuadrilla ?? usuario.sector}
-                  </Text>
-                </View>
-              </Pressable>
-            );
-          })}
+          <TecnicoOptionsList selectedId={tecnicoActualId} onSelect={handleSelect} />
         </Pressable>
       </Pressable>
     </Modal>
@@ -90,24 +62,4 @@ const styles = StyleSheet.create({
     elevation: 6,
   },
   title: { fontSize: 13, fontWeight: '700', color: Colors.primaryDark, marginBottom: Spacing.xs },
-  row: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: Spacing.sm,
-    borderRadius: Radius.md,
-    padding: Spacing.xs,
-  },
-  rowCurrent: { backgroundColor: '#E0E4FF' },
-  avatar: {
-    width: 30,
-    height: 30,
-    borderRadius: 15,
-    backgroundColor: Colors.accent,
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
-  avatarLabel: { fontSize: 11, fontWeight: '700', color: Colors.white },
-  userCol: { gap: 1 },
-  userName: { fontSize: 12, fontWeight: '600', color: Colors.textBody },
-  userRole: { fontSize: 10, color: Colors.textMuted },
 });
