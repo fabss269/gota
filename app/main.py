@@ -1,4 +1,5 @@
 from fastapi import FastAPI
+from fastapi.middleware.cors import CORSMiddleware
 
 from app.core.exceptions import register_exception_handlers
 from app.modules.auth.router import router as auth_router
@@ -9,6 +10,15 @@ from app.modules.red.router import router as red_router
 from app.modules.usuarios.router import router as usuarios_router
 
 app = FastAPI(title="GOTA backend", version="0.1.0")
+
+# Desarrollo local: Expo web corre en localhost con puerto variable (8081, 19006, 8082...).
+# Bearer token en header, no cookies, así que no hace falta allow_credentials.
+app.add_middleware(
+    CORSMiddleware,
+    allow_origin_regex=r"http://localhost:\d+",
+    allow_methods=["*"],
+    allow_headers=["*"],
+)
 
 register_exception_handlers(app)
 
