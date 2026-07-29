@@ -1,0 +1,120 @@
+{
+  "version": 8,
+  "name": "GOTA - Red EPSEL (dev, vía Martin)",
+  "sources": {
+    "osm": {
+      "type": "raster",
+      "tiles": ["https://tile.openstreetmap.org/{z}/{x}/{y}.png"],
+      "tileSize": 256,
+      "maxzoom": 19,
+      "attribution": "© OpenStreetMap contributors"
+    },
+    "agua": {
+      "type": "vector",
+      "tiles": ["http://localhost:3000/agua/{z}/{x}/{y}"]
+    },
+    "alcantarillado": {
+      "type": "vector",
+      "tiles": ["http://localhost:3000/alcantarillado/{z}/{x}/{y}"]
+    },
+    "buzones": {
+      "type": "vector",
+      "tiles": ["http://localhost:3000/buzones/{z}/{x}/{y}"]
+    },
+    "cajaagua": {
+      "type": "vector",
+      "tiles": ["http://localhost:3000/cajaagua/{z}/{x}/{y}"]
+    },
+    "cajadesague": {
+      "type": "vector",
+      "tiles": ["http://localhost:3000/cajadesague/{z}/{x}/{y}"]
+    },
+    "cajaaguaconexion": {
+      "type": "vector",
+      "tiles": ["http://localhost:3000/cajaaguaconexion/{z}/{x}/{y}"]
+    },
+    "cajadesagueconexion": {
+      "type": "vector",
+      "tiles": ["http://localhost:3000/cajadesagueconexion/{z}/{x}/{y}"]
+    }
+  },
+  "layers": [
+    { "id": "osm", "type": "raster", "source": "osm" },
+    {
+      "id": "agua-matriz",
+      "type": "line",
+      "source": "agua",
+      "source-layer": "agua",
+      "layout": { "visibility": "none" },
+      "filter": ["all", ["!=", ["get", "diametro"], null], [">=", ["get", "diametro"], 6]],
+      "paint": { "line-color": "#2563eb", "line-width": 2.5 }
+    },
+    {
+      "id": "agua-distribucion",
+      "type": "line",
+      "source": "agua",
+      "source-layer": "agua",
+      "layout": { "visibility": "none" },
+      "filter": ["any", ["==", ["get", "diametro"], null], ["<", ["get", "diametro"], 6]],
+      "paint": { "line-color": "#60a5fa", "line-width": 1.2 }
+    },
+    {
+      "id": "alcantarillado-primaria",
+      "type": "line",
+      "source": "alcantarillado",
+      "source-layer": "alcantarillado",
+      "layout": { "visibility": "none" },
+      "filter": ["==", ["get", "primaria"], true],
+      "paint": { "line-color": "#92400e", "line-width": 2.5 }
+    },
+    {
+      "id": "alcantarillado-secundaria",
+      "type": "line",
+      "source": "alcantarillado",
+      "source-layer": "alcantarillado",
+      "layout": { "visibility": "none" },
+      "filter": ["==", ["get", "primaria"], false],
+      "paint": { "line-color": "#c2884a", "line-width": 1.2 }
+    },
+    {
+      "id": "cajaaguaconexion-line",
+      "type": "line",
+      "source": "cajaaguaconexion",
+      "source-layer": "cajaaguaconexion",
+      "layout": { "visibility": "none" },
+      "paint": { "line-color": "#60a5fa", "line-width": 1, "line-dasharray": [2, 2] }
+    },
+    {
+      "id": "cajadesagueconexion-line",
+      "type": "line",
+      "source": "cajadesagueconexion",
+      "source-layer": "cajadesagueconexion",
+      "layout": { "visibility": "none" },
+      "paint": { "line-color": "#c2884a", "line-width": 1, "line-dasharray": [2, 2] }
+    },
+    {
+      "id": "buzones-circle",
+      "type": "circle",
+      "source": "buzones",
+      "source-layer": "buzones",
+      "layout": { "visibility": "none" },
+      "paint": { "circle-radius": 3, "circle-color": "#92400e" }
+    },
+    {
+      "id": "cajaagua-circle",
+      "type": "circle",
+      "source": "cajaagua",
+      "source-layer": "cajaagua",
+      "layout": { "visibility": "none" },
+      "paint": { "circle-radius": 3, "circle-color": "#2563eb" }
+    },
+    {
+      "id": "cajadesague-circle",
+      "type": "circle",
+      "source": "cajadesague",
+      "source-layer": "cajadesague",
+      "layout": { "visibility": "none" },
+      "paint": { "circle-radius": 3, "circle-color": "#92400e" }
+    }
+  ]
+}

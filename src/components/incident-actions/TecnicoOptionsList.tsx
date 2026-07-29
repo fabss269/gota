@@ -1,7 +1,8 @@
 import { Pressable, StyleSheet, Text, View } from 'react-native';
 
 import { Colors, Radius, Spacing } from '@/constants/theme';
-import { USUARIOS, type Usuario } from '@/mocks/usuariosMock';
+import { useUsuarios } from '@/hooks/useUsuarios';
+import type { Usuario } from '@/mocks/usuariosMock';
 
 const ROL_LABEL: Record<Usuario['rol'], string> = {
   tecnico: 'Técnico',
@@ -20,9 +21,11 @@ type Props = {
  * flujos usen el mismo componente en vez de duplicar el listado.
  */
 export function TecnicoOptionsList({ selectedId, onSelect }: Props) {
+  const { data: usuarios = [] } = useUsuarios();
+
   return (
     <>
-      {USUARIOS.map((usuario) => {
+      {usuarios.map((usuario) => {
         const initials = usuario.nombre
           .split(' ')
           .slice(0, 2)

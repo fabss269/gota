@@ -1,14 +1,13 @@
 import { useQuery } from '@tanstack/react-query';
 
-import { INCIDENCIAS_HOY } from '@/mocks/incidentsMock';
+import { apiFetch } from '@/api/client';
+import { toIncidencia } from '@/api/mappers';
+import type { ApiIncidenciaListResponse } from '@/api/types';
 import { useFiltersStore } from '@/state/filtersStore';
 
 /**
  * Trae las incidencias de hoy (Spec 03, RF-03.4) aplicando los filtros del Bottom
- * Sheet (Spec 04). Contra un backend real esto sería:
- *   GET /incidencias?fecha=hoy&categoria=...&prioridad=...  (ver docs/API.md § 3)
- * Hoy filtra el mock local — cambiar `queryFn` es el único punto de contacto para
- * conectar la API real.
+ * Sheet (Spec 04). `GET /incidencias?fecha=hoy&categoria=...&prioridad=...` (API.md § 3).
  */
 export function useIncidentsToday() {
   const categorias = useFiltersStore((s) => s.categorias);
@@ -19,14 +18,20 @@ export function useIncidentsToday() {
   return useQuery({
     queryKey: ['incidencias-hoy', categorias, prioridades, tipoAtencion, estado],
     queryFn: async () => {
-      await new Promise((resolve) => setTimeout(resolve, 300));
-      return INCIDENCIAS_HOY.filter(
-        (i) =>
-          categorias.includes(i.categoria) &&
-          prioridades.includes(i.prioridad) &&
-          (tipoAtencion === null || i.tipo === tipoAtencion) &&
-          (estado === null || i.estado === estado),
-      );
+      const params = new URLSearchParams({
+        fecha: 'hoy',
+        categoria: categorias.join(','),
+        prioridad: prioridades.join(','),
+        pageSize: '100',
+      });
+      if (tipoAtencion) params.set('tipoAtencionId', tipoAtencion);
+      if (estado) params.set('estado', estado);
+
+      const response = await apiFetch<ApiIncidenciaListResponse>(`/incidencias?${params.toString()}`);
+      // El mapa necesita coordenadas reales para agrupar/plotear — descartar las que
+      // el catastro no pudo resolver (suministro_codigo sin match en `sig`, ver
+      // memoria del backend) en vez de plotearlas en (0,0).
+      return response.items.filter((i) => i.lat !== null && i.lon !== null).map(toIncidencia);
     },
   });
 }

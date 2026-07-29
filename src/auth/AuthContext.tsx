@@ -1,6 +1,6 @@
 import { createContext, useContext, useEffect, useMemo, useState, type PropsWithChildren } from 'react';
 
-import { mockLogin } from '@/mocks/authMock';
+import { apiFetch } from '@/api/client';
 import {
   clearSession,
   getStoredSession,
@@ -8,6 +8,13 @@ import {
   saveSession,
   type StoredUser,
 } from '@/auth/session';
+
+type LoginResponse = {
+  accessToken: string;
+  refreshToken: string;
+  expiresIn: number;
+  usuario: StoredUser;
+};
 
 type AuthState = {
   isLoading: boolean;
@@ -34,8 +41,10 @@ export function AuthProvider({ children }: PropsWithChildren) {
   }, []);
 
   const signIn = async (correo: string, password: string) => {
-    // Spec 02, RF-02.3: contra backend real esto sería src/api/auth.ts -> POST /auth/login
-    const response = await mockLogin(correo, password);
+    const response = await apiFetch<LoginResponse>('/auth/login', {
+      method: 'POST',
+      body: JSON.stringify({ correo, password }),
+    });
     await saveSession({
       accessToken: response.accessToken,
       refreshToken: response.refreshToken,
