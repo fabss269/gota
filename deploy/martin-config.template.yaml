@@ -5,10 +5,20 @@
 #
 # Whitelist explícita de tablas de `sig` (bd_conhydra) — nunca `auto_publish: true`.
 # `sig` tiene otros schemas (adm, geoportal) con datos de usuarios/sesiones que NO deben
-# quedar expuestos como tiles públicos; y dentro de `sig` mismo hay tablas de catastro
-# (lotes, manzanas, vías) que el mapa de GOTA no necesita — solo se publican las que
-# specs/07-capas-red.md y EPSEL-MOVIL/src/components/map/MapView.web.tsx ya esperan
-# (CAPA_LAYER_IDS: agua, alcantarillado, buzones, cajaagua/cajadesague + sus conexiones).
+# quedar expuestos como tiles públicos.
+#
+# Capas activas en CAPA_LAYER_IDS (MapView.web.tsx):
+#   PREDIO       → manzanas, lotes
+#   ALCANTARILLADO → alcantarillado, cajadesagueconexion, cajadesague, buzones
+#   AGUA         → agua, cajaaguaconexion, cajaagua
+#
+# `sectores` no es un toggle de CAPA_LAYER_IDS: se resalta (línea gruesa + color por
+# sectorid) según la selección de UBICACIÓN en el sidebar (ver ubicacionStore +
+# MapView.web.tsx — filtro dinámico por sectorid, no un layer on/off fijo).
+#
+# `sectorid` está en todas las properties de abajo (incluyendo agua/cajaaguaconexion/
+# cajadesagueconexion) para que, al marcar un sector en UBICACIÓN, MapView.web.tsx
+# pueda filtrar TODAS las capas de catastro a ese sector, no solo el polígono.
 #
 # Estructura (schema/table/srid/geometry_column) verificada en vivo contra bd_conhydra
 # real con `martin --save-config` — no es una plantilla adivinada.
@@ -24,12 +34,8 @@ postgres:
       srid: 32719
       geometry_column: geom
       properties:
-        codigo: varchar
         aguatipoid: int4
-        materialid: int4
-        diametro: numeric
         sectorid: int4
-        distritoid: int4
     alcantarillado:
       schema: sig
       table: alcantarillado
@@ -77,6 +83,7 @@ postgres:
       properties:
         cajaaguaid: int4
         aguaid: int4
+        sectorid: int4
     cajadesagueconexion:
       schema: sig
       table: cajadesagueconexion
@@ -85,3 +92,45 @@ postgres:
       properties:
         cajadesagueid: int4
         alcantarilladoid: int4
+        sectorid: int4
+    manzanas:
+      schema: sig
+      table: manzanas
+      srid: 32719
+      geometry_column: geom
+      properties:
+        manzanaid: int4
+        manzana: varchar
+        sectorid: int4
+        distritoid: int4
+    lotes:
+      schema: sig
+      table: lotes
+      srid: 32719
+      geometry_column: geom
+      properties:
+        loteid: int4
+        manzanaid: int4
+        sectorid: int4
+        distritoid: int4
+    sectores:
+      schema: sig
+      table: sectores
+      srid: 32719
+      geometry_column: geom
+      properties:
+        sectorid: int4
+    alcantarillado_flujo:
+      # Vista materializada (Spec: mv_alcantarillado_flujo) — orienta cada tramo según
+      # el sentido real del flujo y ya trae `geom_flecha`: un triángulo en el punto
+      # medio del tramo, orientado hacia el sentido de flujo (NULL si no hay cotas
+      # válidas para calcularlo, ~20% de los tramos). Publicamos geom_flecha, no geom:
+      # la línea en sí ya se ve con alcantarillado-primaria/secundaria — lo nuevo acá
+      # es la flecha de dirección.
+      schema: sig
+      table: mv_alcantarillado_flujo
+      srid: 32719
+      geometry_column: geom_flecha
+      properties:
+        primaria: bool
+        sectorid: int4

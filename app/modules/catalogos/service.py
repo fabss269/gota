@@ -1,13 +1,17 @@
 from app.modules.catalogos.propia_repository import PropiaCatalogoRepository
-from app.modules.catalogos.schemas import DistritoOut, SectorOut, TipoAtencionOut
+from app.modules.catalogos.schemas import DistritoOut, ProvinciaOut, SectorOut, TipoAtencionOut
 from app.modules.catalogos.sig_repository import SigCatalogoRepository
 
 
 class SigCatalogoService:
-    """Distritos y sectores — viven en `sig`, no en la BD propia."""
+    """Provincias, distritos y sectores — viven en `sig`, no en la BD propia."""
 
     def __init__(self, repository: SigCatalogoRepository) -> None:
         self._repository = repository
+
+    async def listar_provincias(self) -> list[ProvinciaOut]:
+        filas = await self._repository.listar_provincias()
+        return [ProvinciaOut(**fila) for fila in filas]
 
     async def listar_distritos(self) -> list[DistritoOut]:
         filas = await self._repository.listar_distritos()

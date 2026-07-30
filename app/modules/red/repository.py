@@ -43,14 +43,9 @@ class SigRedRepository:
             SELECT jsonb_build_object(
                 'type', 'Feature',
                 'geometry', ST_AsGeoJSON(ST_Transform(t.geom, 4326))::jsonb,
-                'properties', jsonb_build_object(
-                    'codigo', t.codigo, 'diametroMm', t.diametro,
-                    'material', m.material, 'tipo', at.aguatipo
-                )
+                'properties', NULL
             )
             FROM sig.agua t
-            LEFT JOIN sig.materiales m ON m.materialid = t.materialid
-            LEFT JOIN sig.aguatipos at ON at.aguatipoid = t.aguatipoid
             {join}
             WHERE t.geom IS NOT NULL {where}
         """
