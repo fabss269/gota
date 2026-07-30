@@ -63,6 +63,12 @@ export type ApiPredioReclamo = { id: string; tipo: string; fecha: string };
 
 export type ApiUsuario = { id: string; nombre: string; rol: string; sector: string | null };
 
+export type ApiBbox = { minLon: number; minLat: number; maxLon: number; maxLat: number };
+export type ApiProvincia = { id: string; nombre: string; bbox: ApiBbox };
+export type ApiDistrito = { id: string; nombre: string; provinciaId: string; bbox: ApiBbox };
+export type ApiSector = { id: string; nombre: string; distritoId: string; bbox: ApiBbox };
+export type ApiSuministro = { lat: number; lon: number; sectorId: number | null; sectorNombre: string | null };
+
 export type ApiDashboardResumen = {
   kpis: {
     incidenciasAbiertasHoy: number;

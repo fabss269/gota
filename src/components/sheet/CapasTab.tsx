@@ -4,28 +4,22 @@ import { ActivityIndicator, Pressable, StyleSheet, Text, View } from 'react-nati
 import { Colors, Radius, Spacing } from '@/constants/theme';
 import { type CapaKey, useCapasStore } from '@/state/capasStore';
 
-const AGUA_CAPAS: { key: CapaKey; label: string; disabled?: boolean }[] = [
-  { key: 'red_potable', label: 'Red potable' },
-  { key: 'valvulas', label: 'Válvulas', disabled: true },
-  { key: 'grifos_contra_incendio', label: 'Grifos contra incendio', disabled: true },
+const PREDIO_CAPAS: { key: CapaKey; label: string }[] = [
+  { key: 'manzanas', label: 'Manzanas' },
+  { key: 'lotes', label: 'Lotes' },
 ];
 
-const DESAGUE_CAPAS: { key: CapaKey; label: string; disabled?: boolean }[] = [
-  { key: 'red_primaria_desague', label: 'Red primaria' },
+const AGUA_CAPAS: { key: CapaKey; label: string }[] = [
+  { key: 'red_potable', label: 'Red de agua potable' },
+];
+
+const DESAGUE_CAPAS: { key: CapaKey; label: string }[] = [
+  { key: 'red_primaria_desague', label: 'Red primaria (colectores)' },
   { key: 'red_secundaria_desague', label: 'Red secundaria' },
   { key: 'buzones', label: 'Buzones' },
 ];
 
-/**
- * Tab "Capas" del Bottom Sheet (Spec 04, RF-04.7 a RF-04.10).
- *
- * "Ver en el mapa" aplica la selección de verdad sobre las capas reales de catastro/red
- * (servidas por Martin desde `sig`, ver docs/ESTADO_PROYECTO.md) mostrando/ocultando
- * layers de MapLibre en MapView.web.tsx. "Válvulas" y "Grifos contra incendio" quedan
- * deshabilitados a propósito: no existe ninguna tabla/tipo de accesorio para eso en la
- * BD catastral (`sig.accesoriotipos` solo tiene conexiones/fittings de tubería) — no hay
- * geometría real que mostrar, así que no se simula una capa falsa.
- */
+/** Tab "Capas" del Bottom Sheet — versión móvil. Ver FiltersSidebar.tsx para la versión web. */
 export function CapasTab({ onAplicar }: { onAplicar: () => void }) {
   const capasVisibles = useCapasStore((s) => s.capasVisibles);
   const isApplying = useCapasStore((s) => s.isApplying);
@@ -66,9 +60,10 @@ export function CapasTab({ onAplicar }: { onAplicar: () => void }) {
         <Text style={styles.disabledLabel}>Chiclayo · Todos los distritos · Todos los sectores</Text>
       </View>
 
+      <CapaGroup title="Predio" dotColor={Colors.textMuted} items={PREDIO_CAPAS} seleccion={seleccion} onToggle={toggle} />
       <CapaGroup title="Agua" dotColor={Colors.agua} items={AGUA_CAPAS} seleccion={seleccion} onToggle={toggle} />
       <CapaGroup
-        title="Desagüe"
+        title="Alcantarillado"
         dotColor={Colors.desague}
         items={DESAGUE_CAPAS}
         seleccion={seleccion}

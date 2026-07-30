@@ -3,21 +3,77 @@ import 'maplibre-gl/dist/maplibre-gl.css';
 import { useEffect, useRef } from 'react';
 import { createRoot, type Root } from 'react-dom/client';
 
+import type { ApiBbox } from '@/api/types';
 import { IncidentMarker } from '@/components/map/IncidentMarker';
 import { type CapaKey, useCapasStore } from '@/state/capasStore';
+import { useMapSearchStore } from '@/state/mapSearchStore';
+import { useUbicacionStore } from '@/state/ubicacionStore';
 import type { IncidentCluster } from '@/utils/clusterIncidents';
 
-// Une cada checkbox de la pestaña "Capas" (Spec 04) con los layers reales del style.json
-// servido por Martin (docs/ESTADO_PROYECTO.md). "valvulas"/"grifos_contra_incendio" no
-// tienen entrada porque no existe esa geometría en `sig` — no hay layer que mostrar.
+// Une cada toggle de FiltersSidebar con los layers reales del style.json (Martin → sig).
 const CAPA_LAYER_IDS: Record<CapaKey, string[]> = {
-  red_potable: ['agua-matriz', 'agua-distribucion', 'cajaaguaconexion-line', 'cajaagua-circle'],
-  valvulas: [],
-  grifos_contra_incendio: [],
+  manzanas: ['manzanas-fill', 'manzanas-outline'],
+  lotes: ['lotes-fill', 'lotes-outline'],
+  red_potable: ['agua-red'],
+  conexion_agua: ['cajaaguaconexion-line'],
+  caja_agua: ['cajaagua-circle'],
   red_primaria_desague: ['alcantarillado-primaria'],
-  red_secundaria_desague: ['alcantarillado-secundaria', 'cajadesagueconexion-line', 'cajadesague-circle'],
+  red_secundaria_desague: ['alcantarillado-secundaria'],
+  conexion_desague: ['cajadesagueconexion-line'],
+  caja_desague: ['cajadesague-circle'],
   buzones: ['buzones-circle'],
+  flujo_desague: ['alcantarillado-flujo-flecha'],
+  // resaltar_sector no tiene layers propios acá: lo maneja aparte el efecto
+  // applySectorHighlight (necesita togglear el filtro, no solo la visibilidad).
+  resaltar_sector: [],
 };
+
+// Capas de catastro filtrables por sectorid cuando hay un sector activo en UBICACIÓN
+// (ver ubicacionStore.sectoresActivos) — todas las tablas de sig detrás de estas capas
+// tienen columna sectorid (agua/cajaaguaconexion/cajadesagueconexion la ganaron después,
+// ver conversación). alcantarillado-primaria/secundaria ya traen su propio filtro base
+// (primaria true/false) que hay que preservar combinándolo con el de sector.
+const CATASTRO_SECTOR_FILTER_LAYERS: { id: string; baseFilter?: maplibregl.FilterSpecification }[] = [
+  { id: 'manzanas-fill' },
+  { id: 'manzanas-outline' },
+  { id: 'lotes-fill' },
+  { id: 'lotes-outline' },
+  { id: 'agua-red' },
+  { id: 'cajaaguaconexion-line' },
+  { id: 'cajaagua-circle' },
+  { id: 'alcantarillado-primaria', baseFilter: ['==', ['get', 'primaria'], true] },
+  { id: 'alcantarillado-secundaria', baseFilter: ['==', ['get', 'primaria'], false] },
+  { id: 'alcantarillado-flujo-flecha' },
+  { id: 'cajadesagueconexion-line' },
+  { id: 'cajadesague-circle' },
+  { id: 'buzones-circle' },
+];
+
+// Tres capas por el mismo source "sectores" (ver map-style.json): relleno traslúcido,
+// halo blanco para que resalte sobre calles/fondos oscuros, y la línea de color encima.
+// El halo es blanco fijo — solo fill y line necesitan el match de color por sectorid.
+const SECTOR_LAYER_IDS = ['sectores-resaltado-fill', 'sectores-resaltado-halo', 'sectores-resaltado'];
+const SECTOR_COLOR_LAYER_IDS: [string, 'fill-color' | 'line-color'][] = [
+  ['sectores-resaltado-fill', 'fill-color'],
+  ['sectores-resaltado', 'line-color'],
+];
+
+// Ángulo dorado (137.508°) para repartir tonos lo más separados posible entre sí,
+// aunque los sectorid no sean consecutivos — evita que sectores vecinos por id
+// terminen con colores parecidos.
+function colorForSectorId(sectorId: string): string {
+  const hue = (Number(sectorId) * 137.508) % 360;
+  return `hsl(${hue.toFixed(0)}, 75%, 45%)`;
+}
+
+function unionBbox(boxes: ApiBbox[]): ApiBbox {
+  return boxes.reduce((acc, b) => ({
+    minLon: Math.min(acc.minLon, b.minLon),
+    minLat: Math.min(acc.minLat, b.minLat),
+    maxLon: Math.max(acc.maxLon, b.maxLon),
+    maxLat: Math.max(acc.maxLat, b.maxLat),
+  }));
+}
 
 // Chiclayo, Perú (Spec 03, RF-03.1 — centro por defecto si no hay incidencias).
 const DEFAULT_CENTER: [number, number] = [-79.8409, -6.7714];
@@ -66,6 +122,7 @@ export function EpselMapView({ clusters, onPressCluster }: Props) {
       zoom: 13,
       attributionControl: false,
     });
+    map.addControl(new maplibregl.NavigationControl({ showCompass: false }), 'bottom-right');
     mapRef.current = map;
     const markers = markersRef.current;
 
@@ -89,28 +146,172 @@ export function EpselMapView({ clusters, onPressCluster }: Props) {
     const map = mapRef.current;
     if (!map) return;
 
+    // Lee del store en el momento de ejecución (no del closure) para que
+    // re-disparos de styledata siempre usen el estado más reciente.
     const applyVisibility = () => {
+      const current = useCapasStore.getState().capasVisibles;
       for (const [key, layerIds] of Object.entries(CAPA_LAYER_IDS) as [CapaKey, string[]][]) {
-        const visible = capasVisibles.has(key);
+        const visible = current.has(key);
         for (const layerId of layerIds) {
           if (map.getLayer(layerId)) {
             map.setLayoutProperty(layerId, 'visibility', visible ? 'visible' : 'none');
           }
         }
       }
-      // "idle" confirma que MapLibre terminó de pedir/dibujar los tiles de las capas
-      // recién mostradas — recién ahí se apaga el loader del botón "Ver en el mapa".
       if (useCapasStore.getState().isApplying) {
         map.once('idle', () => useCapasStore.getState().setApplying(false));
       }
     };
 
-    if (map.isStyleLoaded()) {
-      applyVisibility();
-    } else {
-      map.once('load', applyVisibility);
-    }
+    // styledata se dispara cada vez que MapLibre termina de procesar el estilo
+    // (incluyendo la primera carga y cambios de estilo posteriores).
+    map.on('styledata', applyVisibility);
+
+    // Aplicar también de inmediato si el estilo ya está cargado.
+    if (map.isStyleLoaded()) applyVisibility();
+
+    return () => {
+      map.off('styledata', applyVisibility);
+    };
   }, [capasVisibles]);
+
+  const sectores = useUbicacionStore((state) => state.sectores);
+  const sectoresActivos = useUbicacionStore((state) => state.sectoresActivos);
+
+  useEffect(() => {
+    const map = mapRef.current;
+    if (!map) return;
+
+    const applySectorHighlight = () => {
+      if (!map.getLayer(SECTOR_LAYER_IDS[0])) return;
+
+      const currentSectores = useUbicacionStore.getState().sectores;
+      if (currentSectores.length > 0) {
+        const colorMatch: unknown[] = ['match', ['get', 'sectorid']];
+        for (const sector of currentSectores) {
+          colorMatch.push(Number(sector.id), colorForSectorId(sector.id));
+        }
+        colorMatch.push('#9E9E9E');
+        for (const [layerId, paintProp] of SECTOR_COLOR_LAYER_IDS) {
+          map.setPaintProperty(layerId, paintProp, colorMatch);
+        }
+      }
+
+      // El pintado es opcional (toggle "Resaltar sector" en UBICACIÓN): el sector
+      // sigue "activo" para filtrar catastro y mover la cámara, solo se deja de
+      // dibujar el polígono si el usuario no lo quiere ver.
+      const resaltarActivo = useCapasStore.getState().capasVisibles.has('resaltar_sector');
+      const idsActivos = resaltarActivo
+        ? [...useUbicacionStore.getState().sectoresActivos].map(Number)
+        : [];
+      const filtro: maplibregl.FilterSpecification = ['in', ['get', 'sectorid'], ['literal', idsActivos]];
+      for (const layerId of SECTOR_LAYER_IDS) {
+        map.setFilter(layerId, filtro);
+      }
+    };
+
+    map.on('styledata', applySectorHighlight);
+    if (map.isStyleLoaded()) applySectorHighlight();
+
+    return () => {
+      map.off('styledata', applySectorHighlight);
+    };
+  }, [sectores, sectoresActivos, capasVisibles]);
+
+  // Con un sector marcado, todo lo de catastro (predio, alcantarillado, agua) se
+  // acota a ese sector — sin sector activo, cada capa vuelve a su filtro base (o a
+  // ninguno) tal como estaba antes de marcar algo.
+  useEffect(() => {
+    const map = mapRef.current;
+    if (!map) return;
+
+    const applyCatastroSectorFilter = () => {
+      const idsActivos = [...useUbicacionStore.getState().sectoresActivos].map(Number);
+      const sectorFilter: maplibregl.FilterSpecification = ['in', ['get', 'sectorid'], ['literal', idsActivos]];
+
+      for (const { id, baseFilter } of CATASTRO_SECTOR_FILTER_LAYERS) {
+        if (!map.getLayer(id)) continue;
+        if (idsActivos.length === 0) {
+          map.setFilter(id, baseFilter ?? null);
+        } else {
+          const combinado = (
+            baseFilter ? ['all', baseFilter, sectorFilter] : sectorFilter
+          ) as maplibregl.FilterSpecification;
+          map.setFilter(id, combinado);
+        }
+      }
+    };
+
+    map.on('styledata', applyCatastroSectorFilter);
+    if (map.isStyleLoaded()) applyCatastroSectorFilter();
+
+    return () => {
+      map.off('styledata', applyCatastroSectorFilter);
+    };
+  }, [sectoresActivos]);
+
+  const provincias = useUbicacionStore((state) => state.provincias);
+  const distritos = useUbicacionStore((state) => state.distritos);
+  const provinciasActivas = useUbicacionStore((state) => state.provinciasActivas);
+  const distritosActivos = useUbicacionStore((state) => state.distritosActivos);
+  const lastBoundsKeyRef = useRef<string | null>(null);
+
+  // El nivel más específico con algo marcado manda la cámara: si hay un sector
+  // activo, gana sobre distrito/provincia (que igual siguen marcados como filtro
+  // de datos, solo dejan de mover el mapa). Varios ítems activos en el mismo nivel
+  // encuadran la unión de sus bbox.
+  useEffect(() => {
+    const map = mapRef.current;
+    if (!map) return;
+
+    const state = useUbicacionStore.getState();
+    let activos: { id: string; bbox: ApiBbox }[];
+    let nivel: string;
+
+    if (state.sectoresActivos.size > 0) {
+      activos = state.sectores.filter((s) => state.sectoresActivos.has(s.id));
+      nivel = 'sector';
+    } else if (state.distritosActivos.size > 0) {
+      activos = state.distritos.filter((d) => state.distritosActivos.has(d.id));
+      nivel = 'distrito';
+    } else if (state.provinciasActivas.size > 0) {
+      activos = state.provincias.filter((p) => state.provinciasActivas.has(p.id));
+      nivel = 'provincia';
+    } else {
+      return;
+    }
+
+    // Guarda defensiva: un catálogo cacheado por el navegador desde antes de que
+    // el backend empezara a mandar `bbox` (Cache-Control de estos endpoints es de
+    // 1h) puede traer items sin bbox — se ignoran en vez de romper el fitBounds.
+    activos = activos.filter((a) => a.bbox);
+    if (activos.length === 0) return;
+
+    const key = `${nivel}:${activos.map((a) => a.id).sort().join(',')}`;
+    if (key === lastBoundsKeyRef.current) return;
+    lastBoundsKeyRef.current = key;
+
+    const bbox = unionBbox(activos.map((a) => a.bbox));
+    // Un sector es un área mucho más chica que un distrito/provincia — permite un
+    // zoom más cercano (a nivel de manzana) en vez del tope de 17 que usan los
+    // niveles más grandes.
+    const maxZoom = nivel === 'sector' ? 19 : 17;
+    map.fitBounds(
+      [
+        [bbox.minLon, bbox.minLat],
+        [bbox.maxLon, bbox.maxLat],
+      ],
+      { padding: 48, maxZoom, duration: 800 }
+    );
+  }, [provincias, distritos, sectores, provinciasActivas, distritosActivos, sectoresActivos]);
+
+  const flyTarget = useMapSearchStore((state) => state.flyTarget);
+
+  useEffect(() => {
+    const map = mapRef.current;
+    if (!map || !flyTarget) return;
+    map.flyTo({ center: [flyTarget.lon, flyTarget.lat], zoom: flyTarget.zoom, duration: 1000 });
+  }, [flyTarget]);
 
   useEffect(() => {
     const map = mapRef.current;

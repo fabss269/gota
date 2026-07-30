@@ -1,0 +1,50 @@
+env: load .env
+env: export EXPO_PUBLIC_API_BASE_URL EXPO_PUBLIC_MAP_STYLE_URL
+Starting project at D:\GOTA\EPSEL-MOVIL
+Using src/app as the root directory for Expo Router.
+React Compiler enabled
+Starting Metro Bundler
+
+Waiting on http://localhost:8081
+
+An update for expo is available: 57.0.7 → ~57.0.8
+6 other packages may need updating. Run npx expo install --check for details.
+Logs for your project will appear below.
+λ Bundled 66187ms node_modules\expo\node_modules\@expo\cli\node_modules\@expo\router-server\node\render.js (1801 modules)
+"shadow*" style props are deprecated. Use "boxShadow".
+Web Bundled 76692ms node_modules\expo-router\entry.js (1679 modules)
+λ Bundled 409ms node_modules\expo\node_modules\@expo\cli\node_modules\@expo\router-server\node\render.js (1 module)
+"shadow*" style props are deprecated. Use "boxShadow".
+Web Bundled 1497ms node_modules\expo-router\entry.js (1 module)
+Web Bundled 29619ms node_modules\expo-router\entry.js (1684 modules)
+Web  INFO  %cDownload the React DevTools for a better development experience: https://react.dev/link/react-devtools font-weight:bold
+Web  LOG  Running application "main" with appParams:
+ {"hydrate": undefined, "rootTag": "#root"} 
+Development-level warnings: ON.
+Performance optimizations: OFF.
+Web  WARN  "shadow*" style props are deprecated. Use "boxShadow".
+λ Bundled 126ms node_modules\expo\node_modules\@expo\cli\node_modules\@expo\router-server\node\render.js (1 module)
+"shadow*" style props are deprecated. Use "boxShadow".
+Web Bundled 1994ms node_modules\expo-router\entry.js (1 module)
+Web Bundled 159ms node_modules\expo-router\entry.js (1 module)
+Web  INFO  %cDownload the React DevTools for a better development experience: https://react.dev/link/react-devtools font-weight:bold
+Web  LOG  Running application "main" with appParams:
+ {"hydrate": undefined, "rootTag": "#root"} 
+Development-level warnings: ON.
+Performance optimizations: OFF.
+Web  WARN  "shadow*" style props are deprecated. Use "boxShadow".
+Web  WARN  props.pointerEvents is deprecated. Use style.pointerEvents
+λ Bundled 91ms node_modules\expo\node_modules\@expo\cli\node_modules\@expo\router-server\node\render.js (1 module)
+"shadow*" style props are deprecated. Use "boxShadow".
+Web Bundled 1188ms node_modules\expo-router\entry.js (1 module)
+Web Bundled 104ms node_modules\expo-router\entry.js (1 module)
+Web  INFO  %cDownload the React DevTools for a better development experience: https://react.dev/link/react-devtools font-weight:bold
+Web  LOG  Running application "main" with appParams:
+ {"hydrate": undefined, "rootTag": "#root"} 
+Development-level warnings: ON.
+Performance optimizations: OFF.
+Web  WARN  "shadow*" style props are deprecated. Use "boxShadow".
+Web  WARN  props.pointerEvents is deprecated. Use style.pointerEvents
+λ Bundled 80ms node_modules\expo\node_modules\@expo\cli\node_modules\@expo\router-server\node\render.js (1 module)
+"shadow*" style props are deprecated. Use "boxShadow".
+Web Bundled 1275ms node_modules\expo-router\entry.js (1 module)

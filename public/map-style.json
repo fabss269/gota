@@ -9,6 +9,14 @@
       "maxzoom": 19,
       "attribution": "© OpenStreetMap contributors"
     },
+    "manzanas": {
+      "type": "vector",
+      "tiles": ["http://localhost:3000/manzanas/{z}/{x}/{y}"]
+    },
+    "lotes": {
+      "type": "vector",
+      "tiles": ["http://localhost:3000/lotes/{z}/{x}/{y}"]
+    },
     "agua": {
       "type": "vector",
       "tiles": ["http://localhost:3000/agua/{z}/{x}/{y}"]
@@ -36,28 +44,77 @@
     "cajadesagueconexion": {
       "type": "vector",
       "tiles": ["http://localhost:3000/cajadesagueconexion/{z}/{x}/{y}"]
+    },
+    "sectores": {
+      "type": "vector",
+      "tiles": ["http://localhost:3000/sectores/{z}/{x}/{y}"]
+    },
+    "alcantarillado_flujo": {
+      "type": "vector",
+      "tiles": ["http://localhost:3000/alcantarillado_flujo/{z}/{x}/{y}"]
     }
   },
   "layers": [
     { "id": "osm", "type": "raster", "source": "osm" },
+
     {
-      "id": "agua-matriz",
+      "id": "manzanas-fill",
+      "type": "fill",
+      "source": "manzanas",
+      "source-layer": "manzanas",
+      "layout": { "visibility": "none" },
+      "paint": { "fill-color": "#BDBDBD", "fill-opacity": 0.08 }
+    },
+    {
+      "id": "manzanas-outline",
+      "type": "line",
+      "source": "manzanas",
+      "source-layer": "manzanas",
+      "layout": { "visibility": "none" },
+      "paint": { "line-color": "#546472", "line-width": 1.4, "line-opacity": 0.85 }
+    },
+    {
+      "id": "lotes-fill",
+      "type": "fill",
+      "source": "lotes",
+      "source-layer": "lotes",
+      "layout": { "visibility": "none" },
+      "paint": { "fill-color": "#FFFFFF", "fill-opacity": 0.03 }
+    },
+    {
+      "id": "lotes-outline",
+      "type": "line",
+      "source": "lotes",
+      "source-layer": "lotes",
+      "layout": { "visibility": "none" },
+      "paint": { "line-color": "#8A97A3", "line-width": 0.9, "line-opacity": 0.8 }
+    },
+
+    {
+      "id": "agua-red",
       "type": "line",
       "source": "agua",
       "source-layer": "agua",
       "layout": { "visibility": "none" },
-      "filter": ["all", ["!=", ["get", "diametro"], null], [">=", ["get", "diametro"], 6]],
-      "paint": { "line-color": "#2563eb", "line-width": 2.5 }
+      "paint": { "line-color": "#2563EB", "line-width": 1.8 }
     },
     {
-      "id": "agua-distribucion",
+      "id": "cajaaguaconexion-line",
       "type": "line",
-      "source": "agua",
-      "source-layer": "agua",
+      "source": "cajaaguaconexion",
+      "source-layer": "cajaaguaconexion",
       "layout": { "visibility": "none" },
-      "filter": ["any", ["==", ["get", "diametro"], null], ["<", ["get", "diametro"], 6]],
-      "paint": { "line-color": "#60a5fa", "line-width": 1.2 }
+      "paint": { "line-color": "#60A5FA", "line-width": 1, "line-dasharray": [2, 2] }
     },
+    {
+      "id": "cajaagua-circle",
+      "type": "circle",
+      "source": "cajaagua",
+      "source-layer": "cajaagua",
+      "layout": { "visibility": "none" },
+      "paint": { "circle-radius": 3, "circle-color": "#06B6D4" }
+    },
+
     {
       "id": "alcantarillado-primaria",
       "type": "line",
@@ -65,7 +122,7 @@
       "source-layer": "alcantarillado",
       "layout": { "visibility": "none" },
       "filter": ["==", ["get", "primaria"], true],
-      "paint": { "line-color": "#92400e", "line-width": 2.5 }
+      "paint": { "line-color": "#E53935", "line-width": 2.5 }
     },
     {
       "id": "alcantarillado-secundaria",
@@ -74,15 +131,15 @@
       "source-layer": "alcantarillado",
       "layout": { "visibility": "none" },
       "filter": ["==", ["get", "primaria"], false],
-      "paint": { "line-color": "#c2884a", "line-width": 1.2 }
+      "paint": { "line-color": "#FB8C00", "line-width": 1.2 }
     },
     {
-      "id": "cajaaguaconexion-line",
-      "type": "line",
-      "source": "cajaaguaconexion",
-      "source-layer": "cajaaguaconexion",
+      "id": "alcantarillado-flujo-flecha",
+      "type": "fill",
+      "source": "alcantarillado_flujo",
+      "source-layer": "alcantarillado_flujo",
       "layout": { "visibility": "none" },
-      "paint": { "line-color": "#60a5fa", "line-width": 1, "line-dasharray": [2, 2] }
+      "paint": { "fill-color": "#B71C1C", "fill-opacity": 0.9 }
     },
     {
       "id": "cajadesagueconexion-line",
@@ -90,23 +147,7 @@
       "source": "cajadesagueconexion",
       "source-layer": "cajadesagueconexion",
       "layout": { "visibility": "none" },
-      "paint": { "line-color": "#c2884a", "line-width": 1, "line-dasharray": [2, 2] }
-    },
-    {
-      "id": "buzones-circle",
-      "type": "circle",
-      "source": "buzones",
-      "source-layer": "buzones",
-      "layout": { "visibility": "none" },
-      "paint": { "circle-radius": 3, "circle-color": "#92400e" }
-    },
-    {
-      "id": "cajaagua-circle",
-      "type": "circle",
-      "source": "cajaagua",
-      "source-layer": "cajaagua",
-      "layout": { "visibility": "none" },
-      "paint": { "circle-radius": 3, "circle-color": "#2563eb" }
+      "paint": { "line-color": "#FB8C00", "line-width": 1, "line-dasharray": [2, 2] }
     },
     {
       "id": "cajadesague-circle",
@@ -114,7 +155,43 @@
       "source": "cajadesague",
       "source-layer": "cajadesague",
       "layout": { "visibility": "none" },
-      "paint": { "circle-radius": 3, "circle-color": "#92400e" }
+      "paint": { "circle-radius": 3, "circle-color": "#795548" }
+    },
+    {
+      "id": "buzones-circle",
+      "type": "circle",
+      "source": "buzones",
+      "source-layer": "buzones",
+      "layout": { "visibility": "none" },
+      "paint": { "circle-radius": 4, "circle-color": "#757575" }
+    },
+
+    {
+      "id": "sectores-resaltado-fill",
+      "type": "fill",
+      "source": "sectores",
+      "source-layer": "sectores",
+      "layout": { "visibility": "visible" },
+      "filter": ["in", ["get", "sectorid"], ["literal", []]],
+      "paint": { "fill-color": "#9E9E9E", "fill-opacity": 0.12 }
+    },
+    {
+      "id": "sectores-resaltado-halo",
+      "type": "line",
+      "source": "sectores",
+      "source-layer": "sectores",
+      "layout": { "visibility": "visible" },
+      "filter": ["in", ["get", "sectorid"], ["literal", []]],
+      "paint": { "line-color": "#FFFFFF", "line-width": 5.5 }
+    },
+    {
+      "id": "sectores-resaltado",
+      "type": "line",
+      "source": "sectores",
+      "source-layer": "sectores",
+      "layout": { "visibility": "visible" },
+      "filter": ["in", ["get", "sectorid"], ["literal", []]],
+      "paint": { "line-color": "#9E9E9E", "line-width": 2.5 }
     }
   ]
 }

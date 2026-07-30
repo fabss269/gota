@@ -14,16 +14,14 @@ type FiltersState = {
   mapMode: MapMode;
   toggleCategoria: (categoria: Categoria) => void;
   togglePrioridad: (prioridad: Prioridad) => void;
+  setPrioridades: (prioridades: Prioridad[]) => void;
   setTipoAtencion: (tipoAtencion: string | null) => void;
   setEstado: (estado: EstadoIncidencia | null) => void;
   setMapMode: (mode: MapMode) => void;
   reset: () => void;
 };
 
-const DEFAULTS: Pick<
-  FiltersState,
-  'categorias' | 'prioridades' | 'tipoAtencion' | 'estado' | 'mapMode'
-> = {
+const DEFAULTS: Pick<FiltersState, 'categorias' | 'prioridades' | 'tipoAtencion' | 'estado' | 'mapMode'> = {
   categorias: ['agua', 'desague'],
   prioridades: ['a_tiempo', 'alerta', 'critica'],
   tipoAtencion: null,
@@ -50,6 +48,7 @@ export const useFiltersStore = create<FiltersState>((set) => ({
       const next = has ? state.prioridades.filter((p) => p !== prioridad) : [...state.prioridades, prioridad];
       return next.length > 0 ? { prioridades: next } : state;
     }),
+  setPrioridades: (prioridades) => set({ prioridades }),
   setTipoAtencion: (tipoAtencion) => set({ tipoAtencion }),
   setEstado: (estado) => set({ estado }),
   setMapMode: (mapMode) => set({ mapMode }),

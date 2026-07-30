@@ -1,0 +1,238 @@
+import type { CSSProperties } from 'react';
+import BottomSheet from '@gorhom/bottom-sheet';
+import { useNavigation, useRouter } from 'expo-router';
+import { useMemo, useRef, useState } from 'react';
+import { Alert, Pressable, StyleSheet, Text, useWindowDimensions, View } from 'react-native';
+import Animated, { useAnimatedStyle, useSharedValue, withTiming } from 'react-native-reanimated';
+import { SafeAreaView } from 'react-native-safe-area-context';
+
+import { DetailPanel } from '@/components/incident-detail/DetailPanel';
+import { FiltersSidebar } from '@/components/map/FiltersSidebar';
+import { LocationSearchBar } from '@/components/map/LocationSearchBar';
+import { EpselMapView } from '@/components/map/MapView';
+import { MapModeSheet } from '@/components/map/MapModeSheet';
+import { MapBottomSheet } from '@/components/sheet/MapBottomSheet';
+import { Colors, Radius } from '@/constants/theme';
+import { useIncidentsToday } from '@/hooks/useIncidentsToday';
+import { openDrawer } from '@/navigation/openDrawer';
+import { useFiltersStore } from '@/state/filtersStore';
+import { clusterIncidents, type IncidentCluster } from '@/utils/clusterIncidents';
+
+const DESKTOP_BP = 768;
+
+/**
+ * Pantalla Mapa — variante web.
+ * - ≥768px: layout de 3 columnas (sidebar filtros | mapa | panel detalle)
+ * - <768px:  mismo layout móvil que index.tsx (bottom sheet, drawer, etc.)
+ */
+export default function MapaScreen() {
+  const { width } = useWindowDimensions();
+  const router = useRouter();
+  const isDesktop = width >= DESKTOP_BP;
+
+  const { data: incidencias = [], isLoading, isError, refetch } = useIncidentsToday();
+  const clusters = useMemo(() => clusterIncidents(incidencias), [incidencias]);
+
+  const [selectedId, setSelectedId] = useState<string | null>(null);
+
+  const handleClusterPress = (cluster: IncidentCluster) => {
+    if (cluster.count === 1) {
+      const id = cluster.incidencias[0].id;
+      if (isDesktop) {
+        setSelectedId(id);
+      } else {
+        router.push({ pathname: '/incidencia/[id]', params: { id } });
+      }
+      return;
+    }
+    Alert.alert(
+      `${cluster.count} incidencias`,
+      cluster.incidencias.map((i) => `• ${i.tipo} — ${i.direccion}`).join('\n'),
+    );
+  };
+
+  if (!isDesktop) {
+    return (
+      <MobileLayout
+        clusters={clusters}
+        onPressCluster={handleClusterPress}
+        isLoading={isLoading}
+        isError={isError}
+        onRefetch={refetch}
+      />
+    );
+  }
+
+  return (
+    <div style={desktopRoot}>
+      {/* Columna izquierda: filtros + capas */}
+      <FiltersSidebar />
+
+      {/* Columna central: mapa */}
+      <div style={centerCol}>
+        <EpselMapView clusters={clusters} onPressCluster={handleClusterPress} />
+
+        {/* Buscador de dirección / suministro */}
+        <LocationSearchBar />
+
+        {/* Banners de estado */}
+        {isLoading && <div style={banner}>Cargando incidencias de hoy…</div>}
+        {isError && (
+          <div
+            style={{ ...banner, backgroundColor: '#FDECEC', cursor: 'pointer' }}
+            onClick={() => refetch()}
+          >
+            No se pudo cargar. Clic para reintentar.
+          </div>
+        )}
+      </div>
+
+      {/* Columna derecha: panel de detalle (visible al seleccionar un marcador) */}
+      {selectedId && (
+        <DetailPanel incidenciaId={selectedId} onClose={() => setSelectedId(null)} />
+      )}
+    </div>
+  );
+}
+
+// ── Layout móvil (replicado de index.tsx) ────────────────────────────
+
+const AnimatedPressable = Animated.createAnimatedComponent(Pressable);
+
+function MobileLayout({
+  clusters,
+  onPressCluster,
+  isLoading,
+  isError,
+  onRefetch,
+}: {
+  clusters: IncidentCluster[];
+  onPressCluster: (cluster: IncidentCluster) => void;
+  isLoading: boolean;
+  isError: boolean;
+  onRefetch: () => void;
+}) {
+  const navigation = useNavigation();
+  const bottomSheetRef = useRef<BottomSheet>(null);
+  const [mapModeVisible, setMapModeVisible] = useState(false);
+  const mapMode = useFiltersStore((s) => s.mapMode);
+
+  const { height: windowHeight } = useWindowDimensions();
+  const GAP = 16;
+  const SNAP_COLAPSADO = 0.14;
+  const mapModeBottom = useSharedValue(windowHeight * SNAP_COLAPSADO + GAP);
+  const mapModeStyle = useAnimatedStyle(() => ({ bottom: mapModeBottom.value }));
+
+  const onSheetPositionChange = (sheetTopY: number) => {
+    // eslint-disable-next-line react-hooks/immutability
+    mapModeBottom.value = withTiming(windowHeight - sheetTopY + GAP, { duration: 250 });
+  };
+
+  return (
+    <View style={mobile.flex}>
+      <EpselMapView clusters={clusters} onPressCluster={onPressCluster} />
+
+      <SafeAreaView style={mobile.overlay} pointerEvents="box-none">
+        <Pressable style={mobile.menuBtn} onPress={() => openDrawer(navigation)}>
+          <Text style={mobile.menuIcon}>☰</Text>
+        </Pressable>
+
+        <AnimatedPressable
+          style={[mobile.mapModeBtn, mapModeStyle]}
+          onPress={() => setMapModeVisible(true)}
+        >
+          <Text style={mobile.mapModeIcon}>🗺️</Text>
+        </AnimatedPressable>
+
+        {mapMode !== 'normal' && (
+          <View style={mobile.modeBadge}>
+            <Text style={mobile.modeBadgeText}>
+              {mapMode === 'calor' ? 'Mapa de calor' : 'Mapa de foco'}
+            </Text>
+          </View>
+        )}
+      </SafeAreaView>
+
+      {isLoading && (
+        <View style={mobile.statusBanner}>
+          <Text style={mobile.statusText}>Cargando incidencias de hoy…</Text>
+        </View>
+      )}
+      {isError && (
+        <Pressable style={[mobile.statusBanner, mobile.errorBanner]} onPress={onRefetch}>
+          <Text style={mobile.statusText}>No se pudo cargar. Toca para reintentar.</Text>
+        </Pressable>
+      )}
+
+      <MapModeSheet visible={mapModeVisible} onClose={() => setMapModeVisible(false)} />
+      <MapBottomSheet ref={bottomSheetRef} onSheetPositionChange={onSheetPositionChange} />
+    </View>
+  );
+}
+
+// ── Estilos desktop (CSS) ─────────────────────────────────────────────
+
+const desktopRoot: CSSProperties = {
+  display: 'flex',
+  height: '100vh',
+  overflow: 'hidden',
+  backgroundColor: '#F0F2F5',
+};
+
+const centerCol: CSSProperties = {
+  flex: 1,
+  position: 'relative',
+  overflow: 'hidden',
+};
+
+const banner: CSSProperties = {
+  position: 'absolute',
+  top: 52,
+  left: '50%',
+  transform: 'translateX(-50%)',
+  backgroundColor: 'white',
+  padding: '6px 14px',
+  borderRadius: 999,
+  fontSize: 12,
+  fontWeight: '600',
+  color: '#212121',
+  boxShadow: '0 1px 4px rgba(0,0,0,0.12)',
+  zIndex: 10,
+  whiteSpace: 'nowrap',
+};
+
+// ── Estilos móvil (RN StyleSheet) ────────────────────────────────────
+
+const mobile = StyleSheet.create({
+  flex: { flex: 1 },
+  overlay: { position: 'absolute', top: 0, left: 0, right: 0, bottom: 0 },
+  menuBtn: {
+    position: 'absolute', top: 16, left: 16,
+    width: 48, height: 48, borderRadius: 24,
+    backgroundColor: Colors.primaryDark,
+    alignItems: 'center', justifyContent: 'center', elevation: 4,
+  },
+  menuIcon: { color: Colors.white, fontSize: 20 },
+  mapModeBtn: {
+    position: 'absolute', left: 16,
+    width: 48, height: 48, borderRadius: 24,
+    backgroundColor: Colors.white,
+    alignItems: 'center', justifyContent: 'center', elevation: 4,
+  },
+  mapModeIcon: { fontSize: 20 },
+  modeBadge: {
+    position: 'absolute', top: 16, alignSelf: 'center',
+    backgroundColor: Colors.primaryDark,
+    paddingHorizontal: 12, paddingVertical: 6,
+    borderRadius: Radius.pill,
+  },
+  modeBadgeText: { color: Colors.white, fontWeight: '700', fontSize: 12 },
+  statusBanner: {
+    position: 'absolute', top: 76, alignSelf: 'center',
+    backgroundColor: Colors.white,
+    paddingHorizontal: 14, paddingVertical: 8,
+    borderRadius: Radius.pill, elevation: 4,
+  },
+  errorBanner: { backgroundColor: '#FDECEC' },
+  statusText: { fontSize: 12, fontWeight: '600', color: Colors.textBody },
+});
