@@ -54,16 +54,6 @@ puerto publicado), `backend`, `martin` y `redis` en una sola red docker (`gota`)
 BD (`bd_conhydra`, esquemas `gota`+`sig`) es **externa**, no hay contenedor `postgres`
 propio. Ver `deploy/.env.example` para las variables reales.
 
-**Antes del primer deploy**, aplicar el esquema `gota` una sola vez contra la BD de
-producción (confirmar antes que no exista ya, para no pisar nada):
-```bash
-psql -h 172.16.5.222 -U postgres -d bd_conhydra -c "\dn"
-psql -h 172.16.5.222 -U postgres -d bd_conhydra -f vp_gota_create.ddl
-```
-
-Pendiente (no resuelto en este cambio, ver plan de la sesión que lo introdujo):
-crear roles de Postgres dedicados (uno dueño de `gota`, uno de solo lectura para
-`sig`) en vez de usar el superusuario `postgres` para el servicio real; TLS/HTTPS
-delante de nginx; migrar la BD OLAP (datamart, DDL en
-`~/Documentos/epsel_gota_datamart_star_schema.sql`) a producción como base de datos
-separada en el mismo servicio Postgres.
+Guía completa, paso a paso (setup del servidor, self-hosted runners, aplicar el
+DDL, primer deploy, verificación):
+[`deploy/PRODUCTION_DEPLOY.md`](./deploy/PRODUCTION_DEPLOY.md).

@@ -1,0 +1,16 @@
+INFO:     Will watch for changes in these directories: ['/home/ivaned/gota-backend']
+INFO:     Uvicorn running on http://127.0.0.1:8123 (Press CTRL+C to quit)
+INFO:     Started reloader process [54321] using WatchFiles
+INFO:     Started server process [54324]
+INFO:     Waiting for application startup.
+INFO:     Application startup complete.
+INFO:     127.0.0.1:60560 - "GET /health HTTP/1.1" 200 OK
+INFO:     127.0.0.1:36056 - "GET / HTTP/1.1" 404 Not Found
+INFO:     127.0.0.1:36056 - "GET / HTTP/1.1" 404 Not Found
+INFO:     127.0.0.1:36068 - "GET /favicon.ico HTTP/1.1" 404 Not Found
+INFO:     127.0.0.1:36068 - "GET /favicon.ico HTTP/1.1" 404 Not Found
+INFO:     Shutting down
+INFO:     Waiting for application shutdown.
+INFO:     Application shutdown complete.
+INFO:     Finished server process [54324]
+INFO:     Stopping reloader process [54321]
