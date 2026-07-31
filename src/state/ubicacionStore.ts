@@ -21,6 +21,9 @@ type UbicacionState = {
   toggleProvincia: (provinciaId: string) => void;
   toggleDistrito: (distritoId: string) => void;
   toggleSector: (sectorId: string) => void;
+  // Selección única (combo box de distrito, versión móvil — ver UbicacionPicker.tsx)
+  // a diferencia de toggleDistrito (multi-select, usado por FiltersSidebar en web).
+  seleccionarDistrito: (distritoId: string | null) => void;
 };
 
 export const useUbicacionStore = create<UbicacionState>((set, get) => ({
@@ -107,5 +110,14 @@ export const useUbicacionStore = create<UbicacionState>((set, get) => ({
         next.add(sectorId);
       }
       return { sectoresActivos: next };
+    }),
+
+  // Reemplaza (no acumula) el distrito activo y limpia los sectores del distrito
+  // anterior — mismo criterio de "colapsar limpia hijos" que toggleDistrito, pero
+  // como reemplazo en vez de acumulación (combo box: un solo valor a la vez).
+  seleccionarDistrito: (distritoId) =>
+    set({
+      distritosActivos: new Set(distritoId ? [distritoId] : []),
+      sectoresActivos: new Set(),
     }),
 }));

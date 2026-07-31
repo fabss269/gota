@@ -5,75 +5,18 @@ import { createRoot, type Root } from 'react-dom/client';
 
 import type { ApiBbox } from '@/api/types';
 import { IncidentMarker } from '@/components/map/IncidentMarker';
+import {
+  CAPA_LAYER_IDS,
+  CATASTRO_SECTOR_FILTER_LAYERS,
+  SECTOR_COLOR_LAYER_IDS,
+  SECTOR_LAYER_IDS,
+  colorForSectorId,
+  unionBbox,
+} from '@/components/map/mapLayers';
 import { type CapaKey, useCapasStore } from '@/state/capasStore';
 import { useMapSearchStore } from '@/state/mapSearchStore';
 import { useUbicacionStore } from '@/state/ubicacionStore';
 import type { IncidentCluster } from '@/utils/clusterIncidents';
-
-// Une cada toggle de FiltersSidebar con los layers reales del style.json (Martin → sig).
-const CAPA_LAYER_IDS: Record<CapaKey, string[]> = {
-  manzanas: ['manzanas-fill', 'manzanas-outline'],
-  lotes: ['lotes-fill', 'lotes-outline'],
-  red_potable: ['agua-red'],
-  conexion_agua: ['cajaaguaconexion-line'],
-  caja_agua: ['cajaagua-circle'],
-  red_primaria_desague: ['alcantarillado-primaria'],
-  red_secundaria_desague: ['alcantarillado-secundaria'],
-  conexion_desague: ['cajadesagueconexion-line'],
-  caja_desague: ['cajadesague-circle'],
-  buzones: ['buzones-circle'],
-  flujo_desague: ['alcantarillado-flujo-flecha'],
-  // resaltar_sector no tiene layers propios acá: lo maneja aparte el efecto
-  // applySectorHighlight (necesita togglear el filtro, no solo la visibilidad).
-  resaltar_sector: [],
-};
-
-// Capas de catastro filtrables por sectorid cuando hay un sector activo en UBICACIÓN
-// (ver ubicacionStore.sectoresActivos) — todas las tablas de sig detrás de estas capas
-// tienen columna sectorid (agua/cajaaguaconexion/cajadesagueconexion la ganaron después,
-// ver conversación). alcantarillado-primaria/secundaria ya traen su propio filtro base
-// (primaria true/false) que hay que preservar combinándolo con el de sector.
-const CATASTRO_SECTOR_FILTER_LAYERS: { id: string; baseFilter?: maplibregl.FilterSpecification }[] = [
-  { id: 'manzanas-fill' },
-  { id: 'manzanas-outline' },
-  { id: 'lotes-fill' },
-  { id: 'lotes-outline' },
-  { id: 'agua-red' },
-  { id: 'cajaaguaconexion-line' },
-  { id: 'cajaagua-circle' },
-  { id: 'alcantarillado-primaria', baseFilter: ['==', ['get', 'primaria'], true] },
-  { id: 'alcantarillado-secundaria', baseFilter: ['==', ['get', 'primaria'], false] },
-  { id: 'alcantarillado-flujo-flecha' },
-  { id: 'cajadesagueconexion-line' },
-  { id: 'cajadesague-circle' },
-  { id: 'buzones-circle' },
-];
-
-// Tres capas por el mismo source "sectores" (ver map-style.json): relleno traslúcido,
-// halo blanco para que resalte sobre calles/fondos oscuros, y la línea de color encima.
-// El halo es blanco fijo — solo fill y line necesitan el match de color por sectorid.
-const SECTOR_LAYER_IDS = ['sectores-resaltado-fill', 'sectores-resaltado-halo', 'sectores-resaltado'];
-const SECTOR_COLOR_LAYER_IDS: [string, 'fill-color' | 'line-color'][] = [
-  ['sectores-resaltado-fill', 'fill-color'],
-  ['sectores-resaltado', 'line-color'],
-];
-
-// Ángulo dorado (137.508°) para repartir tonos lo más separados posible entre sí,
-// aunque los sectorid no sean consecutivos — evita que sectores vecinos por id
-// terminen con colores parecidos.
-function colorForSectorId(sectorId: string): string {
-  const hue = (Number(sectorId) * 137.508) % 360;
-  return `hsl(${hue.toFixed(0)}, 75%, 45%)`;
-}
-
-function unionBbox(boxes: ApiBbox[]): ApiBbox {
-  return boxes.reduce((acc, b) => ({
-    minLon: Math.min(acc.minLon, b.minLon),
-    minLat: Math.min(acc.minLat, b.minLat),
-    maxLon: Math.max(acc.maxLon, b.maxLon),
-    maxLat: Math.max(acc.maxLat, b.maxLat),
-  }));
-}
 
 // Chiclayo, Perú (Spec 03, RF-03.1 — centro por defecto si no hay incidencias).
 const DEFAULT_CENTER: [number, number] = [-79.8409, -6.7714];
@@ -232,7 +175,7 @@ export function EpselMapView({ clusters, onPressCluster }: Props) {
       for (const { id, baseFilter } of CATASTRO_SECTOR_FILTER_LAYERS) {
         if (!map.getLayer(id)) continue;
         if (idsActivos.length === 0) {
-          map.setFilter(id, baseFilter ?? null);
+          map.setFilter(id, (baseFilter as maplibregl.FilterSpecification | undefined) ?? null);
         } else {
           const combinado = (
             baseFilter ? ['all', baseFilter, sectorFilter] : sectorFilter

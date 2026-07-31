@@ -2,6 +2,7 @@ import { useEffect, useState } from 'react';
 import { ActivityIndicator, Pressable, StyleSheet, Text, View } from 'react-native';
 
 import { Colors, Radius, Spacing } from '@/constants/theme';
+import { UbicacionPicker } from '@/components/map/UbicacionPicker';
 import { type CapaKey, useCapasStore } from '@/state/capasStore';
 
 const PREDIO_CAPAS: { key: CapaKey; label: string }[] = [
@@ -56,9 +57,7 @@ export function CapasTab({ onAplicar }: { onAplicar: () => void }) {
   return (
     <View style={styles.container}>
       <Text style={styles.sectionTitle}>Ubicación</Text>
-      <View style={styles.disabledRow}>
-        <Text style={styles.disabledLabel}>Chiclayo · Todos los distritos · Todos los sectores</Text>
-      </View>
+      <UbicacionPicker />
 
       <CapaGroup title="Predio" dotColor={Colors.textMuted} items={PREDIO_CAPAS} seleccion={seleccion} onToggle={toggle} />
       <CapaGroup title="Agua" dotColor={Colors.agua} items={AGUA_CAPAS} seleccion={seleccion} onToggle={toggle} />
@@ -129,14 +128,6 @@ function CapaGroup({
 const styles = StyleSheet.create({
   container: { paddingHorizontal: Spacing.md, paddingBottom: Spacing.xl, gap: Spacing.sm },
   sectionTitle: { fontSize: 13, fontWeight: '700', color: Colors.primaryDark, marginTop: Spacing.sm },
-  disabledRow: {
-    borderWidth: 1,
-    borderColor: Colors.border,
-    borderRadius: Radius.sm,
-    paddingHorizontal: Spacing.sm,
-    paddingVertical: 10,
-  },
-  disabledLabel: { color: Colors.textMuted, fontSize: 13 },
   group: {
     borderWidth: 1,
     borderColor: Colors.border,

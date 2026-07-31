@@ -1,0 +1,334 @@
+import { useEffect, useMemo, useState } from 'react';
+import { ActivityIndicator, Modal, Pressable, ScrollView, StyleSheet, Text, TextInput, View } from 'react-native';
+
+import type { ApiSector } from '@/api/types';
+import { Colors, Radius, Spacing } from '@/constants/theme';
+import { useUbicacionStore } from '@/state/ubicacionStore';
+
+/**
+ * Selector de UBICACIÓN del tab "Capas" (Bottom Sheet móvil) — Distrito como combo box
+ * (selección única) y Sectores como multi-select con chips + búsqueda (estilo Jira).
+ *
+ * Reemplaza el árbol Provincia→Distrito→Sector con checkboxes anidados (versión
+ * anterior): en una pantalla angosta esa jerarquía completa se sentía muy pesada —
+ * acá se asume la provincia por defecto (Chiclayo, ver ubicacionStore) sin exponerla
+ * en la UI, igual que ya hacía FiltrosTab con "Chiclayo · Todos los distritos...".
+ */
+export function UbicacionPicker() {
+  const distritos = useUbicacionStore((s) => s.distritos);
+  const sectores = useUbicacionStore((s) => s.sectores);
+  const cargando = useUbicacionStore((s) => s.cargando);
+  const provinciasActivas = useUbicacionStore((s) => s.provinciasActivas);
+  const distritosActivos = useUbicacionStore((s) => s.distritosActivos);
+  const sectoresActivos = useUbicacionStore((s) => s.sectoresActivos);
+  const cargar = useUbicacionStore((s) => s.cargar);
+  const seleccionarDistrito = useUbicacionStore((s) => s.seleccionarDistrito);
+  const toggleSector = useUbicacionStore((s) => s.toggleSector);
+
+  useEffect(() => {
+    cargar();
+  }, [cargar]);
+
+  const [distritoModalAbierto, setDistritoModalAbierto] = useState(false);
+  const [sectorModalAbierto, setSectorModalAbierto] = useState(false);
+
+  const distritosDisponibles = useMemo(
+    () => distritos.filter((d) => provinciasActivas.has(d.provinciaId)),
+    [distritos, provinciasActivas]
+  );
+
+  const distritoActivoId = [...distritosActivos][0] ?? null;
+  const distritoActivo = distritosDisponibles.find((d) => d.id === distritoActivoId) ?? null;
+
+  const sectoresDelDistrito = useMemo(
+    () => (distritoActivoId ? sectores.filter((s) => s.distritoId === distritoActivoId) : []),
+    [sectores, distritoActivoId]
+  );
+
+  if (cargando && distritosDisponibles.length === 0) {
+    return (
+      <View style={styles.loadingRow}>
+        <ActivityIndicator size="small" color={Colors.textMuted} />
+        <Text style={styles.loadingLabel}>Cargando ubicaciones…</Text>
+      </View>
+    );
+  }
+
+  return (
+    <View style={styles.container}>
+      <Text style={styles.fieldLabel}>Distrito</Text>
+      <Pressable style={styles.comboBox} onPress={() => setDistritoModalAbierto(true)}>
+        <Text style={styles.comboValue}>{distritoActivo?.nombre ?? 'Todos los distritos'}</Text>
+        <Text style={styles.chevron}>▾</Text>
+      </Pressable>
+
+      {distritoActivoId && sectoresDelDistrito.length > 0 && (
+        <>
+          <Text style={styles.fieldLabel}>Sectores</Text>
+          <Pressable style={styles.multiSelectBox} onPress={() => setSectorModalAbierto(true)}>
+            {sectoresActivos.size === 0 ? (
+              <Text style={styles.multiSelectPlaceholder}>Todos los sectores</Text>
+            ) : (
+              <View style={styles.chipWrap}>
+                {sectoresDelDistrito
+                  .filter((s) => sectoresActivos.has(s.id))
+                  .map((s) => (
+                    <View key={s.id} style={styles.chip}>
+                      <Text style={styles.chipLabel} numberOfLines={1}>
+                        {s.nombre}
+                      </Text>
+                      <Pressable hitSlop={8} onPress={() => toggleSector(s.id)}>
+                        <Text style={styles.chipRemove}>×</Text>
+                      </Pressable>
+                    </View>
+                  ))}
+              </View>
+            )}
+            <Text style={styles.chevron}>▾</Text>
+          </Pressable>
+        </>
+      )}
+
+      <DistritoModal
+        visible={distritoModalAbierto}
+        onClose={() => setDistritoModalAbierto(false)}
+        distritos={distritosDisponibles}
+        seleccionado={distritoActivoId}
+        onSeleccionar={seleccionarDistrito}
+      />
+      <SectorMultiSelectModal
+        visible={sectorModalAbierto}
+        onClose={() => setSectorModalAbierto(false)}
+        sectores={sectoresDelDistrito}
+        seleccionados={sectoresActivos}
+        onToggle={toggleSector}
+      />
+    </View>
+  );
+}
+
+// ── Combo box de distrito (selección única) ──────────────────────────
+
+function DistritoModal({
+  visible,
+  onClose,
+  distritos,
+  seleccionado,
+  onSeleccionar,
+}: {
+  visible: boolean;
+  onClose: () => void;
+  distritos: { id: string; nombre: string }[];
+  seleccionado: string | null;
+  onSeleccionar: (id: string | null) => void;
+}) {
+  return (
+    <Modal visible={visible} transparent animationType="fade" onRequestClose={onClose}>
+      <Pressable style={styles.modalBackdrop} onPress={onClose}>
+        <View style={styles.modalCard}>
+          <Pressable
+            style={styles.modalOption}
+            onPress={() => {
+              onSeleccionar(null);
+              onClose();
+            }}
+          >
+            <Text style={[styles.modalOptionLabel, seleccionado === null && styles.modalOptionLabelActive]}>
+              Todos los distritos
+            </Text>
+          </Pressable>
+          {distritos.map((d) => (
+            <Pressable
+              key={d.id}
+              style={styles.modalOption}
+              onPress={() => {
+                onSeleccionar(d.id);
+                onClose();
+              }}
+            >
+              <Text style={[styles.modalOptionLabel, seleccionado === d.id && styles.modalOptionLabelActive]}>
+                {d.nombre}
+              </Text>
+            </Pressable>
+          ))}
+        </View>
+      </Pressable>
+    </Modal>
+  );
+}
+
+// ── Multi-select de sectores con búsqueda (estilo Jira) ──────────────
+
+function SectorMultiSelectModal({
+  visible,
+  onClose,
+  sectores,
+  seleccionados,
+  onToggle,
+}: {
+  visible: boolean;
+  onClose: () => void;
+  sectores: ApiSector[];
+  seleccionados: Set<string>;
+  onToggle: (id: string) => void;
+}) {
+  const [busqueda, setBusqueda] = useState('');
+
+  const filtrados = useMemo(() => {
+    const texto = busqueda.trim().toLowerCase();
+    if (!texto) return sectores;
+    return sectores.filter((s) => s.nombre.toLowerCase().includes(texto));
+  }, [sectores, busqueda]);
+
+  return (
+    <Modal visible={visible} transparent animationType="fade" onRequestClose={onClose}>
+      <Pressable style={styles.modalBackdrop} onPress={onClose}>
+        <Pressable style={styles.sectorModalCard} onPress={(e) => e.stopPropagation()}>
+          <TextInput
+            style={styles.searchInput}
+            value={busqueda}
+            onChangeText={setBusqueda}
+            placeholder="Buscar sector…"
+            placeholderTextColor={Colors.textMuted}
+            autoFocus
+          />
+          <ScrollView style={styles.sectorList}>
+            {filtrados.length === 0 && <Text style={styles.noResults}>Sin resultados</Text>}
+            {filtrados.map((s) => {
+              const activo = seleccionados.has(s.id);
+              return (
+                <Pressable key={s.id} style={styles.sectorRow} onPress={() => onToggle(s.id)}>
+                  <View style={[styles.checkbox, activo && styles.checkboxChecked]}>
+                    {activo && <Text style={styles.checkmark}>✓</Text>}
+                  </View>
+                  <Text style={styles.sectorRowLabel}>{s.nombre}</Text>
+                </Pressable>
+              );
+            })}
+          </ScrollView>
+          <Pressable style={styles.doneButton} onPress={onClose}>
+            <Text style={styles.doneButtonLabel}>Listo</Text>
+          </Pressable>
+        </Pressable>
+      </Pressable>
+    </Modal>
+  );
+}
+
+const styles = StyleSheet.create({
+  container: { gap: 4 },
+  loadingRow: { flexDirection: 'row', alignItems: 'center', gap: Spacing.xs, paddingVertical: Spacing.xs },
+  loadingLabel: { fontSize: 12, color: Colors.textMuted },
+  fieldLabel: { fontSize: 11, fontWeight: '700', color: Colors.textMuted, marginTop: Spacing.xs },
+
+  comboBox: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    borderWidth: 1,
+    borderColor: Colors.border,
+    borderRadius: Radius.sm,
+    paddingHorizontal: Spacing.sm,
+    paddingVertical: 10,
+  },
+  comboValue: { fontSize: 13, fontWeight: '600', color: Colors.textBody },
+  chevron: { color: Colors.textMuted, fontSize: 12 },
+
+  multiSelectBox: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    borderWidth: 1,
+    borderColor: Colors.border,
+    borderRadius: Radius.sm,
+    paddingHorizontal: Spacing.sm,
+    paddingVertical: 8,
+    minHeight: 40,
+    gap: Spacing.xs,
+  },
+  multiSelectPlaceholder: { fontSize: 13, color: Colors.textMuted, flex: 1 },
+  chipWrap: { flex: 1, flexDirection: 'row', flexWrap: 'wrap', gap: 6 },
+  chip: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 4,
+    backgroundColor: Colors.background,
+    borderWidth: 1,
+    borderColor: Colors.accent,
+    borderRadius: Radius.pill,
+    paddingLeft: 10,
+    paddingRight: 6,
+    paddingVertical: 3,
+    maxWidth: 150,
+  },
+  chipLabel: { fontSize: 12, color: Colors.accent, fontWeight: '600' },
+  chipRemove: { fontSize: 14, color: Colors.accent, fontWeight: '700', paddingHorizontal: 2 },
+
+  modalBackdrop: {
+    flex: 1,
+    backgroundColor: 'rgba(13, 43, 82, 0.25)',
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  modalCard: {
+    width: 260,
+    maxHeight: '70%',
+    backgroundColor: Colors.white,
+    borderRadius: Radius.lg,
+    paddingVertical: Spacing.sm,
+    shadowColor: '#000',
+    shadowOpacity: 0.15,
+    shadowRadius: 12,
+    shadowOffset: { width: 0, height: 4 },
+    elevation: 6,
+  },
+  modalOption: { paddingHorizontal: Spacing.md, paddingVertical: Spacing.sm },
+  modalOptionLabel: { fontSize: 15, fontWeight: '700', color: Colors.primaryDark },
+  modalOptionLabelActive: { color: Colors.accent },
+
+  sectorModalCard: {
+    width: 280,
+    maxHeight: '75%',
+    backgroundColor: Colors.white,
+    borderRadius: Radius.lg,
+    padding: Spacing.sm,
+    shadowColor: '#000',
+    shadowOpacity: 0.15,
+    shadowRadius: 12,
+    shadowOffset: { width: 0, height: 4 },
+    elevation: 6,
+  },
+  searchInput: {
+    borderWidth: 1,
+    borderColor: Colors.border,
+    borderRadius: Radius.sm,
+    paddingHorizontal: Spacing.sm,
+    paddingVertical: 8,
+    fontSize: 13,
+    color: Colors.textBody,
+    marginBottom: Spacing.xs,
+  },
+  sectorList: { maxHeight: 280 },
+  noResults: { fontSize: 12, color: Colors.textMuted, paddingVertical: Spacing.sm, textAlign: 'center' },
+  sectorRow: { flexDirection: 'row', alignItems: 'center', gap: Spacing.xs, paddingVertical: 8 },
+  checkbox: {
+    width: 18,
+    height: 18,
+    borderRadius: 4,
+    borderWidth: 1.5,
+    borderColor: Colors.border,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  checkboxChecked: { backgroundColor: Colors.accent, borderColor: Colors.accent },
+  checkmark: { color: Colors.white, fontSize: 12, fontWeight: '700' },
+  sectorRowLabel: { fontSize: 13, color: Colors.textBody, flex: 1 },
+  doneButton: {
+    marginTop: Spacing.xs,
+    backgroundColor: Colors.primary,
+    borderRadius: Radius.pill,
+    paddingVertical: 10,
+    alignItems: 'center',
+  },
+  doneButtonLabel: { color: Colors.white, fontWeight: '700', fontSize: 14 },
+});

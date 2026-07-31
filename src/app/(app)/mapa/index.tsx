@@ -5,6 +5,7 @@ import { Alert, Pressable, StyleSheet, Text, useWindowDimensions, View } from 'r
 import Animated, { useAnimatedStyle, useSharedValue, withTiming } from 'react-native-reanimated';
 import { SafeAreaView } from 'react-native-safe-area-context';
 
+import { LocationSearchBar } from '@/components/map/LocationSearchBar';
 import { EpselMapView } from '@/components/map/MapView';
 import { MapModeSheet } from '@/components/map/MapModeSheet';
 import { MapBottomSheet } from '@/components/sheet/MapBottomSheet';
@@ -66,6 +67,10 @@ export default function MapaScreen() {
           <Text style={styles.menuIcon}>☰</Text>
         </Pressable>
 
+        <View style={styles.searchBarSlot} pointerEvents="box-none">
+          <LocationSearchBar />
+        </View>
+
         <AnimatedPressable
           style={[styles.mapModeButton, mapModeButtonAnimatedStyle]}
           onPress={() => setMapModeVisible(true)}
@@ -107,6 +112,12 @@ const styles = StyleSheet.create({
     left: 0,
     right: 0,
     bottom: 0,
+  },
+  searchBarSlot: {
+    position: 'absolute',
+    top: 16,
+    left: 72,
+    right: 12,
   },
   menuButton: {
     position: 'absolute',
