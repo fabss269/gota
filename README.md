@@ -47,13 +47,23 @@ Si Redis se vacía o se pierde, reconstruir la caché de incidencias con:
 .venv/bin/python -m scripts.rebuild_incidencia_cache
 ```
 
-## Despliegue (producción)
+## CI/CD y despliegue
 
-`deploy/docker-compose.yml` levanta `frontend` (nginx + build de EPSEL-MOVIL, único
-puerto publicado), `backend`, `martin` y `redis` en una sola red docker (`gota`) — la
-BD (`bd_conhydra`, esquemas `gota`+`sig`) es **externa**, no hay contenedor `postgres`
-propio. Ver `deploy/.env.example` para las variables reales.
+Dos ramas: `main` (auto-deploy) y `develop`. En cada push/PR a cualquiera de las dos
+corre `.github/workflows/ci.yml` (`ruff check` + build de la imagen Docker). En cada push
+a `main`, `.github/workflows/deploy.yml` construye la imagen, la publica en
+`ghcr.io/ivanedac/epsel-backend` y despliega por SSH al servidor configurado en los
+secrets del repo (`DEPLOY_HOST`/`DEPLOY_PORT`/`DEPLOY_USER`/`DEPLOY_PATH`/`DEPLOY_SSH_KEY`).
 
-Guía completa, paso a paso (setup del servidor, self-hosted runners, aplicar el
-DDL, primer deploy, verificación):
-[`deploy/PRODUCTION_DEPLOY.md`](./deploy/PRODUCTION_DEPLOY.md).
+El servidor corre `deploy/docker-compose.yml`: `backend` + `postgres` (BD propia) +
+`redis` + `martin` (tiles de `sig`, whitelist explícita de 7 tablas en
+`deploy/martin-config.template.yaml` — Martin no soporta `${VAR}` en su config, el script
+de deploy la renderiza con `envsubst` en el servidor antes de levantar el contenedor). El
+`.env` real con secretos vive **solo en el servidor** (`deploy/.env.example` documenta
+qué variables necesita), nunca en git. `SIG_DB_HOST`/`SIG_DATABASE_URL` son configurables
+ahí: IP LAN directa (`172.16.5.222`) si el servidor está dentro de la red de EPSEL, o el
+túnel (`ssh.kasqan.com:15432`) si no — sin tocar código ni la imagen.
+
+Estado actual: probado end-to-end contra un servidor de prueba (`ssh.kasqan.com:2222`).
+Pendiente repetir la configuración de secrets/`.env` contra el servidor real de EPSEL
+cuando esté disponible.
