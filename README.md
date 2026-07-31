@@ -3,9 +3,12 @@
 Backend FastAPI para GOTA/EPSEL-MOVIL. Integra:
 
 - **BD propia** (`vp_gota_create.ddl`) — incidentes, reclamos, usuarios, catálogos.
-  Lectura/escritura.
-- **`sig`** en `bd_conhydra` — catastro/red de agua y desagüe de EPSEL, vía túnel SSH
-  (`ssh.kasqan.com:15432`). Solo lectura.
+  Lectura/escritura. En dev local es una BD standalone (`gota`, tablas en `public`);
+  en producción vive como esquema `gota` dentro de `bd_conhydra` (ver `PROPIA_DB_SCHEMA`).
+- **`sig`** en `bd_conhydra` — catastro/red de agua y desagüe de EPSEL. Solo lectura.
+  Conexión directa por IP LAN (`172.16.5.222:5432`) en producción (servidor dentro de
+  la red de EPSEL); dev local remoto puede seguir usando un túnel SSH si no está en
+  esa red — solo cambian `SIG_DB_HOST`/`SIG_DB_PORT`, no el código.
 
 Contrato a satisfacer: [`API.md`](./API.md). Diseño técnico spec-driven en
 [`specs/`](./specs/) — leer `specs/00-arquitectura.md` primero, documenta las
@@ -43,3 +46,24 @@ Si Redis se vacía o se pierde, reconstruir la caché de incidencias con:
 ```bash
 .venv/bin/python -m scripts.rebuild_incidencia_cache
 ```
+
+## Despliegue (producción)
+
+`deploy/docker-compose.yml` levanta `frontend` (nginx + build de EPSEL-MOVIL, único
+puerto publicado), `backend`, `martin` y `redis` en una sola red docker (`gota`) — la
+BD (`bd_conhydra`, esquemas `gota`+`sig`) es **externa**, no hay contenedor `postgres`
+propio. Ver `deploy/.env.example` para las variables reales.
+
+**Antes del primer deploy**, aplicar el esquema `gota` una sola vez contra la BD de
+producción (confirmar antes que no exista ya, para no pisar nada):
+```bash
+psql -h 172.16.5.222 -U postgres -d bd_conhydra -c "\dn"
+psql -h 172.16.5.222 -U postgres -d bd_conhydra -f vp_gota_create.ddl
+```
+
+Pendiente (no resuelto en este cambio, ver plan de la sesión que lo introdujo):
+crear roles de Postgres dedicados (uno dueño de `gota`, uno de solo lectura para
+`sig`) en vez de usar el superusuario `postgres` para el servicio real; TLS/HTTPS
+delante de nginx; migrar la BD OLAP (datamart, DDL en
+`~/Documentos/epsel_gota_datamart_star_schema.sql`) a producción como base de datos
+separada en el mismo servicio Postgres.
