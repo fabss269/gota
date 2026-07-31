@@ -1,0 +1,197 @@
+{
+  "version": 8,
+  "name": "GOTA - Red EPSEL (producción, vía nginx -> Martin)",
+  "sources": {
+    "osm": {
+      "type": "raster",
+      "tiles": ["https://tile.openstreetmap.org/{z}/{x}/{y}.png"],
+      "tileSize": 256,
+      "maxzoom": 19,
+      "attribution": "© OpenStreetMap contributors"
+    },
+    "manzanas": {
+      "type": "vector",
+      "tiles": ["/tiles/manzanas/{z}/{x}/{y}"]
+    },
+    "lotes": {
+      "type": "vector",
+      "tiles": ["/tiles/lotes/{z}/{x}/{y}"]
+    },
+    "agua": {
+      "type": "vector",
+      "tiles": ["/tiles/agua/{z}/{x}/{y}"]
+    },
+    "alcantarillado": {
+      "type": "vector",
+      "tiles": ["/tiles/alcantarillado/{z}/{x}/{y}"]
+    },
+    "buzones": {
+      "type": "vector",
+      "tiles": ["/tiles/buzones/{z}/{x}/{y}"]
+    },
+    "cajaagua": {
+      "type": "vector",
+      "tiles": ["/tiles/cajaagua/{z}/{x}/{y}"]
+    },
+    "cajadesague": {
+      "type": "vector",
+      "tiles": ["/tiles/cajadesague/{z}/{x}/{y}"]
+    },
+    "cajaaguaconexion": {
+      "type": "vector",
+      "tiles": ["/tiles/cajaaguaconexion/{z}/{x}/{y}"]
+    },
+    "cajadesagueconexion": {
+      "type": "vector",
+      "tiles": ["/tiles/cajadesagueconexion/{z}/{x}/{y}"]
+    },
+    "sectores": {
+      "type": "vector",
+      "tiles": ["/tiles/sectores/{z}/{x}/{y}"]
+    },
+    "alcantarillado_flujo": {
+      "type": "vector",
+      "tiles": ["/tiles/alcantarillado_flujo/{z}/{x}/{y}"]
+    }
+  },
+  "layers": [
+    { "id": "osm", "type": "raster", "source": "osm" },
+
+    {
+      "id": "manzanas-fill",
+      "type": "fill",
+      "source": "manzanas",
+      "source-layer": "manzanas",
+      "layout": { "visibility": "none" },
+      "paint": { "fill-color": "#BDBDBD", "fill-opacity": 0.08 }
+    },
+    {
+      "id": "manzanas-outline",
+      "type": "line",
+      "source": "manzanas",
+      "source-layer": "manzanas",
+      "layout": { "visibility": "none" },
+      "paint": { "line-color": "#546472", "line-width": 1.4, "line-opacity": 0.85 }
+    },
+    {
+      "id": "lotes-fill",
+      "type": "fill",
+      "source": "lotes",
+      "source-layer": "lotes",
+      "layout": { "visibility": "none" },
+      "paint": { "fill-color": "#FFFFFF", "fill-opacity": 0.03 }
+    },
+    {
+      "id": "lotes-outline",
+      "type": "line",
+      "source": "lotes",
+      "source-layer": "lotes",
+      "layout": { "visibility": "none" },
+      "paint": { "line-color": "#8A97A3", "line-width": 0.9, "line-opacity": 0.8 }
+    },
+
+    {
+      "id": "agua-red",
+      "type": "line",
+      "source": "agua",
+      "source-layer": "agua",
+      "layout": { "visibility": "none" },
+      "paint": { "line-color": "#2563EB", "line-width": 1.8 }
+    },
+    {
+      "id": "cajaaguaconexion-line",
+      "type": "line",
+      "source": "cajaaguaconexion",
+      "source-layer": "cajaaguaconexion",
+      "layout": { "visibility": "none" },
+      "paint": { "line-color": "#60A5FA", "line-width": 1, "line-dasharray": [2, 2] }
+    },
+    {
+      "id": "cajaagua-circle",
+      "type": "circle",
+      "source": "cajaagua",
+      "source-layer": "cajaagua",
+      "layout": { "visibility": "none" },
+      "paint": { "circle-radius": 3, "circle-color": "#06B6D4" }
+    },
+
+    {
+      "id": "alcantarillado-primaria",
+      "type": "line",
+      "source": "alcantarillado",
+      "source-layer": "alcantarillado",
+      "layout": { "visibility": "none" },
+      "filter": ["==", ["get", "primaria"], true],
+      "paint": { "line-color": "#E53935", "line-width": 2.5 }
+    },
+    {
+      "id": "alcantarillado-secundaria",
+      "type": "line",
+      "source": "alcantarillado",
+      "source-layer": "alcantarillado",
+      "layout": { "visibility": "none" },
+      "filter": ["==", ["get", "primaria"], false],
+      "paint": { "line-color": "#FB8C00", "line-width": 1.2 }
+    },
+    {
+      "id": "alcantarillado-flujo-flecha",
+      "type": "fill",
+      "source": "alcantarillado_flujo",
+      "source-layer": "alcantarillado_flujo",
+      "layout": { "visibility": "none" },
+      "paint": { "fill-color": "#B71C1C", "fill-opacity": 0.9 }
+    },
+    {
+      "id": "cajadesagueconexion-line",
+      "type": "line",
+      "source": "cajadesagueconexion",
+      "source-layer": "cajadesagueconexion",
+      "layout": { "visibility": "none" },
+      "paint": { "line-color": "#FB8C00", "line-width": 1, "line-dasharray": [2, 2] }
+    },
+    {
+      "id": "cajadesague-circle",
+      "type": "circle",
+      "source": "cajadesague",
+      "source-layer": "cajadesague",
+      "layout": { "visibility": "none" },
+      "paint": { "circle-radius": 3, "circle-color": "#795548" }
+    },
+    {
+      "id": "buzones-circle",
+      "type": "circle",
+      "source": "buzones",
+      "source-layer": "buzones",
+      "layout": { "visibility": "none" },
+      "paint": { "circle-radius": 4, "circle-color": "#757575" }
+    },
+
+    {
+      "id": "sectores-resaltado-fill",
+      "type": "fill",
+      "source": "sectores",
+      "source-layer": "sectores",
+      "layout": { "visibility": "visible" },
+      "filter": ["in", ["get", "sectorid"], ["literal", []]],
+      "paint": { "fill-color": "#9E9E9E", "fill-opacity": 0.12 }
+    },
+    {
+      "id": "sectores-resaltado-halo",
+      "type": "line",
+      "source": "sectores",
+      "source-layer": "sectores",
+      "layout": { "visibility": "visible" },
+      "filter": ["in", ["get", "sectorid"], ["literal", []]],
+      "paint": { "line-color": "#FFFFFF", "line-width": 5.5 }
+    },
+    {
+      "id": "sectores-resaltado",
+      "type": "line",
+      "source": "sectores",
+      "source-layer": "sectores",
+      "layout": { "visibility": "visible" },
+      "filter": ["in", ["get", "sectorid"], ["literal", []]],
+      "paint": { "line-color": "#9E9E9E", "line-width": 2.5 }
+    }
+  ]
+}
