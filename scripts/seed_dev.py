@@ -14,12 +14,12 @@ from datetime import UTC, datetime, timedelta
 from sqlalchemy import text
 from sqlalchemy.ext.asyncio import create_async_engine
 
-from app.core.config import settings
+from app.core.config import propia_connect_args, settings
 from app.core.security import hash_password
 
 
 async def main() -> None:
-    engine = create_async_engine(settings.propia_db_url)
+    engine = create_async_engine(settings.propia_db_url, connect_args=propia_connect_args())
     async with engine.begin() as conn:
         await conn.execute(
             text("INSERT INTO rol (codigo, nombre) VALUES ('supervisor', 'Supervisor') "

@@ -14,7 +14,7 @@ from redis.asyncio import Redis
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import async_sessionmaker, create_async_engine
 
-from app.core.config import settings
+from app.core.config import propia_connect_args, settings
 from app.db.models_propia import Incidente
 from app.modules.incidencias.cache_repository import IncidenciaCacheRepository
 from app.modules.incidencias.catastro_enrichment import CatastroEnrichmentService
@@ -33,7 +33,7 @@ async def _limpiar_claves(redis: Redis) -> int:
 
 
 async def main() -> None:
-    propia_engine = create_async_engine(settings.propia_db_url)
+    propia_engine = create_async_engine(settings.propia_db_url, connect_args=propia_connect_args())
     sig_engine = create_async_engine(settings.sig_db_url)
     PropiaSession = async_sessionmaker(propia_engine, expire_on_commit=False)
     SigSession = async_sessionmaker(sig_engine, expire_on_commit=False)

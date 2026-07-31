@@ -1,3 +1,8 @@
+-- GOTA pasa a vivir como esquema dentro de bd_conhydra (producción), junto al
+-- esquema `sig` ya existente — no se toca `sig` en absoluto, ni el resto de la BD.
+CREATE SCHEMA IF NOT EXISTS gota;
+SET search_path TO gota;
+
 create table alerta_regla (
   alerta_regla_id serial not null, 
   codigo          varchar(50) not null unique, 

@@ -1,8 +1,9 @@
 """Único responsable del cruce con `sig` (specs/00-arquitectura.md §6).
 
-Usado desde dos flujos: creación de incidente (`resolver_predio`, para poblar
-`latitud`/`longitud` + sector) y detalle de incidente (`resolver_predio` +
-`resolver_catastro_cercano`, para el bloque `catastro` de `GET /incidencias/{id}`).
+Usado desde tres flujos: creación de incidente (`resolver_predio`, para poblar
+`latitud`/`longitud` + sector), detalle de incidente (`resolver_predio` +
+`resolver_catastro_cercano`, para el bloque `catastro` de `GET /incidencias/{id}`)
+y el buscador de suministro del mapa (`resolver_predio`, ver `catalogos/router.py`).
 
 Nunca hace JOIN con la BD propia — todo el cruce ocurre en Python, combinando el
 resultado de estas consultas (que solo tocan `sig`) con datos ya obtenidos por

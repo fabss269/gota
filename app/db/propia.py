@@ -7,9 +7,11 @@ from sqlalchemy.ext.asyncio import (
     create_async_engine,
 )
 
-from app.core.config import settings
+from app.core.config import propia_connect_args, settings
 
-propia_engine: AsyncEngine = create_async_engine(settings.propia_db_url, pool_pre_ping=True)
+propia_engine: AsyncEngine = create_async_engine(
+    settings.propia_db_url, pool_pre_ping=True, connect_args=propia_connect_args()
+)
 
 PropiaSessionFactory = async_sessionmaker(propia_engine, expire_on_commit=False)
 
