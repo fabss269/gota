@@ -14,6 +14,7 @@ export const CAPA_LAYER_IDS: Record<CapaKey, string[]> = {
   red_potable: ['agua-red'],
   conexion_agua: ['cajaaguaconexion-line'],
   caja_agua: ['cajaagua-circle'],
+  accesorios: ['accesorios-circle'],
   red_primaria_desague: ['alcantarillado-primaria'],
   red_secundaria_desague: ['alcantarillado-secundaria'],
   conexion_desague: ['cajadesagueconexion-line'],
@@ -24,6 +25,15 @@ export const CAPA_LAYER_IDS: Record<CapaKey, string[]> = {
   // (necesita togglear el filtro, no solo la visibilidad).
   resaltar_sector: [],
 };
+
+// Mapa inverso layer id -> CapaKey — usado por el click handler de modo simulación
+// (MapView.web.tsx) para verificar que la capa del elemento clickeado esté
+// realmente visible (no solo que exista en el style), y por el efecto de modo
+// vista para restaurar la visibilidad correcta de layers que se ocultan sin
+// distinción propia (ver SIMULACION_OCULTAR_EN_VISTA).
+export const CAPA_KEY_POR_LAYER_ID: Partial<Record<string, CapaKey>> = Object.fromEntries(
+  Object.entries(CAPA_LAYER_IDS).flatMap(([capa, layers]) => layers.map((l) => [l, capa as CapaKey]))
+);
 
 // Capas de catastro filtrables por sectorid cuando hay un sector activo en UBICACIÓN
 // (ver ubicacionStore.sectoresActivos). alcantarillado-primaria/secundaria ya traen su
@@ -37,6 +47,7 @@ export const CATASTRO_SECTOR_FILTER_LAYERS: { id: string; baseFilter?: MapExpres
   { id: 'agua-red' },
   { id: 'cajaaguaconexion-line' },
   { id: 'cajaagua-circle' },
+  { id: 'accesorios-circle' },
   { id: 'alcantarillado-primaria', baseFilter: ['==', ['get', 'primaria'], true] },
   { id: 'alcantarillado-secundaria', baseFilter: ['==', ['get', 'primaria'], false] },
   { id: 'alcantarillado-flujo-flecha' },
@@ -69,3 +80,66 @@ export function unionBbox(boxes: ApiBbox[]): ApiBbox {
     maxLat: Math.max(acc.maxLat, b.maxLat),
   }));
 }
+
+// ── Modo simulación: aislar + pintar de rojo la red afectada (modo vista) ──
+//
+// Mismo idioma que CATASTRO_SECTOR_FILTER_LAYERS/applySectorHighlight
+// (MapView.web.tsx): filtrar por ['in', ['get', idProperty], ['literal', ids]]
+// combinando con el baseFilter existente vía ['all', ...] cuando corresponde,
+// solo que acá los ids vienen de ApiSimulacion.redAfectada (agrupados por
+// elementoTipo) en vez de un sectorid activo.
+
+export type IsolateLayerConfig = {
+  id: string;
+  idProperty: string;
+  /** Coincide con ApiElementoRed.elementoTipo, o 'suministro' para las cajas
+   * (que se identifican por inscripcion vía ApiAfectado, no por redAfectada). */
+  elementoTipo: string;
+  paintProp: 'line-color' | 'circle-color';
+  baseFilter?: MapExpression;
+};
+
+export const SIMULACION_ISOLATE_LAYERS: IsolateLayerConfig[] = [
+  { id: 'agua-red', idProperty: 'aguaid', elementoTipo: 'tuberia', paintProp: 'line-color' },
+  {
+    id: 'alcantarillado-primaria',
+    idProperty: 'alcantarilladoid',
+    elementoTipo: 'tramo',
+    paintProp: 'line-color',
+    baseFilter: ['==', ['get', 'primaria'], true],
+  },
+  {
+    id: 'alcantarillado-secundaria',
+    idProperty: 'alcantarilladoid',
+    elementoTipo: 'tramo',
+    paintProp: 'line-color',
+    baseFilter: ['==', ['get', 'primaria'], false],
+  },
+  { id: 'buzones-circle', idProperty: 'buzonid', elementoTipo: 'buzon', paintProp: 'circle-color' },
+  { id: 'accesorios-circle', idProperty: 'accesorioid', elementoTipo: 'accesorio', paintProp: 'circle-color' },
+  { id: 'cajaagua-circle', idProperty: 'inscripcion', elementoTipo: 'suministro', paintProp: 'circle-color' },
+  { id: 'cajadesague-circle', idProperty: 'inscripcion', elementoTipo: 'suministro', paintProp: 'circle-color' },
+];
+
+export const SIMULACION_AFECTADO_COLOR = '#FF3B30';
+
+// Colores base (copiados de public/map-style.json), para restaurar al salir de
+// modo vista sin depender de leer el style original de vuelta.
+export const SIMULACION_COLOR_ORIGINAL: Record<string, string> = {
+  'agua-red': '#2563EB',
+  'alcantarillado-primaria': '#E53935',
+  'alcantarillado-secundaria': '#FB8C00',
+  'buzones-circle': '#757575',
+  'accesorios-circle': '#9C27B0',
+  'cajaagua-circle': '#06B6D4',
+  'cajadesague-circle': '#795548',
+};
+
+// Layers sin distinción afectado/no-afectado del backend (no aparecen en
+// redAfectada) -> se ocultan por completo en modo vista, no tiene sentido
+// aislarlas por id.
+export const SIMULACION_OCULTAR_EN_VISTA = [
+  'cajaaguaconexion-line',
+  'cajadesagueconexion-line',
+  'alcantarillado-flujo-flecha',
+];

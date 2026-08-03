@@ -29,6 +29,10 @@
       "type": "vector",
       "tiles": ["http://localhost:3000/buzones/{z}/{x}/{y}"]
     },
+    "accesorios": {
+      "type": "vector",
+      "tiles": ["http://localhost:3000/accesorios/{z}/{x}/{y}"]
+    },
     "cajaagua": {
       "type": "vector",
       "tiles": ["http://localhost:3000/cajaagua/{z}/{x}/{y}"]
@@ -164,6 +168,14 @@
       "source-layer": "buzones",
       "layout": { "visibility": "none" },
       "paint": { "circle-radius": 4, "circle-color": "#757575" }
+    },
+    {
+      "id": "accesorios-circle",
+      "type": "circle",
+      "source": "accesorios",
+      "source-layer": "accesorios",
+      "layout": { "visibility": "none" },
+      "paint": { "circle-radius": 3, "circle-color": "#9C27B0" }
     },
 
     {

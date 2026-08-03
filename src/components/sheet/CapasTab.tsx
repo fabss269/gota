@@ -12,6 +12,7 @@ const PREDIO_CAPAS: { key: CapaKey; label: string }[] = [
 
 const AGUA_CAPAS: { key: CapaKey; label: string }[] = [
   { key: 'red_potable', label: 'Red de agua potable' },
+  { key: 'accesorios', label: 'Accesorios (válvulas, codos, tees)' },
 ];
 
 const DESAGUE_CAPAS: { key: CapaKey; label: string }[] = [

@@ -16,6 +16,7 @@ import { Colors, Radius } from '@/constants/theme';
 import { useIncidentsToday } from '@/hooks/useIncidentsToday';
 import { openDrawer } from '@/navigation/openDrawer';
 import { useFiltersStore } from '@/state/filtersStore';
+import { useSimulacionStore } from '@/state/simulacionStore';
 import { clusterIncidents, type IncidentCluster } from '@/utils/clusterIncidents';
 
 const DESKTOP_BP = 768;
@@ -34,6 +35,7 @@ export default function MapaScreen() {
   const clusters = useMemo(() => clusterIncidents(incidencias), [incidencias]);
 
   const [selectedId, setSelectedId] = useState<string | null>(null);
+  const modoVista = useSimulacionStore((s) => s.modoVista);
 
   const handleClusterPress = (cluster: IncidentCluster) => {
     if (cluster.count === 1) {
@@ -65,19 +67,20 @@ export default function MapaScreen() {
 
   return (
     <div style={desktopRoot}>
-      {/* Columna izquierda: filtros + capas */}
-      <FiltersSidebar />
+      {/* Columna izquierda: filtros + capas — oculta en modo vista (bloqueo total,
+          "no interactuar con nada" salvo el ← de SimulacionControl). */}
+      {!modoVista && <FiltersSidebar />}
 
       {/* Columna central: mapa */}
       <div style={centerCol}>
         <EpselMapView clusters={clusters} onPressCluster={handleClusterPress} />
 
         {/* Buscador de dirección / suministro */}
-        <LocationSearchBar />
+        {!modoVista && <LocationSearchBar />}
 
         {/* Banners de estado */}
-        {isLoading && <div style={banner}>Cargando incidencias de hoy…</div>}
-        {isError && (
+        {!modoVista && isLoading && <div style={banner}>Cargando incidencias de hoy…</div>}
+        {!modoVista && isError && (
           <div
             style={{ ...banner, backgroundColor: '#FDECEC', cursor: 'pointer' }}
             onClick={() => refetch()}
@@ -88,7 +91,7 @@ export default function MapaScreen() {
       </div>
 
       {/* Columna derecha: panel de detalle (visible al seleccionar un marcador) */}
-      {selectedId && (
+      {!modoVista && selectedId && (
         <DetailPanel incidenciaId={selectedId} onClose={() => setSelectedId(null)} />
       )}
     </div>
@@ -116,6 +119,7 @@ function MobileLayout({
   const bottomSheetRef = useRef<BottomSheet>(null);
   const [mapModeVisible, setMapModeVisible] = useState(false);
   const mapMode = useFiltersStore((s) => s.mapMode);
+  const modoVista = useSimulacionStore((s) => s.modoVista);
 
   const { height: windowHeight } = useWindowDimensions();
   const GAP = 16;
@@ -132,40 +136,42 @@ function MobileLayout({
     <View style={mobile.flex}>
       <EpselMapView clusters={clusters} onPressCluster={onPressCluster} />
 
-      <SafeAreaView style={mobile.overlay} pointerEvents="box-none">
-        <Pressable style={mobile.menuBtn} onPress={() => openDrawer(navigation)}>
-          <Text style={mobile.menuIcon}>☰</Text>
-        </Pressable>
+      {!modoVista && (
+        <SafeAreaView style={mobile.overlay} pointerEvents="box-none">
+          <Pressable style={mobile.menuBtn} onPress={() => openDrawer(navigation)}>
+            <Text style={mobile.menuIcon}>☰</Text>
+          </Pressable>
 
-        <AnimatedPressable
-          style={[mobile.mapModeBtn, mapModeStyle]}
-          onPress={() => setMapModeVisible(true)}
-        >
-          <Text style={mobile.mapModeIcon}>🗺️</Text>
-        </AnimatedPressable>
+          <AnimatedPressable
+            style={[mobile.mapModeBtn, mapModeStyle]}
+            onPress={() => setMapModeVisible(true)}
+          >
+            <Text style={mobile.mapModeIcon}>🗺️</Text>
+          </AnimatedPressable>
 
-        {mapMode !== 'normal' && (
-          <View style={mobile.modeBadge}>
-            <Text style={mobile.modeBadgeText}>
-              {mapMode === 'calor' ? 'Mapa de calor' : 'Mapa de foco'}
-            </Text>
-          </View>
-        )}
-      </SafeAreaView>
+          {mapMode !== 'normal' && (
+            <View style={mobile.modeBadge}>
+              <Text style={mobile.modeBadgeText}>
+                {mapMode === 'calor' ? 'Mapa de calor' : 'Mapa de foco'}
+              </Text>
+            </View>
+          )}
+        </SafeAreaView>
+      )}
 
-      {isLoading && (
+      {!modoVista && isLoading && (
         <View style={mobile.statusBanner}>
           <Text style={mobile.statusText}>Cargando incidencias de hoy…</Text>
         </View>
       )}
-      {isError && (
+      {!modoVista && isError && (
         <Pressable style={[mobile.statusBanner, mobile.errorBanner]} onPress={onRefetch}>
           <Text style={mobile.statusText}>No se pudo cargar. Toca para reintentar.</Text>
         </Pressable>
       )}
 
-      <MapModeSheet visible={mapModeVisible} onClose={() => setMapModeVisible(false)} />
-      <MapBottomSheet ref={bottomSheetRef} onSheetPositionChange={onSheetPositionChange} />
+      {!modoVista && <MapModeSheet visible={mapModeVisible} onClose={() => setMapModeVisible(false)} />}
+      {!modoVista && <MapBottomSheet ref={bottomSheetRef} onSheetPositionChange={onSheetPositionChange} />}
     </View>
   );
 }
