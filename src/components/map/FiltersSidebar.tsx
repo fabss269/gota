@@ -67,21 +67,6 @@ export function FiltersSidebar() {
     aplicarCapas(next);
   };
 
-  const isAlcantarilladoOn =
-    capasVisibles.has('red_primaria_desague') || capasVisibles.has('red_secundaria_desague');
-
-  const toggleAlcantarillado = () => {
-    const next = new Set(capasVisibles);
-    if (isAlcantarilladoOn) {
-      next.delete('red_primaria_desague');
-      next.delete('red_secundaria_desague');
-    } else {
-      next.add('red_primaria_desague');
-      next.add('red_secundaria_desague');
-    }
-    aplicarCapas(next);
-  };
-
   return (
     <div style={sidebar}>
       {/* ── FILTROS ───────────────────────────────── */}
