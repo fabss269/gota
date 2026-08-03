@@ -25,8 +25,8 @@ Por RDP, en el servidor:
 New-Item -ItemType Directory -Force -Path C:\epsel-deploy
 ```
 Crear ahí `C:\epsel-deploy\.env` a mano, basado en `deploy/.env.example` de este
-repo, con los valores reales de producción (`SIG_DB_PASSWORD`, `JWT_SECRET`,
-`PROPIA_DB_URL`/`SIG_DATABASE_URL` apuntando a `172.16.5.222`,
+repo, con los valores reales de producción (`DB_PASSWORD`, `JWT_SECRET`,
+`DB_HOST`/`SIG_DATABASE_URL` apuntando a `172.16.5.222`,
 `PROPIA_DB_SCHEMA=gota`, `FRONTEND_PORT`, etc.). **Nunca por git** — este archivo
 vive solo en disco, en esta carpeta.
 

@@ -17,7 +17,7 @@ New-Item -ItemType Directory -Force -Path C:\epsel-deploy
 ```
 
 Copiar ahí un `.env` real (nunca versionado) basado en `deploy/.env.example` de
-`gota-backend`, con las credenciales reales de producción (`SIG_DB_PASSWORD`,
+`gota-backend`, con las credenciales reales de producción (`DB_PASSWORD`,
 `JWT_SECRET`, etc.) y `DEPLOY_PATH` (ver más abajo) apuntando a esta misma carpeta.
 Esta carpeta y su `.env` **no los toca ningún workflow de CI** salvo para
 copiar/leer `docker-compose.yml`/`martin-config.*` — el `.env` en sí se administra

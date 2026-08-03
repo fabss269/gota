@@ -8,7 +8,7 @@ Backend FastAPI para GOTA/EPSEL-MOVIL. Integra:
 - **`sig`** en `bd_conhydra` — catastro/red de agua y desagüe de EPSEL. Solo lectura.
   Conexión directa por IP LAN (`172.16.5.222:5432`) en producción (servidor dentro de
   la red de EPSEL); dev local remoto puede seguir usando un túnel SSH si no está en
-  esa red — solo cambian `SIG_DB_HOST`/`SIG_DB_PORT`, no el código.
+  esa red — solo cambian `DB_HOST`/`DB_PORT`, no el código.
 
 Contrato a satisfacer: [`API.md`](./API.md). Diseño técnico spec-driven en
 [`specs/`](./specs/) — leer `specs/00-arquitectura.md` primero, documenta las
@@ -60,7 +60,7 @@ El servidor corre `deploy/docker-compose.yml`: `backend` + `postgres` (BD propia
 `deploy/martin-config.template.yaml` — Martin no soporta `${VAR}` en su config, el script
 de deploy la renderiza con `envsubst` en el servidor antes de levantar el contenedor). El
 `.env` real con secretos vive **solo en el servidor** (`deploy/.env.example` documenta
-qué variables necesita), nunca en git. `SIG_DB_HOST`/`SIG_DATABASE_URL` son configurables
+qué variables necesita), nunca en git. `DB_HOST`/`SIG_DATABASE_URL` son configurables
 ahí: IP LAN directa (`172.16.5.222`) si el servidor está dentro de la red de EPSEL, o el
 túnel (`ssh.kasqan.com:15432`) si no — sin tocar código ni la imagen.
 
