@@ -6,6 +6,7 @@ export type CapaKey =
   | 'red_potable'
   | 'conexion_agua'
   | 'caja_agua'
+  | 'accesorios'
   | 'red_primaria_desague'
   | 'red_secundaria_desague'
   | 'conexion_desague'

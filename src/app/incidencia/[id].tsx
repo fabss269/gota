@@ -8,6 +8,7 @@ import { RegistrarAvanceSheet } from '@/components/incident-actions/RegistrarAva
 import { SeleccionarResponsableSheet } from '@/components/incident-actions/SeleccionarResponsableSheet';
 import { DetalleTab } from '@/components/incident-detail/DetalleTab';
 import { FocoTab } from '@/components/incident-detail/FocoTab';
+import { ImpactoTab } from '@/components/incident-detail/ImpactoTab';
 import { IncidentDetailHeader } from '@/components/incident-detail/IncidentDetailHeader';
 import { PredioTab } from '@/components/incident-detail/PredioTab';
 import { TabsBar, type DetailTab } from '@/components/incident-detail/TabsBar';
@@ -60,6 +61,7 @@ export default function IncidenciaDetalleScreen() {
             {tab === 'detalle' && <DetalleTab incidencia={incidencia} />}
             {tab === 'trazabilidad' && <TrazabilidadTab incidencia={incidencia} />}
             {tab === 'foco' && <FocoTab incidencia={incidencia} />}
+            {tab === 'impacto' && <ImpactoTab incidenciaId={incidencia.id} active={tab === 'impacto'} />}
             {tab === 'predio' && <PredioTab incidencia={incidencia} />}
           </ScrollView>
 

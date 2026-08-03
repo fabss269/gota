@@ -251,6 +251,12 @@ export function FiltersSidebar() {
         value={isCapa('caja_agua')}
         onChange={() => toggleCapa('caja_agua')}
       />
+      <CapaRow
+        icon={<ColorCircle color="#9C27B0" />}
+        label="Accesorios (válvulas, codos, tees)"
+        value={isCapa('accesorios')}
+        onChange={() => toggleCapa('accesorios')}
+      />
     </div>
   );
 }

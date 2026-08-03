@@ -2,12 +2,13 @@ import { Pressable, StyleSheet, Text, View } from 'react-native';
 
 import { Colors, Spacing } from '@/constants/theme';
 
-export type DetailTab = 'detalle' | 'trazabilidad' | 'foco' | 'predio';
+export type DetailTab = 'detalle' | 'trazabilidad' | 'foco' | 'impacto' | 'predio';
 
 const TABS: { key: DetailTab; label: string }[] = [
   { key: 'detalle', label: 'Detalle' },
   { key: 'trazabilidad', label: 'Trazabilidad' },
   { key: 'foco', label: 'Foco' },
+  { key: 'impacto', label: 'Impacto' },
   { key: 'predio', label: 'Predio' },
 ];
 
