@@ -1,4 +1,4 @@
-"""Modelos ORM de la BD propia (`vp_gota_create.ddl`).
+"""Modelos ORM del esquema `gota` (dentro de `bd_conhydra`).
 
 Un único lugar de mapeo por tabla — los `repository.py` de cada módulo importan de
 aquí lo que necesiten, en vez de redeclarar el mapeo (SQLAlchemy no permite dos clases

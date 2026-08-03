@@ -2,9 +2,10 @@
 
 Backend FastAPI para GOTA/EPSEL-MOVIL. Integra:
 
-- **BD propia** (`vp_gota_create.ddl`) — incidentes, reclamos, usuarios, catálogos.
-  Lectura/escritura. En dev local es una BD standalone (`gota`, tablas en `public`);
-  en producción vive como esquema `gota` dentro de `bd_conhydra` (ver `PROPIA_DB_SCHEMA`).
+- **Esquema `gota`** en `bd_conhydra` — incidentes, reclamos, usuarios, catálogos.
+  Lectura/escritura. Convive con `sig` en el mismo Postgres, se controla con
+  `PROPIA_DB_SCHEMA`. El esquema ya está creado en producción — no hay DDL en este
+  repo ni migrations automáticas, los cambios de estructura se aplican a mano.
 - **`sig`** en `bd_conhydra` — catastro/red de agua y desagüe de EPSEL. Solo lectura.
   Conexión directa por IP LAN (`172.16.5.222:5432`) en producción (servidor dentro de
   la red de EPSEL); dev local remoto puede seguir usando un túnel SSH si no está en
@@ -21,9 +22,10 @@ Fase 3 (implementación) completa para los 6 módulos del contrato de `API.md`: 
 `catalogos`, `incidencias`, `usuarios`, `red`, `dashboard` — 18 endpoints, verificados
 end-to-end contra Postgres local + `sig` real (túnel SSH) + Redis. Detalle de decisiones
 tomadas al implementar en la sección "Estado de implementación" de cada `specs/0N-*.md`
-y en `API.md` §10 (cambios de contrato). `vp_gota_create.ddl` sigue siendo el DDL que
-edita Edgar externamente — confirmar que el local coincide con la última versión acordada
-antes de tocar modelos/migraciones.
+y en `API.md` §10 (cambios de contrato). El esquema `gota` en `bd_conhydra` es la
+fuente de verdad — si necesitás inspeccionar la estructura, `pg_dump --schema-only
+-n gota` la vuelca. Cambios de estructura se coordinan con Edgar y se aplican a
+mano (no hay migrations automáticas).
 
 Gaps reales de datos encontrados (no son bugs de este código, ver specs para detalle):
 `sig.alcantarillado` no tiene columna de diámetro (spec 04), `sig.accesoriotipos` no

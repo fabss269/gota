@@ -54,7 +54,7 @@ jobs:
         run: |
           New-Item -ItemType Directory -Force -Path "${{ vars.DEPLOY_PATH }}" | Out-Null
           Copy-Item deploy\docker-compose.yml, deploy\martin-config.template.yaml, `
-            deploy\render-martin-config.ps1, vp_gota_create.ddl `
+            deploy\render-martin-config.ps1 `
             -Destination "${{ vars.DEPLOY_PATH }}" -Force
 
       - name: Desplegar (pull + up)

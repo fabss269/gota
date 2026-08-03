@@ -31,8 +31,8 @@ Módulo: `modules/auth/`. Solo toca la BD propia (`usuario`, `rol`).
 ## `POST /auth/logout`
 
 - Requiere `Authorization`. Invalidación server-side del refresh token: necesita una
-  tabla/registro de tokens revocados o de sesiones activas — **no existe hoy en
-  `vp_gota_create.ddl`**. Como el propio `API.md` marca este endpoint como "opcional",
+  tabla/registro de tokens revocados o de sesiones activas — **no existe hoy en el
+  esquema `gota`**. Como el propio `API.md` marca este endpoint como "opcional",
   la Fase 3 puede empezar sin invalidación real (el cliente simplemente descarta el
   token) y añadir una tabla `sesion_token` más adelante si se vuelve requisito real.
 
