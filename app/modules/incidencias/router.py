@@ -4,6 +4,8 @@ from fastapi import APIRouter, Depends, status
 
 from app.db.models_propia import Usuario
 from app.modules.catalogos.sig_repository import SigCatalogoRepository
+from app.modules.grafo.repository import GrafoRepository
+from app.modules.grafo.service import GrafoService
 from app.modules.incidencias.cache_repository import IncidenciaCacheRepository
 from app.modules.incidencias.catastro_enrichment import CatastroEnrichmentService
 from app.modules.incidencias.propia_repository import PropiaIncidenciaRepository
@@ -39,6 +41,7 @@ def _get_service(session: PropiaSession, sig_session: SigSession, redis: RedisDe
         IncidenciaCacheRepository(redis),
         CatastroEnrichmentService(sig_session),
         SigCatalogoRepository(sig_session),
+        GrafoService(GrafoRepository(session)),
     )
 
 

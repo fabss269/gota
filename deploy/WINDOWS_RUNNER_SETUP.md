@@ -71,12 +71,8 @@ GitHub automáticamente en cada job, no hay que crearlo a mano.
 
 ## 4. Primer deploy
 
-- Push a `main` en `gota-backend` primero (deja `docker-compose.yml`,
-  `martin-config.template.yaml`, `vp_gota_create.ddl` y el `.env` real listos en
-  `C:\epsel-deploy`, y levanta backend+martin+redis).
-- Luego push a `main` en `EPSEL-MOVIL` (o simplemente esperar a que su propio
-  deploy corra) para traer el servicio `frontend`.
-- Verificar con `docker compose ps` en `C:\epsel-deploy` que los 4 servicios estén
-  arriba, y confirmar que el esquema `gota` ya fue aplicado contra `bd_conhydra`
-  (ver sección "Despliegue" del README de `gota-backend`) antes de este primer
-  `up`, si aún no se hizo.
+Con los runners registrados y la variable configurada, seguir
+[`PRODUCTION_DEPLOY.md`](./PRODUCTION_DEPLOY.md) desde el paso 6 en adelante
+(orden exacto de primer deploy, cuándo aplicar el DDL, migración de datos y
+verificación) — no repetido acá para no tener dos versiones del mismo checklist
+que puedan desalinearse.

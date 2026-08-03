@@ -22,6 +22,23 @@
 #
 # Estructura (schema/table/srid/geometry_column) verificada en vivo contra bd_conhydra
 # real con `martin --save-config` — no es una plantilla adivinada.
+#
+# `aguaid`/`alcantarilladoid`/`buzonid` en agua/alcantarillado/buzones: el id propio del
+# elemento, necesario para el modo simulación del mapa (click en un tramo/tubería/buzón
+# -> se lee este id de las properties del feature clickeado -> POST /grafo/simulacion).
+# Sin esto, un click solo trae sectorid/codigo/etc., no hay forma de identificar QUÉ
+# elemento se clickeó para llamar a la función de simulación correspondiente.
+#
+# `agua`/`alcantarillado` publican `gota.agua_2d`/`gota.alcantarillado_2d` (vistas con
+# `ST_Force2D(geom)`, definidas en sql/martin_vistas_2d.sql), NO las tablas base — bug
+# real de PostGIS/Martin encontrado en vivo 2026-08-03: ST_AsMVTGeom revienta con
+# "lwcollection_construct: mixed dimension geometries: 2/0" en algunos tramos
+# MultiLineStringZ con Z=0 (confirmado con alcantarilladoid 311/8, z13/2279/4249) — la Z
+# no se usa en el mapa 2D y en ambas tablas es casi siempre 0 (agua: 254/25401 filas con
+# Z≠0, alcantarillado: 0/30815), así que Force2D es seguro. Las vistas viven en `gota`
+# (no en `sig`: nunca se escribe DDL ahí directamente, mismo criterio que
+# grafo_funciones.sql) aunque lean `sig.agua`/`sig.alcantarillado` cross-schema. El id
+# publicado (`agua`/`alcantarillado`) no cambia, solo la tabla real detrás.
 
 postgres:
   connection_string: '${SIG_DATABASE_URL}'
@@ -29,19 +46,21 @@ postgres:
   pool_size: 10
   tables:
     agua:
-      schema: sig
-      table: agua
+      schema: gota
+      table: agua_2d
       srid: 32719
       geometry_column: geom
       properties:
+        aguaid: int4
         aguatipoid: int4
         sectorid: int4
     alcantarillado:
-      schema: sig
-      table: alcantarillado
+      schema: gota
+      table: alcantarillado_2d
       srid: 32719
       geometry_column: geom
       properties:
+        alcantarilladoid: int4
         codigo: varchar
         alcantarilladotipoid: int4
         materialid: int4
@@ -54,6 +73,7 @@ postgres:
       srid: 32719
       geometry_column: geom
       properties:
+        buzonid: int4
         codigo: varchar
         sectorid: int4
         distritoid: int4
@@ -72,6 +92,7 @@ postgres:
       srid: 32719
       geometry_column: geom
       properties:
+        cajadesagueid: int4
         inscripcion: varchar
         sectorid: int4
         distritoid: int4
@@ -120,17 +141,43 @@ postgres:
       geometry_column: geom
       properties:
         sectorid: int4
-    alcantarillado_flujo:
-      # Vista materializada (Spec: mv_alcantarillado_flujo) — orienta cada tramo según
-      # el sentido real del flujo y ya trae `geom_flecha`: un triángulo en el punto
-      # medio del tramo, orientado hacia el sentido de flujo (NULL si no hay cotas
-      # válidas para calcularlo, ~20% de los tramos). Publicamos geom_flecha, no geom:
-      # la línea en sí ya se ve con alcantarillado-primaria/secundaria — lo nuevo acá
-      # es la flecha de dirección.
+    accesorios:
+      # "Herramienta" en modo simulación (válvulas/codos/tees) — 2026-08-03.
+      # Publica la tabla cruda de sig: es geometry(PointZ,32719) con solo
+      # 279/20374 filas con Z≠0 (~1.4%), muy distinto del caso real de
+      # MultiLineStringZ (agua/alcantarillado) que rompía ST_AsMVTGeom con
+      # "lwcollection_construct: mixed dimension geometries" (ver
+      # sql/martin_vistas_2d.sql) — un Point sin líneas es mucho menos
+      # propenso a ese bug. Verificado en vivo con un barrido de tiles sobre
+      # Chiclayo sin error (ver conversación 2026-08-03). Si algún tile
+      # llegara a fallar igual, la vista Force2D de respaldo es
+      # `gota.accesorios_2d` (mismo patrón que agua_2d/alcantarillado_2d).
       schema: sig
-      table: mv_alcantarillado_flujo
+      table: accesorios
       srid: 32719
-      geometry_column: geom_flecha
+      geometry_column: geom
+      properties:
+        accesorioid: int4
+        accesoriotipoid: int4
+        sectorid: int4
+        distritoid: int4
+    alcantarillado_flujo:
+      # Vista materializada (Spec: mv_alcantarilladoflujo, renombrada en producción
+      # sin guion bajo — el nombre publicado acá ("alcantarillado_flujo", la clave
+      # de este bloque) es independiente y no cambia, lo consume el frontend vía
+      # /tiles/alcantarillado_flujo/... sin saber el nombre real de la tabla) —
+      # orienta cada tramo según el sentido real del flujo: un triángulo (polígono)
+      # en el punto medio del tramo, orientado hacia el sentido de flujo (NULL si no
+      # hay cotas válidas para calcularlo, ~20% de los tramos). La línea en sí ya se
+      # ve con alcantarillado-primaria/secundaria — lo nuevo acá es la flecha.
+      # Columna verificada en vivo contra el backup real: es `geom` (ST_Polygon,
+      # SRID 32719), no `geom_flecha` como decía la versión anterior de este
+      # comentario — el nombre de columna cambió en algún punto entre el diseño
+      # original y este backup de producción (2026-08-02), mismo contenido.
+      schema: sig
+      table: mv_alcantarilladoflujo
+      srid: 32719
+      geometry_column: geom
       properties:
         primaria: bool
         sectorid: int4

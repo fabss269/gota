@@ -29,10 +29,8 @@ class Settings(BaseSettings):
     # al regex de localhost ya permitido para dev. None (default) = solo dev local.
     allowed_origin: str | None = None
 
-    # Heurística de incidencias relacionadas (quejasAgrupadas/foco, specs/04) —
-    # confirmado con Edgar 2026-07-24: 150m / 30 días como default configurable.
-    quejas_radio_metros: float = 150.0
-    quejas_ventana_dias: int = 30
+    # Tope de incidencias relacionadas devueltas en `foco.incidenciasRelacionadasIds`
+    # (quejasAgrupadas/foco, ahora por causa raíz de grafo — ver app/modules/grafo).
     quejas_max_relacionadas: int = 10
 
     @property

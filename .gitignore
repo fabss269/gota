@@ -9,3 +9,4 @@ venv/
 .deploy-keys/
 deploy/.env
 deploy/martin-config.yaml
+deploy/docker-compose.override.yml
