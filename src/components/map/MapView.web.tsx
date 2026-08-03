@@ -427,6 +427,17 @@ export function EpselMapView({ clusters, onPressCluster }: Props) {
   const modoVista = useSimulacionStore((state) => state.modoVista);
   const resultadoSimulacion = useSimulacionStore((state) => state.resultado);
   const redAfectada = useSimulacionStore((state) => state.redAfectada);
+  // Bug real encontrado 2026-08-04: este efecto escribía en el mapa (setFilter/
+  // setPaintProperty) en CADA evento 'styledata', incluso sin haber entrado nunca a
+  // modo simulación — y esas mismas escrituras disparan más 'styledata', creando un
+  // ciclo infinito con applyCatastroSectorFilter/applySectorHighlight/applyVisibility
+  // (los 4 efectos compiten por las mismas capas, sin converger nunca). Eso causaba
+  // que el resaltado de sector y la capa de agua "a veces sí, a veces no" se vieran —
+  // no era intermitente al azar, era una carrera determinística que perdía casi
+  // siempre contra este efecto. Fix: si modo vista nunca estuvo activo desde el
+  // último cambio relevante, no tocar estas capas en absoluto — dejarlas 100% en
+  // manos de los otros efectos, que son sus dueños legítimos fuera de modo vista.
+  const modoVistaAplicadoRef = useRef(false);
 
   useEffect(() => {
     const map = mapRef.current;
@@ -435,6 +446,8 @@ export function EpselMapView({ clusters, onPressCluster }: Props) {
     const applyModoVista = () => {
       const sim = useSimulacionStore.getState();
       const activo = sim.modoVista;
+
+      if (!activo && !modoVistaAplicadoRef.current) return;
 
       const idsPorTipo = new Map<string, (number | string)[]>();
       for (const el of sim.redAfectada ?? []) {
@@ -475,13 +488,21 @@ export function EpselMapView({ clusters, onPressCluster }: Props) {
           map.setLayoutProperty(id, 'visibility', visible ? 'visible' : 'none');
         }
       }
+
+      // Marca que este efecto "tomó control" (activo=true) o que ya soltó el control
+      // tras el reset de arriba (activo=false) — así el próximo tick, si sigue
+      // inactivo, entra por el early-return y deja de pelear por estas capas.
+      modoVistaAplicadoRef.current = activo;
     };
 
     // Registrado después de applyCatastroSectorFilter/applySectorHighlight (ambos
     // más arriba en este componente, se montan primero) para ganar el setFilter en
-    // las layers que comparten: en modo vista, la simulación manda sobre el filtro
-    // de sector; al salir, se pierde el filtro de sector que hubiera estado activo
-    // (limitación conocida y aceptable, no bloqueante).
+    // las layers que comparten mientras modo vista está activo. Al salir, el reset
+    // de arriba deja el filtro en baseFilter/null por un instante, pero como
+    // applyCatastroSectorFilter sigue escuchando 'styledata' y siempre reaplica el
+    // sector activo desde el store (no solo cuando cambia), se autocorrige en el
+    // siguiente tick — sin el guard modoVistaAplicadoRef de arriba esto generaba un
+    // ciclo infinito entre ambos efectos en vez de converger.
     map.on('styledata', applyModoVista);
     if (map.isStyleLoaded()) applyModoVista();
 
