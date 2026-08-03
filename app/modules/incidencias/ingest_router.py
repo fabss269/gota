@@ -12,9 +12,8 @@ from __future__ import annotations
 
 import os
 import tempfile
-import uuid
-from datetime import datetime
-from typing import Literal
+from datetime import UTC, datetime
+from typing import Annotated, Literal
 
 import pandas as pd
 from fastapi import APIRouter, File, HTTPException, UploadFile, status
@@ -72,7 +71,7 @@ class IncidenciaCreate(BaseModel):
 # Endpoint 1: subir Excel
 # ============================================================================
 @router.post("/excel", status_code=status.HTTP_200_OK)
-async def cargar_excel(archivo: UploadFile = File(...)) -> dict:
+async def cargar_excel(archivo: Annotated[UploadFile, File(...)]) -> dict:
     """Recibe un xlsx con el mismo formato del reporte oficial y lo procesa por el
     mismo ETL que usa el CLI (`scripts.etl_tickets_crudos`)."""
     if not archivo.filename or not archivo.filename.lower().endswith((".xlsx", ".xls")):
@@ -126,7 +125,7 @@ async def simular_incidencia(datos: IncidenciaCreate) -> dict:
 
     # 2. Generar TICKET unico — timestamp en ms (13 chars) para no colisionar con
     # los del Excel (5 chars). Es suficientemente unico para simulacion.
-    ticket_id = str(int(datetime.now().timestamp() * 1000))
+    ticket_id = str(int(datetime.now(UTC).timestamp() * 1000))
 
     # 3. Zero-pad suministro si viene con menos de 8 chars
     suministro_norm = datos.suministro.zfill(8) if datos.suministro else None
@@ -136,7 +135,7 @@ async def simular_incidencia(datos: IncidenciaCreate) -> dict:
         "TICKET": ticket_id,
         "ALCANCE": datos.alcance,
         "MEDIO_RECEPCION": datos.medio_recepcion,
-        "FECHA_REGISTRO": datetime.now(),
+        "FECHA_REGISTRO": datetime.now(UTC).replace(tzinfo=None),
         "USUARIO_REGISTRA": datos.usuario_registra.lower(),
         "DISTRITO": datos.distrito,
         "SUMINISTRO": suministro_norm,
