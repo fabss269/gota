@@ -7,6 +7,7 @@ from app.modules.auth.router import router as auth_router
 from app.modules.catalogos.router import router as catalogos_router
 from app.modules.dashboard.router import router as dashboard_router
 from app.modules.grafo.router import router as grafo_router
+from app.modules.incidencias.ingest_router import router as ingest_router
 from app.modules.incidencias.router import router as incidencias_router
 from app.modules.red.router import router as red_router
 from app.modules.usuarios.router import router as usuarios_router
@@ -31,6 +32,7 @@ register_exception_handlers(app)
 app.include_router(auth_router)
 app.include_router(catalogos_router)
 app.include_router(incidencias_router)
+app.include_router(ingest_router)
 app.include_router(usuarios_router)
 app.include_router(red_router)
 app.include_router(dashboard_router)

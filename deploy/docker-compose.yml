@@ -42,6 +42,7 @@ services:
 
   redis:
     image: redis:7-alpine
+    container_name: gota-redis
     restart: unless-stopped
     volumes:
       - gota_redis_data:/data
@@ -49,6 +50,7 @@ services:
 
   martin:
     image: ghcr.io/maplibre/martin:latest
+    container_name: gota-martin
     restart: unless-stopped
     command: ["--config", "/config/martin-config.yaml", "--listen-addresses", "0.0.0.0:3000"]
     volumes:

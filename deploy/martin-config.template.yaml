@@ -40,6 +40,14 @@
 # grafo_funciones.sql) aunque lean `sig.agua`/`sig.alcantarillado` cross-schema. El id
 # publicado (`agua`/`alcantarillado`) no cambia, solo la tabla real detrás.
 
+# Cache global de tiles ya generadas (default de Martin: 256 MB). Subido a 2 GB
+# porque al cambiar de sector el filtro por sectorid se aplica en el cliente:
+# la tile completa igual se descarga y regenera desde Postgres, y con 10 sources
+# activas es el cuello de botella. Con 2 GB entra practicamente todo el catastro
+# de Chiclayo a los zooms usables (16-19), y al re-visitar un sector la tile sale
+# de RAM. Ver referencia: https://maplibre.org/martin/config-file.html#caching
+cache_size_mb: 2048
+
 postgres:
   connection_string: '${SIG_DATABASE_URL}'
   auto_publish: false
