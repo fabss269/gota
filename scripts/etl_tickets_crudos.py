@@ -5,7 +5,10 @@ este script hace la normalización él mismo, para que sirva con cualquier expor
 cruda futura de tickets, no solo con la que ya teníamos procesada:
 
 1. Deduplica por TICKET (se han visto exportaciones que se solapan).
-2. Descarta filas sin SUMINISTRO (no hay forma de ubicarlas en el catastro).
+2. Filas sin SUMINISTRO: se separan del flujo principal y se guardan en
+   gota.reclamo_sin_suministro (decisión Fabiana 2026-08-02). NO van a
+   gota.incidente/reclamo porque ensuciarian los KPIs; NO van al datamart porque
+   no aportan a analitica; pero se preservan para auditoria/regulatorio.
 3. Normaliza DETALLE DE SOLUCIÓN: decenas de variantes con errores de tipeo
    (ATENDIDA/ATENDIDA./ATENIDIDO/SE ATENDIÓ/FINALIZO/SOLUCIONADO/...) -> 'ATENDIDO' si
    hay algo, 'SIN_DATO' si está vacío (ambos casos ya se tratan igual en la carga:
@@ -36,7 +39,7 @@ from pathlib import Path
 
 import pandas as pd
 
-from scripts.tickets_loader import cargar_dataframe
+from scripts.tickets_loader import cargar_dataframe, cargar_sin_suministro
 
 DEFAULT_XLSX_PATH = Path.home() / "Documentos" / "tickets (1) (1) (1).xlsx"
 
@@ -113,7 +116,12 @@ def _excel_serial_a_datetime(columna: pd.Series) -> pd.Series:
     return pd.to_datetime(columna, unit="D", origin="1899-12-30")
 
 
-def normalizar(df_crudo: pd.DataFrame) -> pd.DataFrame:
+def normalizar(df_crudo: pd.DataFrame) -> tuple[pd.DataFrame, pd.DataFrame]:
+    """Normaliza el df crudo. Retorna (df_con_suministro, df_sin_suministro).
+
+    Los sin suministro NO se descartan: van al segundo df para persistirlos aparte
+    en gota.reclamo_sin_suministro (auditoría/regulatorio, sin llegar al datamart).
+    """
     df = df_crudo.rename(columns=COLUMNAS_RENOMBRADAS).drop(columns=COLUMNAS_A_DESCARTAR)
     # incidente.codigo/reclamo.ticket_original son varchar — comparar como texto, si
     # no la carga progresiva nunca detecta lo ya cargado (int64 vs varchar no calzan).
@@ -123,9 +131,13 @@ def normalizar(df_crudo: pd.DataFrame) -> pd.DataFrame:
     df = df.drop_duplicates(subset="TICKET", keep="first")
     print(f"Duplicados por TICKET descartados: {antes - len(df)}")
 
-    antes = len(df)
-    df = df[df["SUMINISTRO"].notna()].copy()
-    print(f"Filas sin SUMINISTRO descartadas: {antes - len(df)}")
+    # Separar el DataFrame en 2: con suministro (flujo normal) y sin suministro
+    # (van a gota.reclamo_sin_suministro, NO al datamart).
+    sin_sum_mask = df["SUMINISTRO"].isna()
+    df_sin_suministro = df[sin_sum_mask].copy()
+    df = df[~sin_sum_mask].copy()
+    print(f"Con SUMINISTRO:    {len(df):,}  -> gota.incidente/reclamo")
+    print(f"Sin SUMINISTRO:    {len(df_sin_suministro):,}  -> gota.reclamo_sin_suministro")
 
     df["SUMINISTRO"] = df["SUMINISTRO"].astype("int64").astype(str).str.zfill(8)
     df["DNI"] = df["DNI"].astype("int64").astype(str).str.zfill(8)
@@ -133,7 +145,20 @@ def normalizar(df_crudo: pd.DataFrame) -> pd.DataFrame:
     df["TELEFONO_FIJO"] = df["TELEFONO_FIJO"].apply(
         lambda v: None if pd.isna(v) else str(int(v))
     )
-    df["FECHA_SOLUCION"] = _excel_serial_a_datetime(df["FECHA_SOLUCION"])
+    # FECHA_SOLUCION y USUARIO_SOLUCIONA pueden estar vacíos si el ticket todavía no
+    # está resuelto (típico cuando llega por API — el operador crea el reclamo, el
+    # técnico lo cierra después). Se manejan como NaT / None y el loader los guarda
+    # como NULL en incidente + estado_actual_id = 'CREADO'.
+    # Convertimos serial Excel -> datetime en toda la columna. `errors='coerce'` deja
+    # NaT para los valores 0 o NaN. En pandas 3.x no se puede asignar un DatetimeArray
+    # a un slice de columna float64, hay que convertir la columna entera.
+    df["FECHA_SOLUCION"] = df["FECHA_SOLUCION"].replace(0, pd.NA)
+    df["FECHA_SOLUCION"] = pd.to_datetime(
+        df["FECHA_SOLUCION"], unit="D", origin="1899-12-30", errors="coerce"
+    )
+    df["USUARIO_SOLUCIONA"] = df["USUARIO_SOLUCIONA"].where(
+        df["USUARIO_SOLUCIONA"].notna(), None
+    )
     df["DETALLE_DE_SOLUCION"] = df["DETALLE_DE_SOLUCION"].apply(normalizar_detalle_solucion)
 
     extraido = df["DETALLE_DEL_TICKET"].apply(extraer_problema_direccion)
@@ -142,14 +167,39 @@ def normalizar(df_crudo: pd.DataFrame) -> pd.DataFrame:
     df["tecnico"] = df["DETALLE_DEL_TICKET"].apply(extraer_tecnico)
     df["es_robo"] = df["DETALLE_DEL_TICKET"].apply(es_robo)
 
-    return df
+    # Aplicar las mismas transformaciones al df sin suministro (excepto SUMINISTRO)
+    if not df_sin_suministro.empty:
+        df_sin_suministro["DNI"] = df_sin_suministro["DNI"].astype("int64").astype(str).str.zfill(8)
+        df_sin_suministro["CELULAR"] = df_sin_suministro["CELULAR"].astype("int64").astype(str)
+        df_sin_suministro["TELEFONO_FIJO"] = df_sin_suministro["TELEFONO_FIJO"].apply(
+            lambda v: None if pd.isna(v) else str(int(v))
+        )
+        df_sin_suministro["FECHA_SOLUCION"] = df_sin_suministro["FECHA_SOLUCION"].replace(0, pd.NA)
+        df_sin_suministro["FECHA_SOLUCION"] = pd.to_datetime(
+            df_sin_suministro["FECHA_SOLUCION"], unit="D", origin="1899-12-30", errors="coerce"
+        )
+        df_sin_suministro["USUARIO_SOLUCIONA"] = df_sin_suministro["USUARIO_SOLUCIONA"].where(
+            df_sin_suministro["USUARIO_SOLUCIONA"].notna(), None
+        )
+        df_sin_suministro["DETALLE_DE_SOLUCION"] = df_sin_suministro["DETALLE_DE_SOLUCION"].apply(
+            normalizar_detalle_solucion
+        )
+        extraido_ss = df_sin_suministro["DETALLE_DEL_TICKET"].apply(extraer_problema_direccion)
+        df_sin_suministro["problema"] = extraido_ss.apply(lambda t: t[0])
+        df_sin_suministro["direccion_detalle"] = extraido_ss.apply(lambda t: t[1])
+        df_sin_suministro["tecnico"] = df_sin_suministro["DETALLE_DEL_TICKET"].apply(extraer_tecnico)
+        df_sin_suministro["es_robo"] = df_sin_suministro["DETALLE_DEL_TICKET"].apply(es_robo)
+
+    return df, df_sin_suministro
 
 
 async def main(xlsx_path: Path) -> None:
     df_crudo = pd.read_excel(xlsx_path)
     print(f"Filas leídas de {xlsx_path.name}: {len(df_crudo)}")
-    df = normalizar(df_crudo)
+    df, df_sin_suministro = normalizar(df_crudo)
     await cargar_dataframe(df)
+    if not df_sin_suministro.empty:
+        await cargar_sin_suministro(df_sin_suministro)
 
 
 if __name__ == "__main__":
