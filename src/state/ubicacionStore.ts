@@ -4,9 +4,12 @@ import { getDistritos, getProvincias, getSectores } from '@/api/catalogos';
 import type { ApiDistrito, ApiProvincia, ApiSector } from '@/api/types';
 
 // Chiclayo (provinciacod '01', ubigeo distrital '140101') — scope por defecto (Spec:
-// sede EPSEL está ahí y es donde vive la mayoría de la data de prueba).
+// sede EPSEL está ahí y es donde vive la mayoría de la data de prueba). Sector 06
+// (sig.sectores.sectorid=28) preseleccionado: es el segundo con mas incidencias del
+// historico de Chiclayo (1175 tickets), buen punto de entrada al mapa.
 const PROVINCIA_DEFAULT = '01';
 const DISTRITO_DEFAULT = '140101';
+const SECTOR_DEFAULT = '28';
 
 type UbicacionState = {
   provincias: ApiProvincia[];
@@ -34,7 +37,7 @@ export const useUbicacionStore = create<UbicacionState>((set, get) => ({
   error: null,
   provinciasActivas: new Set([PROVINCIA_DEFAULT]),
   distritosActivos: new Set([DISTRITO_DEFAULT]),
-  sectoresActivos: new Set(),
+  sectoresActivos: new Set([SECTOR_DEFAULT]),
 
   cargar: async () => {
     if (get().provincias.length > 0 || get().cargando) return;
