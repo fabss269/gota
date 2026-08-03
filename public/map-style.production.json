@@ -100,7 +100,7 @@
       "source": "agua",
       "source-layer": "agua",
       "layout": { "visibility": "none" },
-      "paint": { "line-color": "#2563EB", "line-width": 1.8 }
+      "paint": { "line-color": "#29B6F6", "line-width": 1.8 }
     },
     {
       "id": "cajaaguaconexion-line",
@@ -126,7 +126,7 @@
       "source-layer": "alcantarillado",
       "layout": { "visibility": "none" },
       "filter": ["==", ["get", "primaria"], true],
-      "paint": { "line-color": "#E53935", "line-width": 2.5 }
+      "paint": { "line-color": "#5D4037", "line-width": 2.5 }
     },
     {
       "id": "alcantarillado-secundaria",
@@ -135,7 +135,7 @@
       "source-layer": "alcantarillado",
       "layout": { "visibility": "none" },
       "filter": ["==", ["get", "primaria"], false],
-      "paint": { "line-color": "#FB8C00", "line-width": 1.2 }
+      "paint": { "line-color": "#A1887F", "line-width": 1.2 }
     },
     {
       "id": "alcantarillado-flujo-flecha",

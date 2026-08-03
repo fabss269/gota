@@ -179,13 +179,13 @@ export function FiltersSidebar() {
       <div style={subsectionLabel}>Alcantarillado</div>
 
       <CapaRow
-        icon={<SolidLine color="#E53935" />}
+        icon={<SolidLine color="#5D4037" />}
         label="Red primaria (colectores)"
         value={isCapa('red_primaria_desague')}
         onChange={() => toggleCapa('red_primaria_desague')}
       />
       <CapaRow
-        icon={<SolidLine color="#FB8C00" />}
+        icon={<SolidLine color="#A1887F" />}
         label="Red secundaria"
         value={isCapa('red_secundaria_desague')}
         onChange={() => toggleCapa('red_secundaria_desague')}
@@ -218,7 +218,7 @@ export function FiltersSidebar() {
       <div style={subsectionLabel}>Agua</div>
 
       <CapaRow
-        icon={<SolidLine color="#2563EB" />}
+        icon={<SolidLine color="#29B6F6" />}
         label="Red de agua potable"
         value={isCapa('red_potable')}
         onChange={() => toggleCapa('red_potable')}

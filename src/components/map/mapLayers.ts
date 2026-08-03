@@ -126,9 +126,9 @@ export const SIMULACION_AFECTADO_COLOR = '#FF3B30';
 // Colores base (copiados de public/map-style.json), para restaurar al salir de
 // modo vista sin depender de leer el style original de vuelta.
 export const SIMULACION_COLOR_ORIGINAL: Record<string, string> = {
-  'agua-red': '#2563EB',
-  'alcantarillado-primaria': '#E53935',
-  'alcantarillado-secundaria': '#FB8C00',
+  'agua-red': '#29B6F6',
+  'alcantarillado-primaria': '#5D4037',
+  'alcantarillado-secundaria': '#A1887F',
   'buzones-circle': '#757575',
   'accesorios-circle': '#9C27B0',
   'cajaagua-circle': '#06B6D4',
