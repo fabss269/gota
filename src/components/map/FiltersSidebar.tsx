@@ -275,14 +275,33 @@ function ProvinciaGroup({
   sectoresActivos: Set<string>;
   onToggleSector: (id: string) => void;
 }) {
+  // Expansion visual (chevron) separada del filtro (check): permite ver las 3
+  // provincias siempre y expandir solo una sin perder los filtros activos de otra.
+  const [abierta, setAbierta] = useState(activa);
   return (
     <div style={{ marginBottom: 4 }}>
-      <label style={provinciaRow}>
-        <input type="checkbox" checked={activa} onChange={onToggle} style={checkboxInput} />
-        <span style={provinciaLabel}>{nombre}</span>
-      </label>
+      <div style={provinciaRow}>
+        <input
+          type="checkbox"
+          checked={activa}
+          onChange={onToggle}
+          style={checkboxInput}
+          aria-label={`Filtrar por ${nombre}`}
+        />
+        <button
+          type="button"
+          onClick={() => setAbierta((v) => !v)}
+          aria-expanded={abierta}
+          style={provinciaToggleBtn}
+        >
+          <span style={provinciaLabel}>{nombre}</span>
+          <span style={{ ...chevron, transform: abierta ? 'rotate(0deg)' : 'rotate(-90deg)' }}>
+            ▾
+          </span>
+        </button>
+      </div>
 
-      {activa && (
+      {abierta && (
         <div style={distritoList}>
           {distritos.map((distrito) => (
             <DistritoGroup
@@ -541,7 +560,18 @@ const provinciaRow: CSSProperties = {
   gap: 8,
   paddingTop: 6,
   paddingBottom: 6,
+};
+
+const provinciaToggleBtn: CSSProperties = {
+  flex: 1,
+  display: 'flex',
+  alignItems: 'center',
+  justifyContent: 'space-between',
+  background: 'none',
+  border: 'none',
+  padding: 0,
   cursor: 'pointer',
+  textAlign: 'left',
 };
 
 const provinciaLabel: CSSProperties = {
