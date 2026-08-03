@@ -129,7 +129,6 @@ export function FiltersSidebar() {
       </button>
 
       <CapaRow
-        icon={<ColorSquare color="#9E9E9E" border="#546472" />}
         label="Resaltar sector en el mapa"
         value={isCapa('resaltar_sector')}
         onChange={() => toggleCapa('resaltar_sector')}
@@ -352,7 +351,7 @@ function CapaRow({
   value,
   onChange,
 }: {
-  icon: ReactNode;
+  icon?: ReactNode;
   label: string;
   value: boolean;
   onChange: () => void;
@@ -360,9 +359,11 @@ function CapaRow({
   return (
     <div style={capaRow}>
       <div style={{ display: 'flex', alignItems: 'center', gap: 8, flex: 1 }}>
-        <div style={{ width: 22, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
-          {icon}
-        </div>
+        {icon !== undefined && (
+          <div style={{ width: 22, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+            {icon}
+          </div>
+        )}
         <span style={{ fontSize: 12, color: '#212121' }}>{label}</span>
       </div>
       <Toggle value={value} onChange={onChange} />
