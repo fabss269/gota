@@ -5,7 +5,7 @@
 
 ## 0. Convención: fechas naive en UTC
 
-Todas las columnas de fecha/hora de `vp_gota_create.ddl` son `timestamp` **sin** zona
+Todas las columnas de fecha/hora del esquema `gota` son `timestamp` **sin** zona
 horaria (`ultimo_login`, `creado_en`, `fecha`, `fecha_registro`, etc. — ninguna es
 `timestamptz`). Confirmado con Postgres real (`asyncpg` rechaza con error, no en
 silencio, escribir un `datetime` con `tzinfo` en una columna así). Convención de código
@@ -18,8 +18,11 @@ no algo para decidir unilateralmente desde el código.
 
 ## 1. Dos fuentes de datos, cero JOIN en SQL
 
-`bd_conhydra` (esquema `sig`) y la BD propia (`vp_gota_create.ddl`) son dos Postgres
-distintos. No hay `postgres_fdw`/`dblink` — no se pueden unir con `JOIN` de SQL.
+Los esquemas `sig` (catastro EPSEL) y `gota` (dominio propio) viven en el mismo
+Postgres (`bd_conhydra`), pero en código se acceden con dos engines de SQLAlchemy
+independientes (pools y roles separados). Convención: no usar `JOIN` cross-schema
+en SQL — cualquier composición de datos de ambos se resuelve en el service layer,
+combinando resultados de queries separadas por engine.
 
 - `PropiaDbEngine` — async, lectura/escritura, `asyncpg`. Es donde vive todo el dominio
   de negocio: `incidente`, `reclamo`, `usuario`, `estado_incidente_evento`, catálogos.

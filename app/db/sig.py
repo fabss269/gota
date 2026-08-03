@@ -10,7 +10,7 @@ from sqlalchemy.ext.asyncio import (
 
 from app.core.config import settings
 
-sig_engine: AsyncEngine = create_async_engine(settings.sig_db_url, pool_pre_ping=True)
+sig_engine: AsyncEngine = create_async_engine(settings.sig_db_url_effective, pool_pre_ping=True)
 
 SigSessionFactory = async_sessionmaker(sig_engine, expire_on_commit=False)
 

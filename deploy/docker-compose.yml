@@ -1,13 +1,3 @@
-# Producción — este archivo vive también en el servidor (~/gota-backend-deploy/,
-# ver .github/workflows/deploy.yml). La BD (bd_conhydra, esquemas `gota`+`sig`) es
-# externa (servidor Postgres de EPSEL, IP LAN) — no hay contenedor `postgres` propio.
-# Único puerto publicado: `frontend` (nginx sirve la SPA y hace de proxy a
-# `/api` → backend y `/tiles` → martin) — backend/martin/redis solo son alcanzables
-# dentro de la red `gota`, nunca desde afuera.
-#
-# `martin-config.yaml` (no `.template.yaml`) se genera en el servidor con `envsubst`
-# antes de este `up` — Martin no soporta `${VAR}` en su propio config (verificado).
-
 services:
   frontend:
     image: ${FRONTEND_IMAGE:-ghcr.io/ivanedac/epsel-movil:latest}
@@ -22,18 +12,8 @@ services:
   backend:
     image: ${BACKEND_IMAGE:-ghcr.io/ivanedac/epsel-backend:latest}
     restart: unless-stopped
+    env_file: .env
     environment:
-      PROPIA_DB_URL: ${PROPIA_DB_URL}
-      PROPIA_DB_SCHEMA: ${PROPIA_DB_SCHEMA:-gota}
-      SIG_DB_HOST: ${SIG_DB_HOST}
-      SIG_DB_PORT: ${SIG_DB_PORT:-5432}
-      SIG_DB_NAME: ${SIG_DB_NAME:-bd_conhydra}
-      SIG_DB_USER: ${SIG_DB_USER}
-      SIG_DB_PASSWORD: ${SIG_DB_PASSWORD}
-      JWT_SECRET: ${JWT_SECRET}
-      JWT_ACCESS_EXPIRES_SECONDS: ${JWT_ACCESS_EXPIRES_SECONDS:-3600}
-      JWT_REFRESH_EXPIRES_SECONDS: ${JWT_REFRESH_EXPIRES_SECONDS:-2592000}
-      ALLOWED_ORIGIN: ${ALLOWED_ORIGIN:-}
       REDIS_URL: redis://redis:6379/0
     depends_on:
       redis:
@@ -42,6 +22,7 @@ services:
 
   redis:
     image: redis:7-alpine
+    container_name: gota-redis
     restart: unless-stopped
     volumes:
       - gota_redis_data:/data
@@ -49,6 +30,7 @@ services:
 
   martin:
     image: ghcr.io/maplibre/martin:latest
+    container_name: gota-martin
     restart: unless-stopped
     command: ["--config", "/config/martin-config.yaml", "--listen-addresses", "0.0.0.0:3000"]
     volumes:

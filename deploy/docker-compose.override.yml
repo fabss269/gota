@@ -1,0 +1,14 @@
+# Overrides SOLO para desarrollo local (no se despliega en prod).
+# Docker Compose lee este archivo automaticamente junto con docker-compose.yml.
+# En prod el frontend nginx hace proxy /api -> backend y /tiles -> martin, entonces
+# esos servicios no publican puerto propio. En local corremos uvicorn y expo
+# nativos, entonces necesitan alcanzar redis y martin por localhost.
+
+services:
+  redis:
+    ports:
+      - "6379:6379"
+
+  martin:
+    ports:
+      - "3000:3000"

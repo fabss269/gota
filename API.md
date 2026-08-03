@@ -280,3 +280,57 @@ en la versión original de este documento).
   evento anterior. Restringido a rol `supervisor`.
 - **`GET /red/capas`**: la respuesta es un objeto `{ "<tipo>": FeatureCollection, ... }`
   con una entrada por cada `tipo` pedido (no un único `FeatureCollection` combinado).
+- **`foco`/`quejasAgrupadas` en `GET /incidencias/{id}`** (agregado en la sesión del
+  grafo hidráulico): el campo mantiene exactamente el mismo shape (`FocoOut`), pero el
+  criterio de agrupación cambió de **proximidad geométrica** (radio 150m / ventana 30
+  días, bbox sobre lat/lon) a **causa raíz hidráulica compartida** (mismo tramo de
+  desagüe o tubería de agua que alimenta a los suministros reclamantes, resuelto vía
+  `sql/grafo_funciones.sql`, ventana 7 días / mínimo 3 reclamos). Ver sección 11.
+
+## 11. Grafo hidráulico — impacto, focos por causa raíz y simulación (nuevo)
+
+Diseño completo en `~/Documentos/grafos_catastro_epsel.md`; funciones SQL en
+`sql/grafo_funciones.sql` (schema `gota`, leen `sig.*` cross-schema). Todos requieren
+sesión autenticada (`CurrentUser`), igual que el resto de la API.
+
+### `GET /grafo/incidencias/{codigo}/impacto`
+
+Qué afecta una incidencia aguas abajo/arriba, según su `tipo_atencion` (mapeo interno
+en `app/modules/grafo/service.py::_MAPA_TIPO_FALLA` — no todos los tipos mapean a una
+simulación, ej. "OTROS"/"INSPECCION" devuelven `tipoFalla: null`).
+
+```json
+{
+  "tipoFalla": "atoro_tramo",
+  "elementoTipo": "tramo",
+  "elementoId": 10728,
+  "afectados": [
+    { "suministro": "01183239", "cajaId": 53205, "infraId": 10728,
+      "nivel": 0, "horasEstimadas": 4, "prioridad": "ALTA" }
+  ]
+}
+```
+
+### `GET /grafo/focos?tipoRed=agua|desague&dias=7&minReclamos=3`
+
+Focos activos actuales (agrupación por tramo/tubería con reclamos en la ventana dada).
+
+```json
+[
+  { "infraId": 10728, "tipoRed": "desague", "nReclamos": 11, "nSuministros": 5,
+    "primerTicket": "2025-01-02T11:54:18", "ultimoTicket": "2025-12-20T14:01:30",
+    "diasActivo": 352.1, "tipoDominante": "ATORO EN COLECTORES Y/O DESBORDE ALCANTARILLADO" }
+]
+```
+
+### `POST /grafo/simulacion`
+
+Simulación interactiva (modo simulación del mapa): usuario elige un elemento de red +
+tipo de falla, se devuelve la lista de suministros afectados (mismo shape que
+`afectados` de arriba).
+
+```json
+// body
+{ "tipoFalla": "fuga_tuberia", "elementoId": 140 }
+```
+`tipoFalla`: `atoro_tramo | colapso_buzon | falla_conexion | tapa_faltante | fuga_tuberia`.

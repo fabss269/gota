@@ -34,7 +34,7 @@ async def _limpiar_claves(redis: Redis) -> int:
 
 async def main() -> None:
     propia_engine = create_async_engine(settings.propia_db_url, connect_args=propia_connect_args())
-    sig_engine = create_async_engine(settings.sig_db_url)
+    sig_engine = create_async_engine(settings.sig_db_url_effective)
     PropiaSession = async_sessionmaker(propia_engine, expire_on_commit=False)
     SigSession = async_sessionmaker(sig_engine, expire_on_commit=False)
     redis = Redis.from_url(settings.redis_url, decode_responses=True)

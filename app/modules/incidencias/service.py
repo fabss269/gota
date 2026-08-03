@@ -6,6 +6,7 @@ from app.core.config import settings
 from app.core.exceptions import NoEncontradoError, TransicionInvalidaError
 from app.db.models_propia import Incidente, Usuario
 from app.modules.catalogos.sig_repository import SigCatalogoRepository
+from app.modules.grafo.service import GrafoService
 from app.modules.incidencias.cache_repository import IncidenciaCacheRepository
 from app.modules.incidencias.catastro_enrichment import CatastroEnrichmentService
 from app.modules.incidencias.propia_repository import PropiaIncidenciaRepository
@@ -40,11 +41,13 @@ class IncidenciaService:
         cache_repo: IncidenciaCacheRepository,
         catastro_svc: CatastroEnrichmentService,
         sig_catalogo_repo: SigCatalogoRepository,
+        grafo_svc: GrafoService,
     ) -> None:
         self._propia = propia_repo
         self._cache = cache_repo
         self._catastro = catastro_svc
         self._sig_catalogo = sig_catalogo_repo
+        self._grafo = grafo_svc
         self._mapas_cargados = False
         self._mapa_estados: dict[int, str] = {}
         self._mapa_estados_inv: dict[str, int] = {}
@@ -229,21 +232,27 @@ class IncidenciaService:
                 sector=predio_catastral.sector_nombre,
             )
 
-        relacionadas = await self._propia.get_incidencias_relacionadas(
-            incidente, radio_metros=settings.quejas_radio_metros, ventana_dias=settings.quejas_ventana_dias
-        )
-        quejas_agrupadas = await self._propia.count_reclamos_de_incidentes(
-            [r.incidente_id for r in relacionadas]
-        )
+        # Foco por causa raíz compartida (grafo hidráulico) — reemplaza el heurístico
+        # geométrico anterior (proximidad + mismo tipo_atencion). Mismo shape de
+        # respuesta (`FocoOut`), cambia solo el criterio de agrupación: mismo tramo/
+        # tubería con reclamos activos, no cercanía superficial (ver
+        # ~/Documentos/grafos_catastro_epsel.md §8.6.2).
         foco = None
-        if relacionadas:
-            sector_txt = f", {predio_catastral.sector_nombre}" if predio_catastral else ""
+        quejas_agrupadas = 0
+        foco_activo = await self._grafo.foco_de_incidencia(incidente.suministro_codigo, categoria)
+        if foco_activo is not None:
+            relacionados = await self._grafo.incidentes_relacionados_por_infra(categoria, foco_activo.infraId)
+            quejas_agrupadas = len(relacionados)
+            elemento_txt = "tramo" if categoria == "desague" else "tubería"
+            dias_txt = int(foco_activo.diasActivo) if foco_activo.diasActivo is not None else "varios"
             foco = FocoOut(
                 descripcion=(
-                    f"Posible causa común: {incidente.tipo_atencion.nombre.lower()} "
-                    f"en incidentes cercanos{sector_txt}."
+                    f"Causa raíz común: {foco_activo.nReclamos} reclamos comparten el mismo "
+                    f"{elemento_txt} en los últimos {dias_txt} días."
                 ),
-                incidenciasRelacionadasIds=[r.codigo for r in relacionadas[: settings.quejas_max_relacionadas]],
+                incidenciasRelacionadasIds=[
+                    r["codigo"] for r in relacionados if r["codigo"] != incidente.codigo
+                ][: settings.quejas_max_relacionadas],
             )
 
         historicos = await self._propia.get_predio_reclamos(incidente.incidente_id)

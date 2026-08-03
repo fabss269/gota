@@ -1,6 +1,5 @@
-import math
 import uuid
-from datetime import date, datetime, timedelta
+from datetime import date, datetime
 
 from sqlalchemy import Select, and_, func, or_, select
 from sqlalchemy.ext.asyncio import AsyncSession
@@ -155,43 +154,6 @@ class PropiaIncidenciaRepository:
         )
         result = await self._session.execute(stmt)
         return [(row.Reclamo, row.Incidente) for row in result]
-
-    async def get_incidencias_relacionadas(
-        self, incidente: Incidente, *, radio_metros: float, ventana_dias: int
-    ) -> list[Incidente]:
-        """Mismo `tipo_atencion_id`, dentro de un radio (comparación de rango sobre
-        `latitud`/`longitud` planos — no PostGIS, ver specs/04) y una ventana de tiempo.
-        Heurística de negocio, no verdad derivada del esquema — parámetros configurables
-        (`core/config.py`), confirmados con Edgar: 150m / 30 días."""
-        if incidente.latitud is None or incidente.longitud is None:
-            return []
-
-        # 1 grado de latitud ≈ 111_320 m; longitud se ajusta por el coseno de la latitud.
-        delta_lat = radio_metros / 111_320
-        delta_lon = radio_metros / (111_320 * math.cos(math.radians(float(incidente.latitud))))
-        fecha_desde = incidente.creado_en - timedelta(days=ventana_dias)
-
-        stmt = select(Incidente).where(
-            Incidente.incidente_id != incidente.incidente_id,
-            Incidente.tipo_atencion_id == incidente.tipo_atencion_id,
-            Incidente.creado_en >= fecha_desde,
-            Incidente.latitud.between(
-                float(incidente.latitud) - delta_lat, float(incidente.latitud) + delta_lat
-            ),
-            Incidente.longitud.between(
-                float(incidente.longitud) - delta_lon, float(incidente.longitud) + delta_lon
-            ),
-        )
-        return list(await self._session.scalars(stmt))
-
-    async def count_reclamos_de_incidentes(self, incidente_ids: list[uuid.UUID]) -> int:
-        if not incidente_ids:
-            return 0
-        return (
-            await self._session.scalar(
-                select(func.count()).select_from(Reclamo).where(Reclamo.incidente_id.in_(incidente_ids))
-            )
-        ) or 0
 
     async def insertar_evento(
         self,
