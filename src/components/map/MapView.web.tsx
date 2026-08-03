@@ -235,16 +235,17 @@ export function EpselMapView({ clusters, onPressCluster }: Props) {
     lastBoundsKeyRef.current = key;
 
     const bbox = unionBbox(activos.map((a) => a.bbox));
-    // Un sector es un área mucho más chica que un distrito/provincia — permite un
-    // zoom más cercano (a nivel de manzana) en vez del tope de 17 que usan los
-    // niveles más grandes.
-    const maxZoom = nivel === 'sector' ? 19 : 17;
+    // maxZoom 17 uniforme (antes era 19 para sector): a z=17 ya se ve la manzana y
+    // se piden 16x menos tiles que a z=19, mejor hit-rate del cache de Martin.
+    // duration:0 salta directo al zoom final en vez de animar por zooms intermedios
+    // (16, 17, 18) pidiendo tiles que despues se tiran — la animacion cuesta ~5s
+    // en cold porque cada zoom intermedio dispara pedidos a Martin de las 10 sources.
     map.fitBounds(
       [
         [bbox.minLon, bbox.minLat],
         [bbox.maxLon, bbox.maxLat],
       ],
-      { padding: 48, maxZoom, duration: 800 }
+      { padding: 48, maxZoom: 17, duration: 0 }
     );
   }, [provincias, distritos, sectores, provinciasActivas, distritosActivos, sectoresActivos]);
 
