@@ -23,6 +23,14 @@
 # Estructura (schema/table/srid/geometry_column) verificada en vivo contra bd_conhydra
 # real con `martin --save-config` — no es una plantilla adivinada.
 
+# Cache global de tiles ya generadas (default de Martin: 256 MB). Subido a 2 GB
+# porque al cambiar de sector el filtro por sectorid se aplica en el cliente:
+# la tile completa igual se descarga y regenera desde Postgres, y con 10 sources
+# activas es el cuello de botella. Con 2 GB entra practicamente todo el catastro
+# de Chiclayo a los zooms usables (16-19), y al re-visitar un sector la tile sale
+# de RAM. Ver referencia: https://maplibre.org/martin/config-file.html#caching
+cache_size_mb: 2048
+
 postgres:
   connection_string: '${SIG_DATABASE_URL}'
   auto_publish: false
@@ -121,16 +129,15 @@ postgres:
       properties:
         sectorid: int4
     alcantarillado_flujo:
-      # Vista materializada (Spec: mv_alcantarillado_flujo) — orienta cada tramo según
-      # el sentido real del flujo y ya trae `geom_flecha`: un triángulo en el punto
-      # medio del tramo, orientado hacia el sentido de flujo (NULL si no hay cotas
-      # válidas para calcularlo, ~20% de los tramos). Publicamos geom_flecha, no geom:
-      # la línea en sí ya se ve con alcantarillado-primaria/secundaria — lo nuevo acá
-      # es la flecha de dirección.
+      # Vista materializada `mv_alcantarilladoflujo` (sin guion bajo, nombre real en
+      # bd_conhydra actual — el Spec original era mv_alcantarillado_flujo con guion).
+      # Orienta cada tramo según el sentido real del flujo. La columna geom es un
+      # polígono/triángulo en el punto medio del tramo (NULL si no hay cotas válidas
+      # para calcular el flujo, ~20% de los tramos).
       schema: sig
-      table: mv_alcantarillado_flujo
+      table: mv_alcantarilladoflujo
       srid: 32719
-      geometry_column: geom_flecha
+      geometry_column: geom
       properties:
         primaria: bool
         sectorid: int4
