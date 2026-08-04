@@ -42,6 +42,24 @@ class Settings(BaseSettings):
     quejas_max_relacionadas: int = 10
 
     # ------------------------------------------------------------------------
+    # Ingest DANA (2026-08-04) — hoy apunta a dana_mock/ (simulación, mientras DANA
+    # no nos da acceso a su API real). Cuando lo hagan, solo cambia esta URL.
+    # ------------------------------------------------------------------------
+    dana_api_base_url: str = "http://localhost:8100"
+    # Segundos entre cada pull automático (scheduler interno, ver
+    # app/core/scheduler.py). Decisión 2026-08-04 con Edgar: cadencia rápida (30s)
+    # para que el pipeline completo sea observable en minutos — dana_mock/ emite un
+    # ticket nuevo cada 5s (ver dana_mock/generator.py TICK_SEGUNDOS), así que cada
+    # pull trae ~6 tickets nuevos en promedio.
+    dana_poll_interval_seconds: float = 30
+    # Margen de solapamiento hacia atrás sobre el checkpoint (MAX(fecha_registro) ya
+    # cargado) al calcular `fecha_desde` del próximo pull — defensivo ante relojes
+    # desincronizados entre este servidor y DANA; el dedup por TICKET en
+    # tickets_loader hace que reprocesar el solape sea inofensivo, solo desperdicia
+    # una comparación, no una escritura.
+    dana_poll_overlap_seconds: float = 10
+
+    # ------------------------------------------------------------------------
     # URLs computadas
     # ------------------------------------------------------------------------
     @property

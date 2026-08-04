@@ -45,10 +45,15 @@ import pandas as pd
 from app.core.config import propia_connect_args, settings
 from app.core.security import hash_password
 
-# MEDIO_RECEPCION (dataset) -> catalogo_medio_recepcion.codigo
+# MEDIO_RECEPCION (dataset) -> catalogo_medio_recepcion.codigo. "app" faltaba acá
+# (bug real, encontrado 2026-08-04 al ingerir tickets con medio_recepcion="app" —
+# IncidenciaCreate en ingest_router.py ya lo acepta como valor válido, y el catálogo
+# ya tiene la fila 'app'/"App móvil" sembrada, solo faltaba este mapeo) — sin esto,
+# cualquier ticket con ese medio rompía la carga con KeyError.
 MEDIO_RECEPCION_MAP = {
     "presencial": "presencial",
     "telefono": "telefono",
+    "app": "app",
     "correo electrónico": "correo-electronico",
     "formulario web": "formulario-web",
     "redes sociales": "redes-sociales",

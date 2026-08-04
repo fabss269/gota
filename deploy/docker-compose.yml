@@ -15,9 +15,21 @@ services:
     env_file: .env
     environment:
       REDIS_URL: redis://redis:6379/0
+      # Ingest DANA (2026-08-04) — dana-mock mientras DANA no da acceso real a su
+      # API (ver dana_mock/ y app/modules/incidencias/dana_ingest.py). Nombre de
+      # servicio interno (dana-mock:8100), no localhost — corre en la misma red
+      # `gota` que backend.
+      DANA_API_BASE_URL: ${DANA_API_BASE_URL:-http://dana-mock:8100}
+      DANA_POLL_INTERVAL_SECONDS: ${DANA_POLL_INTERVAL_SECONDS:-30}
+      DANA_POLL_OVERLAP_SECONDS: ${DANA_POLL_OVERLAP_SECONDS:-10}
     depends_on:
       redis:
         condition: service_started
+    networks: [gota]
+
+  dana-mock:
+    image: ${DANA_MOCK_IMAGE:-ghcr.io/ivanedac/epsel-dana-mock:latest}
+    restart: unless-stopped
     networks: [gota]
 
   redis:

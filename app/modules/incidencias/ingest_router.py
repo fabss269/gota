@@ -19,6 +19,7 @@ import pandas as pd
 from fastapi import APIRouter, File, HTTPException, UploadFile, status
 from pydantic import BaseModel, Field
 
+from app.modules.incidencias.dana_ingest import ingerir_tickets_dana
 from scripts.etl_tickets_crudos import (
     es_robo,
     extraer_problema_direccion,
@@ -173,3 +174,26 @@ async def simular_incidencia(datos: IncidenciaCreate) -> dict:
         "tecnico_extraido": tecnico,
         "es_robo_detectado": es_robo_bool,
     }
+
+
+# ============================================================================
+# Endpoint 3: disparar manualmente el pull a la API de DANA (mismo que corre solo
+# cada `settings.dana_poll_interval_hours`, ver app/core/scheduler.py)
+# ============================================================================
+@router.post("/dana", status_code=status.HTTP_200_OK)
+async def ingerir_dana(
+    distrito: str | None = None,
+    tipo_grupo: Literal["AGUA", "DESAGUE"] | None = None,
+    alcance: Literal["general", "particular"] | None = None,
+    medio_recepcion: str | None = None,
+) -> dict:
+    """Fuerza un pull inmediato a la API de DANA sin esperar al scheduler — útil
+    para testear o para cargar de una vez algo que quedó pendiente. Usa el mismo
+    checkpoint automático (MAX(fecha_registro) ya cargado) que la corrida
+    programada, así que no hace falta pasar fecha_desde a mano."""
+    return await ingerir_tickets_dana(
+        distrito=distrito,
+        tipo_grupo=tipo_grupo,
+        alcance=alcance,
+        medio_recepcion=medio_recepcion,
+    )

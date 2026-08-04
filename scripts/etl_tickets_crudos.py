@@ -35,6 +35,7 @@ import argparse
 import asyncio
 import re
 import unicodedata
+from datetime import datetime
 from pathlib import Path
 
 import pandas as pd
@@ -191,6 +192,67 @@ def normalizar(df_crudo: pd.DataFrame) -> tuple[pd.DataFrame, pd.DataFrame]:
         df_sin_suministro["es_robo"] = df_sin_suministro["DETALLE_DEL_TICKET"].apply(es_robo)
 
     return df, df_sin_suministro
+
+
+def dana_ticket_a_fila(ticket: dict) -> dict:
+    """Convierte UN ticket crudo tal como lo devuelve la API de DANA (o su
+    simulación en dana_mock/, mismo shape) a la fila UPPERCASE que espera
+    tickets_loader — mismo contrato que `normalizar()`, pero para JSON en vez de
+    xlsx: NO pasa por `_excel_serial_a_datetime` (los seriales de Excel no aplican
+    acá, DANA manda ISO 8601 real) y no necesita el cast int64->str->zfill de
+    `normalizar()` (existía para el caso en que Excel guardaba SUMINISTRO/DNI como
+    número y perdía los ceros a la izquierda; JSON ya los manda como texto).
+
+    Mismo patrón que ya usa `ingest_router.simular_incidencia` para su fila de 1
+    ticket — acá se reutiliza para N tickets venidos de la API real/simulada.
+    """
+    detalle = ticket["detalle_del_ticket"]
+    suministro = ticket.get("suministro")
+    fecha_solucion_raw = ticket.get("fecha_solucion")
+
+    return {
+        "TICKET": str(ticket["ticket"]),
+        "ALCANCE": ticket["alcance"],
+        "MEDIO_RECEPCION": ticket["medio_recepcion"],
+        "FECHA_REGISTRO": datetime.fromisoformat(ticket["fecha_registro"]),
+        "USUARIO_REGISTRA": ticket["usuario_registra"].lower(),
+        "DISTRITO": ticket["distrito"],
+        "SUMINISTRO": suministro.zfill(8) if suministro else None,
+        "DIRECCION": ticket.get("direccion"),
+        "PERSONA": ticket["persona"],
+        "DNI": ticket["dni"].zfill(8),
+        "CELULAR": ticket["celular"],
+        "TELEFONO_FIJO": ticket.get("telefono_fijo"),
+        "CORREO_ELECTRONICO": ticket.get("correo"),
+        "PARENTESCO": ticket["parentesco"],
+        "TIPO_GRUPO": ticket["tipo_grupo"],
+        "TIPO_DE_ATENCION": ticket["tipo_de_atencion"],
+        "DETALLE_DEL_TICKET": detalle,
+        "USUARIO_SOLUCIONA": (
+            ticket["usuario_soluciona"].lower() if ticket.get("usuario_soluciona") else None
+        ),
+        "DETALLE_DE_SOLUCION": normalizar_detalle_solucion(ticket.get("detalle_de_solucion")),
+        "FECHA_SOLUCION": (
+            datetime.fromisoformat(fecha_solucion_raw) if fecha_solucion_raw else pd.NaT
+        ),
+        "problema": extraer_problema_direccion(detalle)[0],
+        "direccion_detalle": extraer_problema_direccion(detalle)[1],
+        "tecnico": extraer_tecnico(detalle),
+        "es_robo": es_robo(detalle),
+    }
+
+
+def tickets_dana_a_dataframes(tickets: list[dict]) -> tuple[pd.DataFrame, pd.DataFrame]:
+    """Batch de `dana_ticket_a_fila` + el mismo split con/sin-suministro que
+    `normalizar()` hace para el xlsx. Retorna (df_con_suministro, df_sin_suministro),
+    listos para `tickets_loader.cargar_dataframe`/`cargar_sin_suministro`."""
+    filas = [dana_ticket_a_fila(t) for t in tickets]
+    df = pd.DataFrame(filas)
+    if df.empty:
+        return df, df.copy()
+
+    sin_sum_mask = df["SUMINISTRO"].isna()
+    return df[~sin_sum_mask].copy(), df[sin_sum_mask].copy()
 
 
 async def main(xlsx_path: Path) -> None:
