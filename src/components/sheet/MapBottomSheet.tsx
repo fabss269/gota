@@ -5,7 +5,6 @@ import { Pressable, StyleSheet, Text, View } from 'react-native';
 import { Colors, Radius, Spacing } from '@/constants/theme';
 import { CapasTab } from '@/components/sheet/CapasTab';
 import { FiltrosTab } from '@/components/sheet/FiltrosTab';
-import { useCapasStore } from '@/state/capasStore';
 import { useUbicacionStore } from '@/state/ubicacionStore';
 
 type Tab = 'filtros' | 'capas';
@@ -29,14 +28,14 @@ export const MapBottomSheet = forwardRef<BottomSheet, Props>(({ onSheetPositionC
   const snapPoints = useMemo(() => ['14%', '65%'], []);
   const sheetRef = useRef<BottomSheet>(null);
 
-  // Colapsa el sheet al snap point bajo (14%) cuando cambia algo que afecta al mapa
-  // (capas aplicadas o sector/distrito activo) — sin esto, el sheet se queda tapando
-  // el mapa después del cambio y en mobile parece que "no hizo nada" (bug real: en
-  // desktop el sidebar nunca tapa el mapa, así que ahí el mismo cambio sí se nota).
-  // `onAplicar` de CapasTab ya no queda como no-op: acá es donde efectivamente hace
-  // algo, sin necesidad de que el padre (mapa/index.web.tsx) haga nada con su propio
-  // bottomSheetRef.
-  const capasVisibles = useCapasStore((s) => s.capasVisibles);
+  // Colapsa el sheet al snap point bajo (14%) cuando se marca/desmarca un
+  // sector o distrito (acción puntual de UbicacionPicker) — sin esto, el sheet
+  // se queda tapando el mapa después del cambio y en mobile parece que "no hizo
+  // nada" (bug real: en desktop el sidebar nunca tapa el mapa, así que ahí el
+  // mismo cambio sí se nota). Ya NO se dispara con `capasVisibles`: los
+  // checkboxes de CapasTab aplican al toque (sin botón "Ver en el mapa"), y si
+  // el sheet se colapsara en cada toque el usuario tendría que reabrirlo para
+  // tildar la siguiente capa — justo la fricción que se quería sacar.
   const sectoresActivos = useUbicacionStore((s) => s.sectoresActivos);
   const distritosActivos = useUbicacionStore((s) => s.distritosActivos);
   const isFirstRender = useRef(true);
@@ -47,7 +46,7 @@ export const MapBottomSheet = forwardRef<BottomSheet, Props>(({ onSheetPositionC
       return;
     }
     sheetRef.current?.snapToIndex(0);
-  }, [capasVisibles, sectoresActivos, distritosActivos]);
+  }, [sectoresActivos, distritosActivos]);
 
   return (
     <BottomSheet
@@ -66,7 +65,7 @@ export const MapBottomSheet = forwardRef<BottomSheet, Props>(({ onSheetPositionC
         <TabButton label="Capas" active={tab === 'capas'} onPress={() => setTab('capas')} />
       </View>
       <BottomSheetScrollView contentContainerStyle={styles.content}>
-        {tab === 'filtros' ? <FiltrosTab /> : <CapasTab onAplicar={() => {}} />}
+        {tab === 'filtros' ? <FiltrosTab /> : <CapasTab />}
       </BottomSheetScrollView>
     </BottomSheet>
   );

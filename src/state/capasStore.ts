@@ -17,9 +17,7 @@ export type CapaKey =
 
 type CapasState = {
   capasVisibles: Set<CapaKey>;
-  isApplying: boolean;
   aplicarCapas: (capas: Set<CapaKey>) => void;
-  setApplying: (value: boolean) => void;
 };
 
 const DEFAULT_CAPAS: Set<CapaKey> = new Set([
@@ -35,7 +33,5 @@ const DEFAULT_CAPAS: Set<CapaKey> = new Set([
 
 export const useCapasStore = create<CapasState>((set) => ({
   capasVisibles: DEFAULT_CAPAS,
-  isApplying: false,
   aplicarCapas: (capas) => set({ capasVisibles: capas }),
-  setApplying: (isApplying) => set({ isApplying }),
 }));

@@ -159,12 +159,17 @@ export function EpselMapView({ clusters, onPressCluster }: Props) {
         const visible = current.has(key);
         for (const layerId of layerIds) {
           if (map.getLayer(layerId)) {
-            map.setLayoutProperty(layerId, 'visibility', visible ? 'visible' : 'none');
+            const desired = visible ? 'visible' : 'none';
+            // Guard: setLayoutProperty siempre marca el estilo dirty y re-dispara
+            // 'styledata' aunque el valor no cambie — sin este chequeo, este handler
+            // (suscrito a 'styledata') se retrigger a sí mismo en loop infinito junto
+            // con applySectorHighlight/applyCatastroSectorFilter (mismo bug de fondo
+            // que el ya arreglado en applyModoVista, ver comentario más abajo).
+            if (map.getLayoutProperty(layerId, 'visibility') !== desired) {
+              map.setLayoutProperty(layerId, 'visibility', desired);
+            }
           }
         }
-      }
-      if (useCapasStore.getState().isApplying) {
-        map.once('idle', () => useCapasStore.getState().setApplying(false));
       }
     };
 
@@ -198,7 +203,11 @@ export function EpselMapView({ clusters, onPressCluster }: Props) {
         }
         colorMatch.push('#9E9E9E');
         for (const [layerId, paintProp] of SECTOR_COLOR_LAYER_IDS) {
-          map.setPaintProperty(layerId, paintProp, colorMatch);
+          // Mismo guard que applyVisibility: comparar antes de escribir corta el
+          // ciclo con 'styledata' en vez de retriggerearlo en cada frame.
+          if (JSON.stringify(map.getPaintProperty(layerId, paintProp)) !== JSON.stringify(colorMatch)) {
+            map.setPaintProperty(layerId, paintProp, colorMatch);
+          }
         }
       }
 
@@ -211,7 +220,9 @@ export function EpselMapView({ clusters, onPressCluster }: Props) {
         : [];
       const filtro: maplibregl.FilterSpecification = ['in', ['get', 'sectorid'], ['literal', idsActivos]];
       for (const layerId of SECTOR_LAYER_IDS) {
-        map.setFilter(layerId, filtro);
+        if (JSON.stringify(map.getFilter(layerId) ?? null) !== JSON.stringify(filtro)) {
+          map.setFilter(layerId, filtro);
+        }
       }
     };
 
@@ -236,13 +247,15 @@ export function EpselMapView({ clusters, onPressCluster }: Props) {
 
       for (const { id, baseFilter } of CATASTRO_SECTOR_FILTER_LAYERS) {
         if (!map.getLayer(id)) continue;
-        if (idsActivos.length === 0) {
-          map.setFilter(id, (baseFilter as maplibregl.FilterSpecification | undefined) ?? null);
-        } else {
-          const combinado = (
-            baseFilter ? ['all', baseFilter, sectorFilter] : sectorFilter
-          ) as maplibregl.FilterSpecification;
-          map.setFilter(id, combinado);
+        const desired =
+          idsActivos.length === 0
+            ? ((baseFilter as maplibregl.FilterSpecification | undefined) ?? null)
+            : ((baseFilter ? ['all', baseFilter, sectorFilter] : sectorFilter) as maplibregl.FilterSpecification);
+        // Mismo guard que applyVisibility/applySectorHighlight: sin esto, este
+        // handler (suscrito a 'styledata') retriggerea el evento en cada frame y
+        // entra en loop infinito con los otros dos.
+        if (JSON.stringify(map.getFilter(id) ?? null) !== JSON.stringify(desired)) {
+          map.setFilter(id, desired);
         }
       }
     };

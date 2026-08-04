@@ -1,5 +1,4 @@
-import { useEffect, useState } from 'react';
-import { ActivityIndicator, Pressable, StyleSheet, Text, View } from 'react-native';
+import { Pressable, StyleSheet, Text, View } from 'react-native';
 
 import { Colors, Radius, Spacing } from '@/constants/theme';
 import { UbicacionPicker } from '@/components/map/UbicacionPicker';
@@ -22,61 +21,39 @@ const DESAGUE_CAPAS: { key: CapaKey; label: string }[] = [
 ];
 
 /** Tab "Capas" del Bottom Sheet — versión móvil. Ver FiltersSidebar.tsx para la versión web. */
-export function CapasTab({ onAplicar }: { onAplicar: () => void }) {
+export function CapasTab() {
   const capasVisibles = useCapasStore((s) => s.capasVisibles);
-  const isApplying = useCapasStore((s) => s.isApplying);
   const aplicarCapas = useCapasStore((s) => s.aplicarCapas);
-  const setApplying = useCapasStore((s) => s.setApplying);
 
-  const [seleccion, setSeleccion] = useState<Set<CapaKey>>(new Set(capasVisibles));
-
-  const toggle = (key: CapaKey) =>
-    setSeleccion((prev) => {
-      const next = new Set(prev);
-      if (next.has(key)) {
-        next.delete(key);
-      } else {
-        next.add(key);
-      }
-      return next;
-    });
-
-  const handleAplicar = () => {
-    aplicarCapas(new Set(seleccion));
-    setApplying(true);
-    onAplicar();
+  // Cada toggle aplica directo al store (mismo patrón que FiltersSidebar.tsx en web) —
+  // ya no hay selección local en borrador ni botón "Ver en el mapa": el guard
+  // agregado en MapView.web.tsx (compara valor actual antes de escribir, ver fix del
+  // loop infinito de 'styledata') hace que aplicar en cada toque sea barato, no hace
+  // falta batchear varios cambios detrás de un botón de confirmación.
+  const toggle = (key: CapaKey) => {
+    const next = new Set(capasVisibles);
+    if (next.has(key)) {
+      next.delete(key);
+    } else {
+      next.add(key);
+    }
+    aplicarCapas(next);
   };
-
-  // Red de seguridad: si el mapa (solo web hoy) no confirma que terminó de renderizar
-  // las capas nuevas, el botón no debe quedar cargando para siempre.
-  useEffect(() => {
-    if (!isApplying) return;
-    const timeout = setTimeout(() => setApplying(false), 4000);
-    return () => clearTimeout(timeout);
-  }, [isApplying, setApplying]);
 
   return (
     <View style={styles.container}>
       <Text style={styles.sectionTitle}>Ubicación</Text>
       <UbicacionPicker />
 
-      <CapaGroup title="Predio" dotColor={Colors.textMuted} items={PREDIO_CAPAS} seleccion={seleccion} onToggle={toggle} />
-      <CapaGroup title="Agua" dotColor={Colors.agua} items={AGUA_CAPAS} seleccion={seleccion} onToggle={toggle} />
+      <CapaGroup title="Predio" dotColor={Colors.textMuted} items={PREDIO_CAPAS} seleccion={capasVisibles} onToggle={toggle} />
+      <CapaGroup title="Agua" dotColor={Colors.agua} items={AGUA_CAPAS} seleccion={capasVisibles} onToggle={toggle} />
       <CapaGroup
         title="Alcantarillado"
         dotColor={Colors.desague}
         items={DESAGUE_CAPAS}
-        seleccion={seleccion}
+        seleccion={capasVisibles}
         onToggle={toggle}
       />
-
-      <Pressable style={styles.applyButton} onPress={handleAplicar} disabled={isApplying}>
-        {isApplying ? (
-          <ActivityIndicator color={Colors.white} />
-        ) : (
-          <Text style={styles.applyButtonLabel}>Ver en el mapa</Text>
-        )}
-      </Pressable>
     </View>
   );
 }
@@ -154,12 +131,4 @@ const styles = StyleSheet.create({
   checkmark: { color: Colors.white, fontSize: 12, fontWeight: '700' },
   checkboxLabel: { fontSize: 14, color: Colors.textBody },
   checkboxLabelDisabled: { color: Colors.textMuted, fontStyle: 'italic' },
-  applyButton: {
-    backgroundColor: Colors.primary,
-    borderRadius: Radius.pill,
-    paddingVertical: 14,
-    alignItems: 'center',
-    marginTop: Spacing.sm,
-  },
-  applyButtonLabel: { color: Colors.white, fontWeight: '700', fontSize: 15 },
 });
