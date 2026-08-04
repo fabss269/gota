@@ -38,11 +38,20 @@ from typing import Any
 SEED_PATH = Path(__file__).parent / "data" / "suministros_seed.json"
 _SUMINISTROS: list[dict[str, str]] = json.loads(SEED_PATH.read_text(encoding="utf-8"))
 
-# Un ticket nuevo cada 5s de reloj real, contados desde EPOCH. Fijo en el código (no
-# "ahora" al importar) para que el resultado sea reproducible entre reinicios del
-# proceso — si se reinicia el servicio, sigue exactamente donde iba, no arranca de 0.
-EPOCH = datetime(2026, 8, 4, 10, 5, 0)  # noqa: DTZ001 — naive a propósito, ver módulo
-TICK_SEGUNDOS = 5
+# Un ticket nuevo cada TICK_SEGUNDOS de reloj real, contados desde EPOCH. Fijo en el
+# código (no "ahora" al importar) para que el resultado sea reproducible entre
+# reinicios del proceso — si se reinicia el servicio, sigue exactamente donde iba,
+# no arranca de 0.
+#
+# Bajado de 5s a 60s el 2026-08-04 (pedido de Edgar, "que no se sobrecargue" — el
+# rango reservado de 10.000 códigos de 5 dígitos se agotaba en ~14h a 5s/ticket;
+# a 60s dura ~7 días). EPOCH reseteado a este cambio: mismo tick-index puede
+# corresponder a un ticket distinto que antes (el contenido depende solo del índice,
+# pero fecha_registro = EPOCH + tick*TICK_SEGUNDOS sí cambia con el rate) — no hay
+# problema real porque el dedup de tickets_loader es por TICKET (string), no por
+# contenido, así que lo ya cargado con el rate viejo se sigue salteando igual.
+EPOCH = datetime(2026, 8, 4, 17, 7, 0)  # noqa: DTZ001 — naive a propósito, ver módulo
+TICK_SEGUNDOS = 60
 
 
 def _ahora_utc_naive() -> datetime:

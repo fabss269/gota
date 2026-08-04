@@ -47,11 +47,12 @@ class Settings(BaseSettings):
     # ------------------------------------------------------------------------
     dana_api_base_url: str = "http://localhost:8100"
     # Segundos entre cada pull automático (scheduler interno, ver
-    # app/core/scheduler.py). Decisión 2026-08-04 con Edgar: cadencia rápida (30s)
-    # para que el pipeline completo sea observable en minutos — dana_mock/ emite un
-    # ticket nuevo cada 5s (ver dana_mock/generator.py TICK_SEGUNDOS), así que cada
-    # pull trae ~6 tickets nuevos en promedio.
-    dana_poll_interval_seconds: float = 30
+    # app/core/scheduler.py). Bajado de 30s a 10s el 2026-08-04 (pedido de Edgar) —
+    # dana_mock/ emite un ticket nuevo cada 60s (ver dana_mock/generator.py
+    # TICK_SEGUNDOS, bajado de 5s en el mismo pedido para no agotar tan rápido el
+    # rango de 10.000 códigos reservados), así que la mayoría de los polls no
+    # encuentran nada nuevo — barato, es solo un SELECT MAX + un GET vacío.
+    dana_poll_interval_seconds: float = 10
     # Margen de solapamiento hacia atrás sobre el checkpoint (MAX(fecha_registro) ya
     # cargado) al calcular `fecha_desde` del próximo pull — defensivo ante relojes
     # desincronizados entre este servidor y DANA; el dedup por TICKET en
