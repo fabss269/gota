@@ -2,11 +2,12 @@ import type { CSSProperties } from 'react';
 import BottomSheet from '@gorhom/bottom-sheet';
 import { useNavigation, useRouter } from 'expo-router';
 import { useMemo, useRef, useState } from 'react';
-import { Alert, Pressable, StyleSheet, Text, useWindowDimensions, View } from 'react-native';
+import { Pressable, StyleSheet, Text, useWindowDimensions, View } from 'react-native';
 import Animated, { useAnimatedStyle, useSharedValue, withTiming } from 'react-native-reanimated';
 import { SafeAreaView } from 'react-native-safe-area-context';
 
 import { DetailPanel } from '@/components/incident-detail/DetailPanel';
+import { ClusterListSheet } from '@/components/map/ClusterListSheet';
 import { FiltersSidebar } from '@/components/map/FiltersSidebar';
 import { LocationSearchBar } from '@/components/map/LocationSearchBar';
 import { EpselMapView } from '@/components/map/MapView';
@@ -14,6 +15,7 @@ import { MapModeSheet } from '@/components/map/MapModeSheet';
 import { MapBottomSheet } from '@/components/sheet/MapBottomSheet';
 import { Colors, Radius } from '@/constants/theme';
 import { useIncidentsToday } from '@/hooks/useIncidentsToday';
+import type { Incidencia } from '@/mocks/incidentsMock';
 import { openDrawer } from '@/navigation/openDrawer';
 import { useFiltersStore } from '@/state/filtersStore';
 import { useSimulacionStore } from '@/state/simulacionStore';
@@ -35,22 +37,32 @@ export default function MapaScreen() {
   const clusters = useMemo(() => clusterIncidents(incidencias), [incidencias]);
 
   const [selectedId, setSelectedId] = useState<string | null>(null);
+  const [clusterSeleccionado, setClusterSeleccionado] = useState<IncidentCluster | null>(null);
   const modoVista = useSimulacionStore((s) => s.modoVista);
+
+  const abrirDetalle = (id: string) => {
+    if (isDesktop) {
+      setSelectedId(id);
+    } else {
+      router.push({ pathname: '/incidencia/[id]', params: { id } });
+    }
+  };
 
   const handleClusterPress = (cluster: IncidentCluster) => {
     if (cluster.count === 1) {
-      const id = cluster.incidencias[0].id;
-      if (isDesktop) {
-        setSelectedId(id);
-      } else {
-        router.push({ pathname: '/incidencia/[id]', params: { id } });
-      }
+      abrirDetalle(cluster.incidencias[0].id);
       return;
     }
-    Alert.alert(
-      `${cluster.count} incidencias`,
-      cluster.incidencias.map((i) => `• ${i.tipo} — ${i.direccion}`).join('\n'),
-    );
+    // Varias Incidencias distintas cayeron en el mismo punto/radio de agrupación
+    // (mismo suministro con más de un tipo de problema, por ejemplo — el dedup del
+    // backend agrupa por suministro+tipo, así que son entidades genuinamente
+    // separadas) — se elige cuál abrir desde la lista, ver ClusterListSheet.
+    setClusterSeleccionado(cluster);
+  };
+
+  const handleSelectFromCluster = (incidencia: Incidencia) => {
+    setClusterSeleccionado(null);
+    abrirDetalle(incidencia.id);
   };
 
   if (!isDesktop) {
@@ -61,6 +73,9 @@ export default function MapaScreen() {
         isLoading={isLoading}
         isError={isError}
         onRefetch={refetch}
+        clusterSeleccionado={clusterSeleccionado}
+        onSelectFromCluster={handleSelectFromCluster}
+        onCloseCluster={() => setClusterSeleccionado(null)}
       />
     );
   }
@@ -94,6 +109,13 @@ export default function MapaScreen() {
       {!modoVista && selectedId && (
         <DetailPanel incidenciaId={selectedId} onClose={() => setSelectedId(null)} />
       )}
+
+      <ClusterListSheet
+        visible={!!clusterSeleccionado}
+        incidencias={clusterSeleccionado?.incidencias ?? []}
+        onSelect={handleSelectFromCluster}
+        onClose={() => setClusterSeleccionado(null)}
+      />
     </div>
   );
 }
@@ -108,12 +130,18 @@ function MobileLayout({
   isLoading,
   isError,
   onRefetch,
+  clusterSeleccionado,
+  onSelectFromCluster,
+  onCloseCluster,
 }: {
   clusters: IncidentCluster[];
   onPressCluster: (cluster: IncidentCluster) => void;
   isLoading: boolean;
   isError: boolean;
   onRefetch: () => void;
+  clusterSeleccionado: IncidentCluster | null;
+  onSelectFromCluster: (incidencia: Incidencia) => void;
+  onCloseCluster: () => void;
 }) {
   const navigation = useNavigation();
   const bottomSheetRef = useRef<BottomSheet>(null);
@@ -172,6 +200,13 @@ function MobileLayout({
 
       {!modoVista && <MapModeSheet visible={mapModeVisible} onClose={() => setMapModeVisible(false)} />}
       {!modoVista && <MapBottomSheet ref={bottomSheetRef} onSheetPositionChange={onSheetPositionChange} />}
+
+      <ClusterListSheet
+        visible={!!clusterSeleccionado}
+        incidencias={clusterSeleccionado?.incidencias ?? []}
+        onSelect={onSelectFromCluster}
+        onClose={onCloseCluster}
+      />
     </View>
   );
 }

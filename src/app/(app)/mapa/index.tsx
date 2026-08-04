@@ -1,10 +1,11 @@
 import BottomSheet from '@gorhom/bottom-sheet';
 import { useNavigation, useRouter } from 'expo-router';
 import { useMemo, useRef, useState } from 'react';
-import { Alert, Pressable, StyleSheet, Text, useWindowDimensions, View } from 'react-native';
+import { Pressable, StyleSheet, Text, useWindowDimensions, View } from 'react-native';
 import Animated, { useAnimatedStyle, useSharedValue, withTiming } from 'react-native-reanimated';
 import { SafeAreaView } from 'react-native-safe-area-context';
 
+import { ClusterListSheet } from '@/components/map/ClusterListSheet';
 import { LocationSearchBar } from '@/components/map/LocationSearchBar';
 import { EpselMapView } from '@/components/map/MapView';
 import { MapModeSheet } from '@/components/map/MapModeSheet';
@@ -44,18 +45,18 @@ export default function MapaScreen() {
 
   const { data: incidencias = [], isLoading, isError, refetch } = useIncidentsToday();
   const clusters = useMemo(() => clusterIncidents(incidencias), [incidencias]);
+  const [clusterSeleccionado, setClusterSeleccionado] = useState<IncidentCluster | null>(null);
 
   const handleClusterPress = (cluster: IncidentCluster) => {
     if (cluster.count === 1) {
       router.push({ pathname: '/incidencia/[id]', params: { id: cluster.incidencias[0].id } });
       return;
     }
-    // Clúster con más de una incidencia: no hay una UI de desambiguación diseñada
-    // (Spec 03) para elegir cuál abrir, así que se mantiene el resumen en texto.
-    Alert.alert(
-      `${cluster.count} incidencias`,
-      cluster.incidencias.map((i) => `• ${i.tipo} — ${i.direccion}`).join('\n'),
-    );
+    // Varias Incidencias distintas cayeron en el mismo punto/radio de agrupación
+    // (mismo suministro con más de un tipo de problema, por ejemplo — el dedup del
+    // backend agrupa por suministro+tipo, así que son entidades genuinamente
+    // separadas) — se elige cuál abrir desde la lista, ver ClusterListSheet.
+    setClusterSeleccionado(cluster);
   };
 
   return (
@@ -100,6 +101,16 @@ export default function MapaScreen() {
 
       <MapModeSheet visible={mapModeVisible} onClose={() => setMapModeVisible(false)} />
       <MapBottomSheet ref={bottomSheetRef} onSheetPositionChange={handleSheetPositionChange} />
+
+      <ClusterListSheet
+        visible={!!clusterSeleccionado}
+        incidencias={clusterSeleccionado?.incidencias ?? []}
+        onSelect={(incidencia) => {
+          setClusterSeleccionado(null);
+          router.push({ pathname: '/incidencia/[id]', params: { id: incidencia.id } });
+        }}
+        onClose={() => setClusterSeleccionado(null)}
+      />
     </View>
   );
 }
