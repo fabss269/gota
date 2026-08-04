@@ -18,17 +18,20 @@ dependencies = [
     # pandas + openpyxl los usa ingest_router.py (POST /incidencias/ingest/excel)
     # con import top-level, entonces se cargan al arrancar aunque nadie use el
     # endpoint; tienen que estar en prod. pyarrow es el engine de parquet que
-    # usan los scripts (etl_tickets_crudos, tickets_loader).
+    # usan los scripts (etl_tickets_crudos, tickets_loader). httpx: cliente HTTP
+    # para el pull a la API de DANA (dana_ingest.py), no solo test client de dev.
+    # apscheduler: scheduler interno del pull automático (app/core/scheduler.py).
     "pandas>=3.0.5",
     "pyarrow>=25.0.0",
     "openpyxl>=3.1.5",
+    "httpx>=0.27",
+    "apscheduler>=3.10",
 ]
 
 [project.optional-dependencies]
 dev = [
     "pytest>=8.3",
     "pytest-asyncio>=0.24",
-    "httpx>=0.27",
     "ruff>=0.7",
 ]
 
