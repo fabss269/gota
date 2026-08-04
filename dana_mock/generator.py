@@ -38,11 +38,20 @@ from typing import Any
 SEED_PATH = Path(__file__).parent / "data" / "suministros_seed.json"
 _SUMINISTROS: list[dict[str, str]] = json.loads(SEED_PATH.read_text(encoding="utf-8"))
 
-# Un ticket nuevo cada 5s de reloj real, contados desde EPOCH. Fijo en el código (no
-# "ahora" al importar) para que el resultado sea reproducible entre reinicios del
-# proceso — si se reinicia el servicio, sigue exactamente donde iba, no arranca de 0.
-EPOCH = datetime(2026, 8, 4, 10, 5, 0)  # noqa: DTZ001 — naive a propósito, ver módulo
-TICK_SEGUNDOS = 5
+# Un ticket nuevo cada TICK_SEGUNDOS de reloj real, contados desde EPOCH. Fijo en el
+# código (no "ahora" al importar) para que el resultado sea reproducible entre
+# reinicios del proceso — si se reinicia el servicio, sigue exactamente donde iba,
+# no arranca de 0.
+#
+# Bajado de 5s a 60s el 2026-08-04 (pedido de Edgar, "que no se sobrecargue" — el
+# rango reservado de 10.000 códigos de 5 dígitos se agotaba en ~14h a 5s/ticket;
+# a 60s dura ~7 días). EPOCH reseteado a este cambio: mismo tick-index puede
+# corresponder a un ticket distinto que antes (el contenido depende solo del índice,
+# pero fecha_registro = EPOCH + tick*TICK_SEGUNDOS sí cambia con el rate) — no hay
+# problema real porque el dedup de tickets_loader es por TICKET (string), no por
+# contenido, así que lo ya cargado con el rate viejo se sigue salteando igual.
+EPOCH = datetime(2026, 8, 4, 17, 7, 0)  # noqa: DTZ001 — naive a propósito, ver módulo
+TICK_SEGUNDOS = 60
 
 
 def _ahora_utc_naive() -> datetime:
@@ -108,6 +117,18 @@ def _rng_del_tick(tick: int) -> random.Random:
     return random.Random(f"dana-mock-tick-{tick}")
 
 
+def _direccion_del_suministro(suministro: str) -> str:
+    """Determinística por SUMINISTRO (no por tick): una dirección es del predio/
+    conexión, no cambia entre reclamos. Bug real encontrado 2026-08-04 — antes se
+    sorteaba calle/número con el RNG del tick, así que el mismo suministro (mismo
+    punto exacto en el mapa, reusado entre varios tickets porque el pool de
+    suministros es chico) podía reportar una dirección distinta en cada ticket."""
+    rng = random.Random(f"dana-mock-direccion-{suministro}")
+    calle = rng.choice(CALLES)
+    numero = rng.randint(100, 999)
+    return f"{calle} NRO. {numero}"
+
+
 def _generar_ticket(tick: int) -> dict[str, Any]:
     rng = _rng_del_tick(tick)
     fecha_registro = EPOCH + timedelta(seconds=tick * TICK_SEGUNDOS)
@@ -116,8 +137,7 @@ def _generar_ticket(tick: int) -> dict[str, Any]:
     tipo_grupo = suministro_info["tipo_grupo"]
     tipo_atencion = rng.choice(TIPOS_ATENCION[tipo_grupo])
     tecnico = rng.choice(TECNICOS)
-    calle = rng.choice(CALLES)
-    numero = rng.randint(100, 999)
+    direccion = _direccion_del_suministro(suministro_info["suministro"])
     distrito = suministro_info["distrito"]
 
     # Rango reservado (ver docstring del módulo): módulo para que, si se agota,
@@ -134,7 +154,7 @@ def _generar_ticket(tick: int) -> dict[str, Any]:
         "usuario_registra": rng.choice(OPERADORES),
         "distrito": distrito,
         "suministro": suministro_info["suministro"],
-        "direccion": f"{calle} NRO. {numero}",
+        "direccion": direccion,
         "persona": rng.choice(NOMBRES),
         "dni": str(rng.randint(10_000_000, 79_999_999)),
         "celular": f"9{rng.randint(10_000_000, 99_999_999)}",
@@ -146,7 +166,7 @@ def _generar_ticket(tick: int) -> dict[str, Any]:
         "categoria": "RECLAMO OPERACIONAL",
         "tipo_de_atencion": tipo_atencion,
         "detalle_del_ticket": (
-            f"USUARIO ESTA COMUNICANDO {tipo_atencion} EN CALLE {calle} N° {numero} "
+            f"USUARIO ESTA COMUNICANDO {tipo_atencion} EN {direccion.replace('NRO.', 'N°')} "
             f"{distrito}. TEC. {tecnico}"
         ),
         "estado_del_ticket": "Creado",

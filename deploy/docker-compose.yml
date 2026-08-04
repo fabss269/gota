@@ -20,7 +20,7 @@ services:
       # servicio interno (dana-mock:8100), no localhost — corre en la misma red
       # `gota` que backend.
       DANA_API_BASE_URL: ${DANA_API_BASE_URL:-http://dana-mock:8100}
-      DANA_POLL_INTERVAL_SECONDS: ${DANA_POLL_INTERVAL_SECONDS:-30}
+      DANA_POLL_INTERVAL_SECONDS: ${DANA_POLL_INTERVAL_SECONDS:-10}
       DANA_POLL_OVERLAP_SECONDS: ${DANA_POLL_OVERLAP_SECONDS:-10}
     depends_on:
       redis:
