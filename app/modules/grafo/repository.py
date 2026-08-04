@@ -154,7 +154,7 @@ class GrafoRepository:
             JOIN sig.cajadesague cd ON cd.inscripcion = i.suministro_codigo
             JOIN sig.cajadesagueconexion cdc ON cdc.cajadesagueid = cd.cajadesagueid
             WHERE cdc.alcantarilladoid = :tramo_id
-              AND r.fecha_registro >= NOW() - (:dias || ' days')::interval
+              AND r.fecha_registro >= NOW() - (:dias * INTERVAL '1 day')
             """
         )
         rows = (await self._session.execute(stmt, {"tramo_id": tramo_id, "dias": dias})).mappings()
@@ -169,7 +169,7 @@ class GrafoRepository:
             JOIN sig.cajaagua ca ON ca.inscripcion = i.suministro_codigo
             JOIN sig.cajaaguaconexion cac ON cac.cajaaguaid = ca.cajaaguaid
             WHERE cac.aguaid = :tuberia_id
-              AND r.fecha_registro >= NOW() - (:dias || ' days')::interval
+              AND r.fecha_registro >= NOW() - (:dias * INTERVAL '1 day')
             """
         )
         rows = (await self._session.execute(stmt, {"tuberia_id": tuberia_id, "dias": dias})).mappings()
