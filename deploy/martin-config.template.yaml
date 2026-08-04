@@ -1,51 +1,3 @@
-# Plantilla — NO se monta directo en el contenedor. Martin no soporta `${VAR}` dentro
-# de su propio config.yaml (verificado en vivo: falla el parseo de connection_string
-# con una variable sin resolver). El script de deploy la resuelve con `envsubst` antes
-# de montarla: `envsubst < martin-config.template.yaml > martin-config.yaml`.
-#
-# Whitelist explícita de tablas de `sig` (bd_conhydra) — nunca `auto_publish: true`.
-# `sig` tiene otros schemas (adm, geoportal) con datos de usuarios/sesiones que NO deben
-# quedar expuestos como tiles públicos.
-#
-# Capas activas en CAPA_LAYER_IDS (MapView.web.tsx):
-#   PREDIO       → manzanas, lotes
-#   ALCANTARILLADO → alcantarillado, cajadesagueconexion, cajadesague, buzones
-#   AGUA         → agua, cajaaguaconexion, cajaagua
-#
-# `sectores` no es un toggle de CAPA_LAYER_IDS: se resalta (línea gruesa + color por
-# sectorid) según la selección de UBICACIÓN en el sidebar (ver ubicacionStore +
-# MapView.web.tsx — filtro dinámico por sectorid, no un layer on/off fijo).
-#
-# `sectorid` está en todas las properties de abajo (incluyendo agua/cajaaguaconexion/
-# cajadesagueconexion) para que, al marcar un sector en UBICACIÓN, MapView.web.tsx
-# pueda filtrar TODAS las capas de catastro a ese sector, no solo el polígono.
-#
-# Estructura (schema/table/srid/geometry_column) verificada en vivo contra bd_conhydra
-# real con `martin --save-config` — no es una plantilla adivinada.
-#
-# `aguaid`/`alcantarilladoid`/`buzonid` en agua/alcantarillado/buzones: el id propio del
-# elemento, necesario para el modo simulación del mapa (click en un tramo/tubería/buzón
-# -> se lee este id de las properties del feature clickeado -> POST /grafo/simulacion).
-# Sin esto, un click solo trae sectorid/codigo/etc., no hay forma de identificar QUÉ
-# elemento se clickeó para llamar a la función de simulación correspondiente.
-#
-# `agua`/`alcantarillado` publican `gota.agua_2d`/`gota.alcantarillado_2d` (vistas con
-# `ST_Force2D(geom)`, definidas en sql/martin_vistas_2d.sql), NO las tablas base — bug
-# real de PostGIS/Martin encontrado en vivo 2026-08-03: ST_AsMVTGeom revienta con
-# "lwcollection_construct: mixed dimension geometries: 2/0" en algunos tramos
-# MultiLineStringZ con Z=0 (confirmado con alcantarilladoid 311/8, z13/2279/4249) — la Z
-# no se usa en el mapa 2D y en ambas tablas es casi siempre 0 (agua: 254/25401 filas con
-# Z≠0, alcantarillado: 0/30815), así que Force2D es seguro. Las vistas viven en `gota`
-# (no en `sig`: nunca se escribe DDL ahí directamente, mismo criterio que
-# grafo_funciones.sql) aunque lean `sig.agua`/`sig.alcantarillado` cross-schema. El id
-# publicado (`agua`/`alcantarillado`) no cambia, solo la tabla real detrás.
-
-# Cache global de tiles ya generadas (default de Martin: 256 MB). Subido a 2 GB
-# porque al cambiar de sector el filtro por sectorid se aplica en el cliente:
-# la tile completa igual se descarga y regenera desde Postgres, y con 10 sources
-# activas es el cuello de botella. Con 2 GB entra practicamente todo el catastro
-# de Chiclayo a los zooms usables (16-19), y al re-visitar un sector la tile sale
-# de RAM. Ver referencia: https://maplibre.org/martin/config-file.html#caching
 cache_size_mb: 2048
 
 postgres:
@@ -150,16 +102,6 @@ postgres:
       properties:
         sectorid: int4
     accesorios:
-      # "Herramienta" en modo simulación (válvulas/codos/tees) — 2026-08-03.
-      # Publica la tabla cruda de sig: es geometry(PointZ,32719) con solo
-      # 279/20374 filas con Z≠0 (~1.4%), muy distinto del caso real de
-      # MultiLineStringZ (agua/alcantarillado) que rompía ST_AsMVTGeom con
-      # "lwcollection_construct: mixed dimension geometries" (ver
-      # sql/martin_vistas_2d.sql) — un Point sin líneas es mucho menos
-      # propenso a ese bug. Verificado en vivo con un barrido de tiles sobre
-      # Chiclayo sin error (ver conversación 2026-08-03). Si algún tile
-      # llegara a fallar igual, la vista Force2D de respaldo es
-      # `gota.accesorios_2d` (mismo patrón que agua_2d/alcantarillado_2d).
       schema: sig
       table: accesorios
       srid: 32719
@@ -170,18 +112,6 @@ postgres:
         sectorid: int4
         distritoid: int4
     alcantarillado_flujo:
-      # Vista materializada (Spec: mv_alcantarilladoflujo, renombrada en producción
-      # sin guion bajo — el nombre publicado acá ("alcantarillado_flujo", la clave
-      # de este bloque) es independiente y no cambia, lo consume el frontend vía
-      # /tiles/alcantarillado_flujo/... sin saber el nombre real de la tabla) —
-      # orienta cada tramo según el sentido real del flujo: un triángulo (polígono)
-      # en el punto medio del tramo, orientado hacia el sentido de flujo (NULL si no
-      # hay cotas válidas para calcularlo, ~20% de los tramos). La línea en sí ya se
-      # ve con alcantarillado-primaria/secundaria — lo nuevo acá es la flecha.
-      # Columna verificada en vivo contra el backup real: es `geom` (ST_Polygon,
-      # SRID 32719), no `geom_flecha` como decía la versión anterior de este
-      # comentario — el nombre de columna cambió en algún punto entre el diseño
-      # original y este backup de producción (2026-08-02), mismo contenido.
       schema: sig
       table: mv_alcantarilladoflujo
       srid: 32719

@@ -1,20 +1,3 @@
--- ============================================================================
--- Grafo hidráulico — funciones de simulación de fallas y detección de focos
--- ============================================================================
--- Fuente de diseño: ~/Documentos/grafos_catastro_epsel.md (sección 9), adaptado:
--- namespace `gota.` en vez de `sig.` — estas funciones son nuestras (viven en el
--- esquema que administramos), aunque su cuerpo lea tablas de `sig` (CONHYDRA,
--- solo lectura) vía cross-schema dentro de la misma BD `bd_conhydra`. Nunca se
--- escribe DDL en `sig` directamente.
---
--- Aplicar una sola vez (y de nuevo si se edita este archivo) contra la BD real:
---   psql -h <host> -U postgres -d bd_conhydra -f sql/grafo_funciones.sql
--- (local: bd_conhydra_local; producción: ver deploy/PRODUCTION_DEPLOY.md)
---
--- Alcance: cálculo on-demand en cada request, sin persistencia de focos ni job
--- programado (documento §8.6.9-8.6.10) — no implementado en esta primera versión.
--- ============================================================================
-
 -- ----------------------------------------------------------------------------
 -- 1) simular_atoro_tramo — BFS reverso desde buzonsalidaid del tramo (desagüe)
 -- ----------------------------------------------------------------------------
@@ -241,14 +224,7 @@ RETURNS TABLE (
 $$;
 
 -- ----------------------------------------------------------------------------
--- 4) simular_tapa_faltante — BFS directo (aguas abajo) desde el buzón sin tapa
---    (desagüe). Corregida 2026-08-03: la versión original no resolvía
---    suministro/caja (solo tramo/riesgo), por lo que
---    service.py::simular()'s `if "suministro" in f` la descartaba siempre
---    (devolvía [] para tapa_faltante) — se agrega el mismo join a
---    cajadesagueconexion/cajadesague que ya usa simular_atoro_tramo, y
---    riesgo(ALTO/MEDIO/BAJO) pasa a prioridad(ALTA/MEDIA/BAJA) para
---    coincidir con AfectadoOut.prioridad.
+-- 4) simular_tapa_faltante — BFS directo (aguas abajo)
 -- ----------------------------------------------------------------------------
 CREATE OR REPLACE FUNCTION gota.simular_tapa_faltante(
     p_buzon_id INTEGER,
@@ -526,14 +502,7 @@ $$;
 -- ----------------------------------------------------------------------------
 -- 8) simular_fuga_accesorio — BFS bidireccional desde un accesorio (agua) —
 --    "herramienta" del pedido del usuario 2026-08-03 (válvulas/codos/tees,
---    sig.accesorios). Misma mecánica que simular_fuga_tuberia, sembrada desde
---    todas las tuberías que tocan el accesorio en vez de una sola tubería.
---    Todo accesorio se trata como nodo de paso (peor caso): no hay forma de
---    distinguir válvulas activas de uniones pasivas en los datos migrados —
---    sig.accesoriotipos no tiene tipo "Válvula", situacion/estado son
---    idénticos en las 20,374 filas (ver ~/Documentos/grafos_catastro_epsel.md
---    §3.7, §6.3: los datos reales de válvulas están solo en el shapefile
---    accesoriosficha_agua.shp, nunca migrados a Postgres).
+--    sig.accesorios).
 -- ----------------------------------------------------------------------------
 CREATE OR REPLACE FUNCTION gota.simular_fuga_accesorio(
     p_accesorio_id INTEGER,
@@ -580,7 +549,6 @@ RETURNS TABLE (
     ORDER BY nivel ASC;
 $$;
 
--- ----------------------------------------------------------------------------
 -- 8b) simular_fuga_accesorio_red — red completa recorrida (para modo vista)
 -- ----------------------------------------------------------------------------
 CREATE OR REPLACE FUNCTION gota.simular_fuga_accesorio_red(
