@@ -36,7 +36,10 @@ const DEFAULTS: Pick<
   prioridades: ['a_tiempo', 'alerta', 'critica'],
   tipoAtencion: null,
   estado: null,
-  rangoFechas: 'hoy',
+  // Default 'hoy' -> '7d' (pedido de Edgar 2026-08-05): el mapa arranca mostrando
+  // la última semana, no solo el día actual — 'hoy' sigue disponible como preset
+  // en el selector, solo cambió cuál es el punto de partida.
+  rangoFechas: '7d',
   mapMode: 'normal',
 };
 
