@@ -24,6 +24,17 @@ export function TicketsLineChart({ serie }: Props) {
   const [categoria, setCategoria] = useState<Categoria>('agua');
   const color = categoria === 'agua' ? Colors.agua : Colors.desague;
 
+  if (serie.length === 0) {
+    return (
+      <View>
+        <Text style={styles.title}>Tickets</Text>
+        <View style={styles.emptyBox}>
+          <Text style={styles.emptyLabel}>Sin datos disponibles</Text>
+        </View>
+      </View>
+    );
+  }
+
   const values = serie.map((p) => p[categoria]);
   const min = Math.min(...values);
   const max = Math.max(...values);
@@ -93,4 +104,12 @@ const styles = StyleSheet.create({
   title: { fontSize: 16, fontWeight: '700', color: Colors.accent },
   tabs: { flexDirection: 'row', gap: Spacing.sm },
   tabLabel: { fontSize: 13, color: Colors.textMuted },
+  emptyBox: {
+    height: HEIGHT,
+    alignItems: 'center',
+    justifyContent: 'center',
+    backgroundColor: '#F8F9FB',
+    borderRadius: 8,
+  },
+  emptyLabel: { fontSize: 12, color: Colors.textMuted },
 });

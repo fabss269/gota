@@ -1,3 +1,4 @@
+import { Ionicons } from '@expo/vector-icons';
 import type { CSSProperties } from 'react';
 import { useEffect, useRef, useState } from 'react';
 
@@ -8,8 +9,15 @@ import { useMapSearchStore } from '@/state/mapSearchStore';
 
 type Modo = 'direccion' | 'suministro';
 
-const DEBOUNCE_MS = 600;
+const DEBOUNCE_DIRECCION_MS = 600;
+const DEBOUNCE_SUMINISTRO_MS = 300;
 const MIN_QUERY_LEN = 3;
+
+/** El código de suministro es exactamente 8 dígitos (constraint chk_suministro_8digitos
+ *  en la BD). Si el texto matchea ese patrón se trata como suministro; cualquier otra
+ *  cosa es dirección. Autodetección → sin toggle en la UI. */
+const detectarModo = (texto: string): Modo =>
+  /^\d{8}$/.test(texto) ? 'suministro' : 'direccion';
 
 // Web Speech API — no está en todos los navegadores (Firefox no la soporta, Safari
 // parcialmente) ni tiene tipos oficiales en el lib DOM de TS, de ahí esta interfaz
@@ -40,7 +48,6 @@ function getSpeechRecognitionCtor(): (new () => SpeechRecognitionLike) | null {
 export function LocationSearchBar() {
   const flyTo = useMapSearchStore((state) => state.flyTo);
 
-  const [modo, setModo] = useState<Modo>('direccion');
   const [query, setQuery] = useState('');
   const [resultados, setResultados] = useState<DireccionResultado[]>([]);
   const [mostrarResultados, setMostrarResultados] = useState(false);
@@ -58,20 +65,32 @@ export function LocationSearchBar() {
   const skipNextSearchRef = useRef(false);
   const soportaVoz = getSpeechRecognitionCtor() !== null;
 
-  // Búsqueda de dirección: debounced, cancela la petición anterior si el usuario
-  // sigue escribiendo (evita que una respuesta vieja pise a una más nueva). El caso
-  // "texto muy corto" se resuelve en el onChange del input, no acá — un efecto no
-  // debería hacer setState síncrono en su cuerpo (react-hooks/set-state-in-effect).
+  const modo = detectarModo(query.trim());
+
+  // Autodetecta modo según el texto: 8 dígitos → suministro (búsqueda puntual), otra
+  // cosa → dirección (debounced Nominatim). Se cancela la petición anterior si el
+  // usuario sigue escribiendo.
   useEffect(() => {
-    if (modo !== 'direccion') return;
     if (skipNextSearchRef.current) {
       skipNextSearchRef.current = false;
       return;
     }
     const texto = query.trim();
-    if (texto.length < MIN_QUERY_LEN) return;
+    if (!texto) return;
+    const modoActual = detectarModo(texto);
 
     if (debounceRef.current) clearTimeout(debounceRef.current);
+
+    if (modoActual === 'suministro') {
+      debounceRef.current = setTimeout(() => {
+        void buscarPorSuministro();
+      }, DEBOUNCE_SUMINISTRO_MS);
+      return () => {
+        if (debounceRef.current) clearTimeout(debounceRef.current);
+      };
+    }
+
+    if (texto.length < MIN_QUERY_LEN) return;
     debounceRef.current = setTimeout(() => {
       abortRef.current?.abort();
       const controller = new AbortController();
@@ -90,16 +109,22 @@ export function LocationSearchBar() {
           setError('No se pudo buscar la dirección. Intenta de nuevo.');
         })
         .finally(() => setBuscando(false));
-    }, DEBOUNCE_MS);
+    }, DEBOUNCE_DIRECCION_MS);
 
     return () => {
       if (debounceRef.current) clearTimeout(debounceRef.current);
     };
-  }, [query, modo]);
+    // buscarPorSuministro se define abajo y lee query/flyTo del closure actual; no la
+    // ponemos como dep porque generaría un loop.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [query]);
 
   const handleQueryChange = (value: string) => {
     setQuery(value);
-    if (modo === 'direccion' && value.trim().length < MIN_QUERY_LEN) {
+    const texto = value.trim();
+    // Limpiar dropdown/error cuando el texto es muy corto para buscar dirección
+    // (y no aplica el modo suministro).
+    if (detectarModo(texto) === 'direccion' && texto.length < MIN_QUERY_LEN) {
       setResultados([]);
       setMostrarResultados(false);
       setError(null);
@@ -136,7 +161,7 @@ export function LocationSearchBar() {
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
     if (modo === 'suministro') {
-      buscarPorSuministro();
+      void buscarPorSuministro();
     } else if (resultados.length > 0) {
       seleccionarDireccion(resultados[0]);
     }
@@ -158,11 +183,8 @@ export function LocationSearchBar() {
       const transcript = event.results[0]?.[0]?.transcript;
       if (transcript) {
         setQuery(transcript);
-        if (modo === 'suministro') {
-          // El código de suministro es una búsqueda exacta puntual: al terminar de
-          // dictar, se dispara sola en vez de esperar que el usuario presione Enter.
-          setTimeout(() => buscarPorSuministro(), 0);
-        }
+        // El useEffect autodetecta si el transcript es un suministro (8 dígitos) o
+        // una dirección y dispara la búsqueda apropiada; no hace falta forzar aquí.
       }
     };
     recognition.onerror = () => setEscuchando(false);
@@ -171,13 +193,6 @@ export function LocationSearchBar() {
     recognitionRef.current = recognition;
     setEscuchando(true);
     recognition.start();
-  };
-
-  const cambiarModo = (nuevo: Modo) => {
-    setModo(nuevo);
-    setResultados([]);
-    setMostrarResultados(false);
-    setError(null);
   };
 
   const usarMiUbicacion = () => {
@@ -205,57 +220,54 @@ export function LocationSearchBar() {
     );
   };
 
+  const hayTexto = query.trim().length > 0;
+
   return (
     <div style={wrapper}>
-      <div style={segmented}>
-        <button
-          type="button"
-          style={{ ...segmentBtn, ...(modo === 'direccion' ? segmentBtnActive : {}) }}
-          onClick={() => cambiarModo('direccion')}
-        >
-          Dirección
-        </button>
-        <button
-          type="button"
-          style={{ ...segmentBtn, ...(modo === 'suministro' ? segmentBtnActive : {}) }}
-          onClick={() => cambiarModo('suministro')}
-        >
-          Suministro
-        </button>
-      </div>
-
       <form onSubmit={handleSubmit} style={formRow}>
-        <span style={searchIcon}>🔍</span>
+        <span style={searchIcon}>
+          <Ionicons name="search-outline" size={16} color="#8B9BB4" />
+        </span>
         <input
           style={input}
           type="text"
           value={query}
           onChange={(e) => handleQueryChange(e.target.value)}
           onFocus={() => resultados.length > 0 && setMostrarResultados(true)}
-          placeholder={modo === 'direccion' ? 'Buscar dirección…' : 'Código de suministro…'}
+          placeholder="Buscar dirección o código de suministro (8 dígitos)…"
         />
         <button
           type="button"
-          style={micBtn}
+          style={iconBtn}
           onClick={usarMiUbicacion}
           aria-label="Usar mi ubicación"
           title="Usar mi ubicación"
         >
-          📍
+          <Ionicons name="locate-outline" size={18} color="#0152AC" />
         </button>
         {soportaVoz && (
           <button
             type="button"
-            style={{ ...micBtn, ...(escuchando ? micBtnActive : {}) }}
+            style={{ ...iconBtn, ...(escuchando ? iconBtnActive : {}) }}
             onClick={toggleVoz}
             aria-label="Dictar por voz"
             title="Dictar por voz"
           >
-            🎤
+            <Ionicons name="mic-outline" size={18} color={escuchando ? '#C0392B' : '#8B9BB4'} />
           </button>
         )}
       </form>
 
+      {hayTexto && !buscando && !error && (
+        <div style={modeChip}>
+          <Ionicons
+            name={modo === 'suministro' ? 'barcode-outline' : 'location-outline'}
+            size={12}
+            color="#8B9BB4"
+          />
+          <span>{modo === 'suministro' ? 'Buscando por suministro' : 'Buscando por dirección'}</span>
+        </div>
+      )}
       {buscando && <div style={statusMsg}>Buscando…</div>}
       {!buscando && error && <div style={{ ...statusMsg, color: '#C0392B' }}>{error}</div>}
 
@@ -288,28 +300,19 @@ const wrapper: CSSProperties = {
   maxWidth: 'calc(100% - 24px)',
 };
 
-const segmented: CSSProperties = {
-  display: 'flex',
-  width: 'fit-content',
-  marginBottom: 6,
-  borderRadius: 6,
-  overflow: 'hidden',
-  boxShadow: '0 1px 4px rgba(0,0,0,0.18)',
-};
-
-const segmentBtn: CSSProperties = {
-  padding: '5px 12px',
-  fontSize: 11,
-  fontWeight: '600',
-  border: 'none',
-  cursor: 'pointer',
-  backgroundColor: 'rgba(255,255,255,0.85)',
+const modeChip: CSSProperties = {
+  display: 'inline-flex',
+  alignItems: 'center',
+  gap: 4,
+  marginTop: 4,
+  padding: '3px 8px',
+  fontSize: 10,
+  fontWeight: 600,
   color: '#8B9BB4',
-};
-
-const segmentBtnActive: CSSProperties = {
-  backgroundColor: 'white',
-  color: '#0D2B52',
+  backgroundColor: 'rgba(255,255,255,0.92)',
+  borderRadius: 6,
+  boxShadow: '0 1px 3px rgba(0,0,0,0.12)',
+  width: 'fit-content',
 };
 
 const formRow: CSSProperties = {
@@ -323,7 +326,8 @@ const formRow: CSSProperties = {
 };
 
 const searchIcon: CSSProperties = {
-  fontSize: 13,
+  display: 'inline-flex',
+  alignItems: 'center',
   flexShrink: 0,
 };
 
@@ -336,17 +340,19 @@ const input: CSSProperties = {
   backgroundColor: 'transparent',
 };
 
-const micBtn: CSSProperties = {
+const iconBtn: CSSProperties = {
   border: 'none',
   background: 'none',
   cursor: 'pointer',
-  fontSize: 14,
-  padding: 2,
+  display: 'inline-flex',
+  alignItems: 'center',
+  justifyContent: 'center',
+  padding: 4,
   borderRadius: 4,
   flexShrink: 0,
 };
 
-const micBtnActive: CSSProperties = {
+const iconBtnActive: CSSProperties = {
   backgroundColor: '#FDECEC',
 };
 

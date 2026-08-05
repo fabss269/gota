@@ -1,17 +1,34 @@
-import { Redirect } from 'expo-router';
+import { Redirect, Slot } from 'expo-router';
 import { Drawer } from 'expo-router/drawer';
-import { View } from 'react-native';
+import { useWindowDimensions, View } from 'react-native';
 
 import { useAuth } from '@/auth/AuthContext';
 import { Colors } from '@/constants/theme';
 import { DrawerContent } from '@/navigation/DrawerContent';
+import { TopNav } from '@/navigation/TopNav';
 
-/** Contenedor autenticado de la app: Mapa / Dashboard / Incidencias (Spec 08). */
+/** Ancho a partir del cual se usa el TopNav horizontal en lugar del Drawer lateral. */
+const WIDE_BREAKPOINT = 900;
+
+/** Contenedor autenticado de la app: Mapa / Dashboard / Incidencias (Spec 08).
+ *  Responsive: TopNav horizontal en pantallas anchas (>= 900px), Drawer en angostas. */
 export default function AppLayout() {
   const { isAuthenticated, isLoading } = useAuth();
+  const { width } = useWindowDimensions();
 
   if (isLoading) return <View style={{ flex: 1, backgroundColor: Colors.primary }} />;
   if (!isAuthenticated) return <Redirect href="/login" />;
+
+  if (width >= WIDE_BREAKPOINT) {
+    return (
+      <View style={{ flex: 1, backgroundColor: Colors.background }}>
+        <TopNav />
+        <View style={{ flex: 1 }}>
+          <Slot />
+        </View>
+      </View>
+    );
+  }
 
   return (
     <Drawer

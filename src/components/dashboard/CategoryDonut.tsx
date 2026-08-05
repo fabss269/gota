@@ -17,7 +17,7 @@ export function CategoryDonut({ agua, desague }: Props) {
   return (
     <View style={styles.row}>
       <Svg width={SIZE} height={SIZE} viewBox={`0 0 ${SIZE} ${SIZE}`}>
-        <G rotation={-90} originX={SIZE / 2} originY={SIZE / 2}>
+        <G transform={`rotate(-90 ${SIZE / 2} ${SIZE / 2})`}>
           <Circle
             cx={SIZE / 2}
             cy={SIZE / 2}

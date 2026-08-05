@@ -1,3 +1,4 @@
+import { Ionicons } from '@expo/vector-icons';
 import { usePathname, useRouter } from 'expo-router';
 import { DrawerContentScrollView, type DrawerContentComponentProps } from 'expo-router/drawer';
 import { Pressable, StyleSheet, Text, View } from 'react-native';
@@ -5,11 +6,13 @@ import { Pressable, StyleSheet, Text, View } from 'react-native';
 import { useAuth } from '@/auth/AuthContext';
 import { Colors, Radius, Spacing } from '@/constants/theme';
 
-const ITEMS = [
-  { href: '/mapa', label: 'Mapa', icon: '📍' },
-  { href: '/dashboard', label: 'Dashboard', icon: '📊' },
-  { href: '/incidencias', label: 'Incidencias', icon: '🚨' },
-] as const;
+type IconName = keyof typeof Ionicons.glyphMap;
+
+const ITEMS: { href: string; label: string; icon: IconName }[] = [
+  { href: '/mapa', label: 'Mapa', icon: 'location-outline' },
+  { href: '/dashboard', label: 'Dashboard', icon: 'stats-chart-outline' },
+  { href: '/incidencias', label: 'Incidencias', icon: 'warning-outline' },
+];
 
 /**
  * nav-drawer (Spec 08). Corrección de diseño aplicada: se eliminan los 3 ítems de
@@ -40,9 +43,14 @@ export function DrawerContent(props: DrawerContentComponentProps) {
           <Pressable
             key={item.href}
             style={[styles.item, active && styles.itemActive]}
-            onPress={() => router.push(item.href)}
+            onPress={() => router.push(item.href as never)}
           >
-            <Text style={styles.itemIcon}>{item.icon}</Text>
+            <Ionicons
+              name={item.icon}
+              size={20}
+              color={active ? Colors.accent : Colors.textBody}
+              style={styles.itemIcon}
+            />
             <Text style={[styles.itemLabel, active && styles.itemLabelActive]}>{item.label}</Text>
           </Pressable>
         );
@@ -57,7 +65,7 @@ export function DrawerContent(props: DrawerContentComponentProps) {
           router.replace('/login');
         }}
       >
-        <Text style={styles.itemIcon}>🚪</Text>
+        <Ionicons name="log-out-outline" size={20} color={Colors.textBody} style={styles.itemIcon} />
         <Text style={styles.itemLabel}>Cerrar sesión</Text>
       </Pressable>
     </DrawerContentScrollView>
@@ -99,7 +107,7 @@ const styles = StyleSheet.create({
     borderRadius: Radius.sm,
   },
   itemActive: { backgroundColor: '#EEF1F6' },
-  itemIcon: { fontSize: 18, width: 22, textAlign: 'center' },
+  itemIcon: { width: 22, textAlign: 'center' },
   itemLabel: { fontSize: 15, fontWeight: '600', color: Colors.textBody },
   itemLabelActive: { color: Colors.accent },
   spacer: { flex: 1, minHeight: Spacing.lg },

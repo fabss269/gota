@@ -1,3 +1,4 @@
+import { Ionicons } from '@expo/vector-icons';
 import { useEffect, useRef, useState } from 'react';
 import { ActivityIndicator, Pressable, StyleSheet, Text, TextInput, View } from 'react-native';
 
@@ -9,8 +10,15 @@ import { useMapSearchStore } from '@/state/mapSearchStore';
 
 type Modo = 'direccion' | 'suministro';
 
-const DEBOUNCE_MS = 600;
+const DEBOUNCE_DIRECCION_MS = 600;
+const DEBOUNCE_SUMINISTRO_MS = 300;
 const MIN_QUERY_LEN = 3;
+
+/** El código de suministro es exactamente 8 dígitos (constraint chk_suministro_8digitos
+ *  en la BD). Si el texto matchea ese patrón se trata como suministro; cualquier otra
+ *  cosa es dirección. Autodetección → sin toggle en la UI. */
+const detectarModo = (texto: string): Modo =>
+  /^\d{8}$/.test(texto) ? 'suministro' : 'direccion';
 
 /**
  * Buscador de ubicación (dirección vía Nominatim/OSM, o suministro vía backend) —
@@ -22,7 +30,6 @@ const MIN_QUERY_LEN = 3;
 export function LocationSearchBar() {
   const flyTo = useMapSearchStore((state) => state.flyTo);
 
-  const [modo, setModo] = useState<Modo>('direccion');
   const [query, setQuery] = useState('');
   const [resultados, setResultados] = useState<DireccionResultado[]>([]);
   const [mostrarResultados, setMostrarResultados] = useState(false);
@@ -33,16 +40,29 @@ export function LocationSearchBar() {
   const abortRef = useRef<AbortController | null>(null);
   const skipNextSearchRef = useRef(false);
 
+  const modo = detectarModo(query.trim());
+
   useEffect(() => {
-    if (modo !== 'direccion') return;
     if (skipNextSearchRef.current) {
       skipNextSearchRef.current = false;
       return;
     }
     const texto = query.trim();
-    if (texto.length < MIN_QUERY_LEN) return;
+    if (!texto) return;
+    const modoActual = detectarModo(texto);
 
     if (debounceRef.current) clearTimeout(debounceRef.current);
+
+    if (modoActual === 'suministro') {
+      debounceRef.current = setTimeout(() => {
+        void buscarPorSuministro();
+      }, DEBOUNCE_SUMINISTRO_MS);
+      return () => {
+        if (debounceRef.current) clearTimeout(debounceRef.current);
+      };
+    }
+
+    if (texto.length < MIN_QUERY_LEN) return;
     debounceRef.current = setTimeout(() => {
       abortRef.current?.abort();
       const controller = new AbortController();
@@ -61,16 +81,18 @@ export function LocationSearchBar() {
           setError('No se pudo buscar la dirección. Intenta de nuevo.');
         })
         .finally(() => setBuscando(false));
-    }, DEBOUNCE_MS);
+    }, DEBOUNCE_DIRECCION_MS);
 
     return () => {
       if (debounceRef.current) clearTimeout(debounceRef.current);
     };
-  }, [query, modo]);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [query]);
 
   const handleQueryChange = (value: string) => {
     setQuery(value);
-    if (modo === 'direccion' && value.trim().length < MIN_QUERY_LEN) {
+    const texto = value.trim();
+    if (detectarModo(texto) === 'direccion' && texto.length < MIN_QUERY_LEN) {
       setResultados([]);
       setMostrarResultados(false);
       setError(null);
@@ -106,50 +128,42 @@ export function LocationSearchBar() {
 
   const handleSubmit = () => {
     if (modo === 'suministro') {
-      buscarPorSuministro();
+      void buscarPorSuministro();
     } else if (resultados.length > 0) {
       seleccionarDireccion(resultados[0]);
     }
   };
 
-  const cambiarModo = (nuevo: Modo) => {
-    setModo(nuevo);
-    setQuery('');
-    setResultados([]);
-    setMostrarResultados(false);
-    setError(null);
-  };
+  const hayTexto = query.trim().length > 0;
 
   return (
     <View style={styles.wrapper}>
-      <View style={styles.segmented}>
-        <Pressable
-          style={[styles.segmentBtn, modo === 'direccion' && styles.segmentBtnActive]}
-          onPress={() => cambiarModo('direccion')}
-        >
-          <Text style={[styles.segmentLabel, modo === 'direccion' && styles.segmentLabelActive]}>Dirección</Text>
-        </Pressable>
-        <Pressable
-          style={[styles.segmentBtn, modo === 'suministro' && styles.segmentBtnActive]}
-          onPress={() => cambiarModo('suministro')}
-        >
-          <Text style={[styles.segmentLabel, modo === 'suministro' && styles.segmentLabelActive]}>Suministro</Text>
-        </Pressable>
-      </View>
-
       <View style={styles.formRow}>
-        <Text style={styles.searchIcon}>🔍</Text>
+        <Ionicons name="search-outline" size={16} color={Colors.textMuted} style={styles.searchIcon} />
         <TextInput
           style={styles.input}
           value={query}
           onChangeText={handleQueryChange}
           onFocus={() => resultados.length > 0 && setMostrarResultados(true)}
           onSubmitEditing={handleSubmit}
-          placeholder={modo === 'direccion' ? 'Buscar dirección…' : 'Código de suministro…'}
+          placeholder="Buscar dirección o código de suministro (8 dígitos)…"
           placeholderTextColor={Colors.textMuted}
           returnKeyType="search"
         />
       </View>
+
+      {hayTexto && !buscando && !error && (
+        <View style={styles.modeChip}>
+          <Ionicons
+            name={modo === 'suministro' ? 'barcode-outline' : 'location-outline'}
+            size={12}
+            color={Colors.textMuted}
+          />
+          <Text style={styles.modeChipLabel}>
+            {modo === 'suministro' ? 'Buscando por suministro' : 'Buscando por dirección'}
+          </Text>
+        </View>
+      )}
 
       {buscando && (
         <View style={styles.statusMsg}>
@@ -185,22 +199,19 @@ export function LocationSearchBar() {
 
 const styles = StyleSheet.create({
   wrapper: { width: '100%' },
-  segmented: {
+  modeChip: {
     flexDirection: 'row',
-    width: 160,
-    marginBottom: 6,
+    alignItems: 'center',
+    gap: 4,
+    alignSelf: 'flex-start',
+    marginTop: 4,
+    paddingHorizontal: 8,
+    paddingVertical: 3,
+    backgroundColor: 'rgba(255,255,255,0.92)',
     borderRadius: 6,
-    overflow: 'hidden',
-    elevation: 3,
+    elevation: 2,
   },
-  segmentBtn: {
-    paddingVertical: 5,
-    paddingHorizontal: 12,
-    backgroundColor: 'rgba(255,255,255,0.85)',
-  },
-  segmentBtnActive: { backgroundColor: Colors.white },
-  segmentLabel: { fontSize: 11, fontWeight: '600', color: Colors.textMuted },
-  segmentLabelActive: { color: Colors.primaryDark },
+  modeChipLabel: { fontSize: 10, fontWeight: '600', color: Colors.textMuted },
   formRow: {
     flexDirection: 'row',
     alignItems: 'center',

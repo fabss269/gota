@@ -16,8 +16,8 @@ export function PrioridadSectorGrid({ sectores }: Props) {
   return (
     <View>
       <View style={styles.grid}>
-        {sectores.map((s) => (
-          <View key={s.sector} style={[styles.cell, { backgroundColor: COLOR_MAP[s.color] }]}>
+        {sectores.map((s, i) => (
+          <View key={`${s.sector}-${i}`} style={[styles.cell, { backgroundColor: COLOR_MAP[s.color] }]}>
             <Text style={styles.cellLabel} numberOfLines={2}>
               {s.sector.split('·')[0].trim()}
             </Text>
