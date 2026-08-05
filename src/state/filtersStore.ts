@@ -4,6 +4,11 @@ import type { Categoria, EstadoIncidencia, Prioridad } from '@/mocks/incidentsMo
 
 export type MapMode = 'normal' | 'calor' | 'foco';
 
+// Presets simples en vez de un date-picker completo (no hay ninguno en el proyecto
+// todavía) — cubre los casos de uso reales de una vista operativa sin la complejidad
+// de un calendario. `useIncidentsToday` traduce esto a fecha/fechaDesde/fechaHasta.
+export type RangoFechas = 'hoy' | '7d' | '30d' | 'mes' | 'todo';
+
 type FiltersState = {
   categorias: Categoria[];
   prioridades: Prioridad[];
@@ -11,21 +16,27 @@ type FiltersState = {
   // a diferencia de Categoría/Prioridad que son multi-select (ver RF-04.3).
   tipoAtencion: string | null;
   estado: EstadoIncidencia | null;
+  rangoFechas: RangoFechas;
   mapMode: MapMode;
   toggleCategoria: (categoria: Categoria) => void;
   togglePrioridad: (prioridad: Prioridad) => void;
   setPrioridades: (prioridades: Prioridad[]) => void;
   setTipoAtencion: (tipoAtencion: string | null) => void;
   setEstado: (estado: EstadoIncidencia | null) => void;
+  setRangoFechas: (rango: RangoFechas) => void;
   setMapMode: (mode: MapMode) => void;
   reset: () => void;
 };
 
-const DEFAULTS: Pick<FiltersState, 'categorias' | 'prioridades' | 'tipoAtencion' | 'estado' | 'mapMode'> = {
+const DEFAULTS: Pick<
+  FiltersState,
+  'categorias' | 'prioridades' | 'tipoAtencion' | 'estado' | 'rangoFechas' | 'mapMode'
+> = {
   categorias: ['agua', 'desague'],
   prioridades: ['a_tiempo', 'alerta', 'critica'],
   tipoAtencion: null,
   estado: null,
+  rangoFechas: 'hoy',
   mapMode: 'normal',
 };
 
@@ -51,6 +62,7 @@ export const useFiltersStore = create<FiltersState>((set) => ({
   setPrioridades: (prioridades) => set({ prioridades }),
   setTipoAtencion: (tipoAtencion) => set({ tipoAtencion }),
   setEstado: (estado) => set({ estado }),
+  setRangoFechas: (rangoFechas) => set({ rangoFechas }),
   setMapMode: (mapMode) => set({ mapMode }),
   reset: () => set({ ...DEFAULTS }),
 }));

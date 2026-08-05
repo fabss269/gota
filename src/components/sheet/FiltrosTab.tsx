@@ -1,9 +1,10 @@
 import { useState } from 'react';
 import { Modal, Pressable, StyleSheet, Text, View } from 'react-native';
 
+import { UbicacionPicker } from '@/components/map/UbicacionPicker';
 import { Colors, Radius, Spacing } from '@/constants/theme';
 import type { EstadoIncidencia, Prioridad } from '@/mocks/incidentsMock';
-import { useFiltersStore } from '@/state/filtersStore';
+import { type RangoFechas, useFiltersStore } from '@/state/filtersStore';
 
 const PRIORIDAD_LABEL: Record<Prioridad, string> = {
   a_tiempo: 'A tiempo',
@@ -14,6 +15,14 @@ const PRIORIDAD_COLOR: Record<Prioridad, string> = {
   a_tiempo: Colors.statusATiempo,
   alerta: Colors.statusAlerta,
   critica: Colors.statusCritica,
+};
+
+const RANGO_LABEL: Record<RangoFechas, string> = {
+  hoy: 'Hoy',
+  '7d': 'Últimos 7 días',
+  '30d': 'Últimos 30 días',
+  mes: 'Este mes',
+  todo: 'Todo',
 };
 
 // Mismos valores/labels que ya usa el resto de la app para "tipo"/"estado"
@@ -30,10 +39,11 @@ const ESTADO_OPTIONS: { value: EstadoIncidencia; label: string }[] = [
 /**
  * Tab "Filtros" del Bottom Sheet (Spec 04, RF-04.1 a RF-04.6).
  *
- * Simplificación documentada: los selectores de Distrito/Sector y Rango de fechas se
- * muestran como en el diseño pero no están conectados (no hay endpoint de catálogos
- * real todavía, ver docs/API.md § 2). Categoría, Prioridad, Tipo de atención y Estado
- * sí filtran el mapa de verdad porque son datos que ya existen en el mock.
+ * Todo acá filtra el mapa/lista de verdad: Categoría, Prioridad, Tipo de atención,
+ * Estado, Ubicación (reusa `UbicacionPicker`, el mismo componente/store que ya usa
+ * la pestaña Capas y que centra la cámara — elegir un distrito/sector acá también
+ * lo hace) y Rango de fechas (presets simples, no hay date-picker en el proyecto
+ * todavía — ver `useIncidentsToday`).
  */
 export function FiltrosTab() {
   const categorias = useFiltersStore((s) => s.categorias);
@@ -44,9 +54,11 @@ export function FiltrosTab() {
   const setTipoAtencion = useFiltersStore((s) => s.setTipoAtencion);
   const estado = useFiltersStore((s) => s.estado);
   const setEstado = useFiltersStore((s) => s.setEstado);
+  const rangoFechas = useFiltersStore((s) => s.rangoFechas);
+  const setRangoFechas = useFiltersStore((s) => s.setRangoFechas);
   const reset = useFiltersStore((s) => s.reset);
 
-  const [selectorAbierto, setSelectorAbierto] = useState<'tipo' | 'estado' | null>(null);
+  const [selectorAbierto, setSelectorAbierto] = useState<'tipo' | 'estado' | 'rango' | null>(null);
 
   return (
     <View style={styles.container}>
@@ -58,8 +70,14 @@ export function FiltrosTab() {
       </View>
 
       <View style={styles.chipRow}>
-        <Chip label="Agua" active={categorias.includes('agua')} onPress={() => toggleCategoria('agua')} />
-        <Chip
+        <CategoriaChip
+          icon="💧"
+          label="Agua"
+          active={categorias.includes('agua')}
+          onPress={() => toggleCategoria('agua')}
+        />
+        <CategoriaChip
+          icon="⚡"
           label="Desagüe"
           active={categorias.includes('desague')}
           onPress={() => toggleCategoria('desague')}
@@ -67,9 +85,7 @@ export function FiltrosTab() {
       </View>
 
       <Text style={styles.sectionTitle}>Ubicación</Text>
-      <View style={styles.disabledRow}>
-        <Text style={styles.disabledLabel}>Chiclayo · Todos los distritos · Todos los sectores</Text>
-      </View>
+      <UbicacionPicker />
 
       <View style={styles.dualRow}>
         <SelectorRow
@@ -87,20 +103,18 @@ export function FiltrosTab() {
       <Text style={styles.sectionTitle}>Prioridad</Text>
       <View style={styles.chipRow}>
         {(Object.keys(PRIORIDAD_LABEL) as Prioridad[]).map((p) => (
-          <Chip
+          <PrioridadChip
             key={p}
             label={PRIORIDAD_LABEL[p]}
+            color={PRIORIDAD_COLOR[p]}
             active={prioridades.includes(p)}
-            dotColor={PRIORIDAD_COLOR[p]}
             onPress={() => togglePrioridad(p)}
           />
         ))}
       </View>
 
       <Text style={styles.sectionTitle}>Rango de fechas</Text>
-      <View style={styles.disabledRow}>
-        <Text style={styles.disabledLabel}>Hoy</Text>
-      </View>
+      <SelectorRow label="Rango de fechas" value={RANGO_LABEL[rangoFechas]} onPress={() => setSelectorAbierto('rango')} hideLabel />
 
       <SelectorModal
         visible={selectorAbierto === 'tipo'}
@@ -116,15 +130,32 @@ export function FiltrosTab() {
         selected={estado}
         onSelect={setEstado}
       />
+      <SelectorModal
+        visible={selectorAbierto === 'rango'}
+        onClose={() => setSelectorAbierto(null)}
+        options={(Object.keys(RANGO_LABEL) as RangoFechas[]).map((r) => ({ value: r, label: RANGO_LABEL[r] }))}
+        selected={rangoFechas}
+        onSelect={setRangoFechas}
+      />
     </View>
   );
 }
 
-function SelectorRow({ label, value, onPress }: { label: string; value: string; onPress: () => void }) {
+function SelectorRow({
+  label,
+  value,
+  onPress,
+  hideLabel,
+}: {
+  label: string;
+  value: string;
+  onPress: () => void;
+  hideLabel?: boolean;
+}) {
   return (
     <Pressable style={styles.selectorBox} onPress={onPress}>
       <View style={styles.selectorHeaderRow}>
-        <Text style={styles.selectorLabel}>{label}</Text>
+        {!hideLabel && <Text style={styles.selectorLabel}>{label}</Text>}
         <Text style={styles.selectorChevron}>›</Text>
       </View>
       <Text style={styles.selectorValue}>{value}</Text>
@@ -169,21 +200,39 @@ function SelectorModal<T extends string | null>({
   );
 }
 
-function Chip({
+function CategoriaChip({
+  icon,
   label,
   active,
   onPress,
-  dotColor,
 }: {
+  icon: string;
   label: string;
   active: boolean;
   onPress: () => void;
-  dotColor?: string;
 }) {
   return (
-    <Pressable style={[styles.chip, active && styles.chipActive]} onPress={onPress}>
-      {dotColor && <View style={[styles.dot, { backgroundColor: dotColor }]} />}
-      <Text style={[styles.chipLabel, active && styles.chipLabelActive]}>{label}</Text>
+    <Pressable style={[styles.categoriaChip, active && styles.categoriaChipActive]} onPress={onPress}>
+      <Text style={styles.categoriaIcon}>{icon}</Text>
+      <Text style={[styles.categoriaLabel, active && styles.categoriaLabelActive]}>{label}</Text>
+    </Pressable>
+  );
+}
+
+function PrioridadChip({
+  label,
+  color,
+  active,
+  onPress,
+}: {
+  label: string;
+  color: string;
+  active: boolean;
+  onPress: () => void;
+}) {
+  return (
+    <Pressable style={[styles.prioridadChip, { borderTopColor: color }, !active && styles.prioridadChipInactive]} onPress={onPress}>
+      <Text style={[styles.prioridadLabel, !active && styles.prioridadLabelInactive]}>{label}</Text>
     </Pressable>
   );
 }
@@ -193,29 +242,39 @@ const styles = StyleSheet.create({
   headerRow: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' },
   sectionTitle: { fontSize: 13, fontWeight: '700', color: Colors.primaryDark, marginTop: Spacing.sm },
   limpiar: { color: Colors.accent, fontWeight: '600' },
-  chipRow: { flexDirection: 'row', flexWrap: 'wrap', gap: Spacing.xs },
-  chip: {
+  chipRow: { flexDirection: 'row', gap: Spacing.xs },
+
+  categoriaChip: {
+    flex: 1,
     flexDirection: 'row',
     alignItems: 'center',
+    justifyContent: 'center',
     gap: 6,
-    paddingHorizontal: Spacing.sm,
-    paddingVertical: 8,
+    paddingVertical: 12,
     borderRadius: Radius.pill,
     borderWidth: 1,
     borderColor: Colors.border,
+    backgroundColor: Colors.background,
   },
-  chipActive: { backgroundColor: Colors.accent, borderColor: Colors.accent },
-  chipLabel: { fontSize: 13, fontWeight: '600', color: Colors.textBody },
-  chipLabelActive: { color: Colors.white },
-  dot: { width: 8, height: 8, borderRadius: 4 },
-  disabledRow: {
+  categoriaChipActive: { backgroundColor: Colors.primaryDark, borderColor: Colors.primaryDark },
+  categoriaIcon: { fontSize: 14 },
+  categoriaLabel: { fontSize: 14, fontWeight: '700', color: Colors.textBody },
+  categoriaLabelActive: { color: Colors.white },
+
+  prioridadChip: {
+    flex: 1,
+    alignItems: 'center',
+    paddingVertical: 10,
+    borderRadius: Radius.sm,
     borderWidth: 1,
     borderColor: Colors.border,
-    borderRadius: Radius.sm,
-    paddingHorizontal: Spacing.sm,
-    paddingVertical: 10,
+    borderTopWidth: 3,
+    backgroundColor: Colors.white,
   },
-  disabledLabel: { color: Colors.textMuted, fontSize: 13 },
+  prioridadChipInactive: { opacity: 0.45 },
+  prioridadLabel: { fontSize: 12, fontWeight: '700', color: Colors.textBody },
+  prioridadLabelInactive: { color: Colors.textMuted },
+
   dualRow: { flexDirection: 'row', gap: Spacing.xs },
   selectorBox: {
     flex: 1,
