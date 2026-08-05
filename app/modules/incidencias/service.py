@@ -267,6 +267,8 @@ class IncidenciaService:
             prioridad=prioridad,
             estado=estado,
             antiguedadDias=(_now() - incidente.creado_en).days,
+            lat=predio_catastral.lat if predio_catastral else None,
+            lon=predio_catastral.lon if predio_catastral else None,
             tecnicoAsignado=(
                 TecnicoAsignadoOut(
                     id=str(tecnico_evento.usuario_id),
