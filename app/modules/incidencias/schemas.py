@@ -72,6 +72,8 @@ class IncidenciaDetalleOut(BaseModel):
     prioridad: str | None
     estado: str
     antiguedadDias: int
+    lat: float | None
+    lon: float | None
     tecnicoAsignado: TecnicoAsignadoOut | None
     reclamo: ReclamoResumenOut | None
     catastro: CatastroOut | None
