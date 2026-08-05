@@ -1,9 +1,11 @@
 import { useRouter } from 'expo-router';
+import { useMemo } from 'react';
 import { Pressable, StyleSheet, Text, View } from 'react-native';
 
-import { Colors, Spacing } from '@/constants/theme';
+import { Spacing, type ColorPalette } from '@/constants/theme';
 import type { EstadoIncidencia } from '@/mocks/incidentsMock';
 import type { IncidenciaDetalle } from '@/mocks/incidentDetailMock';
+import { useThemeColors } from '@/state/themeStore';
 
 const ESTADO_LABEL: Record<EstadoIncidencia, string> = {
   CREADO: 'Creado',
@@ -11,18 +13,20 @@ const ESTADO_LABEL: Record<EstadoIncidencia, string> = {
   EN_PROGRESO: 'En progreso',
   ATENDIDO: 'Atendido',
 };
-const ESTADO_PILL: Record<EstadoIncidencia, { bg: string; text: string }> = {
-  CREADO: { bg: '#E3E4E8', text: Colors.textMuted },
-  PENDIENTE: { bg: '#E3E4E8', text: Colors.textMuted },
-  EN_PROGRESO: { bg: '#E0E4FF', text: Colors.accent },
-  ATENDIDO: { bg: '#DCF7E3', text: '#1E8E3E' },
-};
 
 type Props = { incidencia: IncidenciaDetalle };
 
 /** Tab "Foco" (Spec 06, RF-06.6). */
 export function FocoTab({ incidencia }: Props) {
   const router = useRouter();
+  const t = useThemeColors();
+  const styles = useMemo(() => makeStyles(t), [t]);
+  const ESTADO_PILL: Record<EstadoIncidencia, { bg: string; text: string }> = {
+    CREADO: { bg: t.border, text: t.textMuted },
+    PENDIENTE: { bg: t.border, text: t.textMuted },
+    EN_PROGRESO: { bg: t.accentBg, text: t.accent },
+    ATENDIDO: { bg: '#DCF7E3', text: '#1E8E3E' },
+  };
 
   if (!incidencia.foco) {
     return (
@@ -64,15 +68,17 @@ export function FocoTab({ incidencia }: Props) {
   );
 }
 
-const styles = StyleSheet.create({
-  card: { gap: Spacing.sm },
-  cardTitle: { fontSize: 13, fontWeight: '700', color: Colors.accent },
-  descripcion: { fontSize: 12.5, color: Colors.textBody },
-  emptyText: { fontSize: 13, color: Colors.textMuted },
-  row: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', gap: Spacing.sm, paddingVertical: 6 },
-  rowTextCol: { flex: 1, gap: 2 },
-  rowTitle: { fontSize: 13, fontWeight: '600', color: Colors.textBody },
-  rowSubtitle: { fontSize: 11, color: Colors.textMuted },
-  pill: { borderRadius: 20, paddingHorizontal: Spacing.sm, paddingVertical: 4 },
-  pillLabel: { fontSize: 11, fontWeight: '600' },
-});
+function makeStyles(t: ColorPalette) {
+  return StyleSheet.create({
+    card: { gap: Spacing.sm },
+    cardTitle: { fontSize: 13, fontWeight: '700', color: t.accent },
+    descripcion: { fontSize: 12.5, color: t.textBody },
+    emptyText: { fontSize: 13, color: t.textMuted },
+    row: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', gap: Spacing.sm, paddingVertical: 6 },
+    rowTextCol: { flex: 1, gap: 2 },
+    rowTitle: { fontSize: 13, fontWeight: '600', color: t.textBody },
+    rowSubtitle: { fontSize: 11, color: t.textMuted },
+    pill: { borderRadius: 20, paddingHorizontal: Spacing.sm, paddingVertical: 4 },
+    pillLabel: { fontSize: 11, fontWeight: '600' },
+  });
+}

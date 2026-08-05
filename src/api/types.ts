@@ -43,6 +43,8 @@ export type ApiIncidenciaDetalle = {
   prioridad: Prioridad | null;
   estado: EstadoIncidencia;
   antiguedadDias: number;
+  lat: number | null;
+  lon: number | null;
   tecnicoAsignado: ApiTecnicoAsignado | null;
   reclamo: ApiReclamoResumen | null;
   catastro: ApiCatastro | null;

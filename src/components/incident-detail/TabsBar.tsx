@@ -1,6 +1,8 @@
+import { useMemo } from 'react';
 import { Pressable, StyleSheet, Text, View } from 'react-native';
 
-import { Colors, Spacing } from '@/constants/theme';
+import { Spacing, type ColorPalette } from '@/constants/theme';
+import { useThemeColors } from '@/state/themeStore';
 
 export type DetailTab = 'detalle' | 'trazabilidad' | 'foco' | 'impacto' | 'predio';
 
@@ -16,6 +18,9 @@ type Props = { active: DetailTab; onChange: (tab: DetailTab) => void };
 
 /** Barra de 4 tabs del Detalle de Incidencia (Spec 06 § 2). */
 export function TabsBar({ active, onChange }: Props) {
+  const t = useThemeColors();
+  const styles = useMemo(() => makeStyles(t), [t]);
+
   return (
     <View style={styles.row}>
       {TABS.map((tab) => {
@@ -31,11 +36,13 @@ export function TabsBar({ active, onChange }: Props) {
   );
 }
 
-const styles = StyleSheet.create({
-  row: { flexDirection: 'row', borderBottomWidth: 1, borderBottomColor: Colors.border },
-  tab: { flex: 1, alignItems: 'center', gap: 6, paddingVertical: Spacing.sm },
-  label: { fontSize: 12, fontWeight: '400', color: Colors.textMuted },
-  labelActive: { fontWeight: '700', color: Colors.accent },
-  indicator: { height: 3, width: '70%', borderRadius: 2, backgroundColor: 'transparent' },
-  indicatorActive: { backgroundColor: Colors.accent },
-});
+function makeStyles(t: ColorPalette) {
+  return StyleSheet.create({
+    row: { flexDirection: 'row', borderBottomWidth: 1, borderBottomColor: t.border },
+    tab: { flex: 1, alignItems: 'center', gap: 6, paddingVertical: Spacing.sm },
+    label: { fontSize: 12, fontWeight: '400', color: t.textMuted },
+    labelActive: { fontWeight: '700', color: t.accent },
+    indicator: { height: 3, width: '70%', borderRadius: 2, backgroundColor: 'transparent' },
+    indicatorActive: { backgroundColor: t.accent },
+  });
+}

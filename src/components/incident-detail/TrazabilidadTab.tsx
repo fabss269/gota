@@ -1,7 +1,9 @@
+import { useMemo } from 'react';
 import { StyleSheet, Text, View } from 'react-native';
 
-import { Colors, Spacing } from '@/constants/theme';
+import { Spacing, type ColorPalette } from '@/constants/theme';
 import type { IncidenciaDetalle, TrazabilidadPaso } from '@/mocks/incidentDetailMock';
+import { useThemeColors } from '@/state/themeStore';
 import { formatFechaHora } from '@/utils/formatFecha';
 
 const ESTADO_LABEL: Record<TrazabilidadPaso['estado'], string> = {
@@ -21,6 +23,9 @@ type Props = { incidencia: IncidenciaDetalle };
 
 /** Tab "Trazabilidad" (Spec 06, RF-06.5). */
 export function TrazabilidadTab({ incidencia }: Props) {
+  const t = useThemeColors();
+  const styles = useMemo(() => makeStyles(t), [t]);
+
   return (
     <View style={styles.card}>
       <Text style={styles.cardTitle}>Trazabilidad completa</Text>
@@ -44,15 +49,17 @@ export function TrazabilidadTab({ incidencia }: Props) {
   );
 }
 
-const styles = StyleSheet.create({
-  card: { gap: 4 },
-  cardTitle: { fontSize: 13, fontWeight: '700', color: Colors.accent, marginBottom: Spacing.xs },
-  step: {},
-  connector: { position: 'absolute', left: 4, top: -10, width: 1, height: 10, backgroundColor: Colors.border },
-  dotRow: { flexDirection: 'row', gap: Spacing.sm },
-  dot: { width: 9, height: 9, borderRadius: 5, marginTop: 4 },
-  textCol: { flex: 1, gap: 1, paddingBottom: Spacing.sm },
-  estadoLabel: { fontSize: 12.5, fontWeight: '700', color: Colors.textBody },
-  fechaLabel: { fontSize: 11, color: Colors.textMuted },
-  metaLabel: { fontSize: 11, color: Colors.textMuted },
-});
+function makeStyles(t: ColorPalette) {
+  return StyleSheet.create({
+    card: { gap: 4 },
+    cardTitle: { fontSize: 13, fontWeight: '700', color: t.accent, marginBottom: Spacing.xs },
+    step: {},
+    connector: { position: 'absolute', left: 4, top: -10, width: 1, height: 10, backgroundColor: t.border },
+    dotRow: { flexDirection: 'row', gap: Spacing.sm },
+    dot: { width: 9, height: 9, borderRadius: 5, marginTop: 4 },
+    textCol: { flex: 1, gap: 1, paddingBottom: Spacing.sm },
+    estadoLabel: { fontSize: 12.5, fontWeight: '700', color: t.textBody },
+    fechaLabel: { fontSize: 11, color: t.textMuted },
+    metaLabel: { fontSize: 11, color: t.textMuted },
+  });
+}

@@ -1,10 +1,12 @@
-import { useEffect, useState, type CSSProperties, type ReactNode } from 'react';
+import { useEffect, useRef, useState, type CSSProperties, type ReactNode } from 'react';
 
 import type { ApiDistrito, ApiSector } from '@/api/types';
 import type { EstadoIncidencia, Prioridad } from '@/mocks/incidentsMock';
 import { useCapasStore, type CapaKey } from '@/state/capasStore';
 import { useFiltersStore } from '@/state/filtersStore';
 import { useUbicacionStore } from '@/state/ubicacionStore';
+
+import { ThemeToggleButton } from './ThemeToggleButton.web';
 
 const TIPO_OPTIONS = [
   'Atoro en colector',
@@ -21,7 +23,11 @@ const ESTADO_OPTIONS: { value: EstadoIncidencia | ''; label: string }[] = [
   { value: 'ATENDIDO', label: 'Atendido' },
 ];
 
-/** Sidebar fija izquierda del layout web del mapa — Filtros + capas de catastro. */
+/**
+ * Sidebar fija izquierda del layout web del mapa — Filtros + Ubicación.
+ * Catastro (Predio/Alcantarillado/Agua) vive en un panel flotante aparte,
+ * ver CatastroFloatingPanel.
+ */
 export function FiltersSidebar() {
   const { tipoAtencion, setTipoAtencion, estado, setEstado, prioridades, setPrioridades, reset } =
     useFiltersStore();
@@ -72,45 +78,39 @@ export function FiltersSidebar() {
       {/* ── FILTROS ───────────────────────────────── */}
       <div style={sectionHeaderRow}>
         <span style={sectionLabel}>FILTROS</span>
-        <button style={clearBtn} onClick={reset}>Limpiar</button>
+        <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
+          <button style={clearBtn} onClick={reset}>Limpiar</button>
+          <ThemeToggleButton />
+        </div>
       </div>
 
       <FilterField label="Tipo de incidencia">
-        <select
-          style={selectBase}
+        <Dropdown
           value={tipoAtencion ?? ''}
-          onChange={(e) => setTipoAtencion(e.target.value || null)}
-        >
-          <option value="">Todos</option>
-          {TIPO_OPTIONS.map((t) => (
-            <option key={t} value={t}>{t}</option>
-          ))}
-        </select>
+          options={[{ value: '', label: 'Todos' }, ...TIPO_OPTIONS.map((t) => ({ value: t, label: t }))]}
+          onChange={(v) => setTipoAtencion(v || null)}
+        />
       </FilterField>
 
       <FilterField label="Estado">
-        <select
-          style={selectBase}
+        <Dropdown
           value={estado ?? ''}
-          onChange={(e) => setEstado((e.target.value as EstadoIncidencia) || null)}
-        >
-          {ESTADO_OPTIONS.map((o) => (
-            <option key={o.value} value={o.value}>{o.label}</option>
-          ))}
-        </select>
+          options={ESTADO_OPTIONS}
+          onChange={(v) => setEstado((v as EstadoIncidencia) || null)}
+        />
       </FilterField>
 
       <FilterField label="Prioridad">
-        <select
-          style={selectBase}
+        <Dropdown
           value={prioridadValue}
-          onChange={(e) => handlePrioridad(e.target.value)}
-        >
-          <option value="todas">Todas</option>
-          <option value="critica">Crítica</option>
-          <option value="alerta">Alerta</option>
-          <option value="a_tiempo">A tiempo</option>
-        </select>
+          options={[
+            { value: 'todas', label: 'Todas' },
+            { value: 'critica', label: 'Crítica' },
+            { value: 'alerta', label: 'Alerta' },
+            { value: 'a_tiempo', label: 'A tiempo' },
+          ]}
+          onChange={handlePrioridad}
+        />
       </FilterField>
 
       <div style={divider} />
@@ -136,7 +136,7 @@ export function FiltersSidebar() {
 
       {ubicacionAbierta &&
         (ubicacionCargando && provincias.length === 0 ? (
-          <div style={{ fontSize: 12, color: '#8B9BB4', padding: '2px 0 4px' }}>Cargando…</div>
+          <div style={{ fontSize: 12, color: 'var(--map-text-muted)', padding: '2px 0 4px' }}>Cargando…</div>
         ) : (
           provincias.map((provincia) => (
             <ProvinciaGroup
@@ -153,94 +153,6 @@ export function FiltersSidebar() {
             />
           ))
         ))}
-
-      <div style={divider} />
-
-      {/* ── CATASTRO ──────────────────────────────── */}
-      <div style={sectionHeaderRow}>
-        <span style={sectionLabel}>CATASTRO</span>
-      </div>
-
-      <div style={subsectionLabel}>Predio</div>
-
-      <CapaRow
-        icon={<ColorSquare color="#BDBDBD" border="#9E9E9E" />}
-        label="Manzanas"
-        value={isCapa('manzanas')}
-        onChange={() => toggleCapa('manzanas')}
-      />
-      <CapaRow
-        icon={<ColorSquare color="white" border="#BDBDBD" />}
-        label="Lotes"
-        value={isCapa('lotes')}
-        onChange={() => toggleCapa('lotes')}
-      />
-
-      <div style={subsectionLabel}>Alcantarillado</div>
-
-      <CapaRow
-        icon={<SolidLine color="#5D4037" />}
-        label="Red primaria (colectores)"
-        value={isCapa('red_primaria_desague')}
-        onChange={() => toggleCapa('red_primaria_desague')}
-      />
-      <CapaRow
-        icon={<SolidLine color="#A1887F" />}
-        label="Red secundaria"
-        value={isCapa('red_secundaria_desague')}
-        onChange={() => toggleCapa('red_secundaria_desague')}
-      />
-      <CapaRow
-        icon={<Triangle color="#B71C1C" />}
-        label="Dirección de flujo"
-        value={isCapa('flujo_desague')}
-        onChange={() => toggleCapa('flujo_desague')}
-      />
-      <CapaRow
-        icon={<DashedLine color="#FB8C00" />}
-        label="Conexión desagüe"
-        value={isCapa('conexion_desague')}
-        onChange={() => toggleCapa('conexion_desague')}
-      />
-      <CapaRow
-        icon={<ColorCircle color="#795548" />}
-        label="Caja desagüe"
-        value={isCapa('caja_desague')}
-        onChange={() => toggleCapa('caja_desague')}
-      />
-      <CapaRow
-        icon={<ColorCircle color="#757575" />}
-        label="Buzones"
-        value={isCapa('buzones')}
-        onChange={() => toggleCapa('buzones')}
-      />
-
-      <div style={subsectionLabel}>Agua</div>
-
-      <CapaRow
-        icon={<SolidLine color="#29B6F6" />}
-        label="Red de agua potable"
-        value={isCapa('red_potable')}
-        onChange={() => toggleCapa('red_potable')}
-      />
-      <CapaRow
-        icon={<DashedLine color="#60A5FA" />}
-        label="Conexión agua"
-        value={isCapa('conexion_agua')}
-        onChange={() => toggleCapa('conexion_agua')}
-      />
-      <CapaRow
-        icon={<ColorCircle color="#06B6D4" />}
-        label="Caja agua"
-        value={isCapa('caja_agua')}
-        onChange={() => toggleCapa('caja_agua')}
-      />
-      <CapaRow
-        icon={<ColorCircle color="#9C27B0" />}
-        label="Accesorios (válvulas, codos, tees)"
-        value={isCapa('accesorios')}
-        onChange={() => toggleCapa('accesorios')}
-      />
     </div>
   );
 }
@@ -252,6 +164,61 @@ function FilterField({ label, children }: { label: string; children: ReactNode }
     <div style={{ marginBottom: 10 }}>
       <div style={fieldLabel}>{label}</div>
       {children}
+    </div>
+  );
+}
+
+// Dropdown propio en vez de <select> nativo: el <select> del navegador no daba
+// garantías de abrir de forma consistente (reporte de Edgar) y además un <select>
+// nativo no se puede themear en modo oscuro de forma confiable entre navegadores
+// — este popover sí, y además queda visualmente consistente con el resto del panel.
+function Dropdown({
+  value,
+  options,
+  onChange,
+}: {
+  value: string;
+  options: { value: string; label: string }[];
+  onChange: (value: string) => void;
+}) {
+  const [abierto, setAbierto] = useState(false);
+  const ref = useRef<HTMLDivElement>(null);
+
+  useEffect(() => {
+    if (!abierto) return;
+    const onClickFuera = (e: MouseEvent) => {
+      if (ref.current && !ref.current.contains(e.target as Node)) setAbierto(false);
+    };
+    document.addEventListener('mousedown', onClickFuera);
+    return () => document.removeEventListener('mousedown', onClickFuera);
+  }, [abierto]);
+
+  const seleccionado = options.find((o) => o.value === value);
+
+  return (
+    <div ref={ref} style={dropdownWrap}>
+      <button type="button" style={dropdownTrigger} onClick={() => setAbierto((v) => !v)}>
+        <span style={dropdownTriggerLabel}>{seleccionado?.label ?? value}</span>
+        <span style={{ ...chevron, transform: abierto ? 'rotate(180deg)' : 'rotate(0deg)' }}>▾</span>
+      </button>
+
+      {abierto && (
+        <div style={dropdownMenu}>
+          {options.map((o) => (
+            <button
+              key={o.value}
+              type="button"
+              style={{ ...dropdownOption, ...(o.value === value ? dropdownOptionActive : {}) }}
+              onClick={() => {
+                onChange(o.value);
+                setAbierto(false);
+              }}
+            >
+              {o.label}
+            </button>
+          ))}
+        </div>
+      )}
     </div>
   );
 }
@@ -389,7 +356,7 @@ function CapaRow({
             {icon}
           </div>
         )}
-        <span style={{ fontSize: 12, color: '#212121' }}>{label}</span>
+        <span style={{ fontSize: 12, color: 'var(--map-text)' }}>{label}</span>
       </div>
       <Toggle value={value} onChange={onChange} />
     </div>
@@ -406,7 +373,7 @@ function Toggle({ value, onChange }: { value: boolean; onChange: () => void }) {
         width: 36,
         height: 20,
         borderRadius: 10,
-        backgroundColor: value ? '#0152AC' : '#D1D5DB',
+        backgroundColor: value ? 'var(--map-accent)' : 'var(--map-border)',
         cursor: 'pointer',
         position: 'relative',
         flexShrink: 0,
@@ -418,7 +385,7 @@ function Toggle({ value, onChange }: { value: boolean; onChange: () => void }) {
           width: 16,
           height: 16,
           borderRadius: 8,
-          backgroundColor: 'white',
+          backgroundColor: 'var(--map-surface)',
           position: 'absolute',
           top: 2,
           left: value ? 18 : 2,
@@ -430,38 +397,6 @@ function Toggle({ value, onChange }: { value: boolean; onChange: () => void }) {
   );
 }
 
-function SolidLine({ color }: { color: string }) {
-  return <div style={{ width: 20, height: 2.5, backgroundColor: color, borderRadius: 1 }} />;
-}
-
-function DashedLine({ color }: { color: string }) {
-  return <div style={{ width: 20, height: 0, borderTop: `2px dashed ${color}` }} />;
-}
-
-function ColorSquare({ color, border }: { color: string; border: string }) {
-  return (
-    <div style={{ width: 12, height: 12, backgroundColor: color, border: `1.5px solid ${border}`, borderRadius: 2 }} />
-  );
-}
-
-function ColorCircle({ color }: { color: string }) {
-  return <div style={{ width: 10, height: 10, backgroundColor: color, borderRadius: 5 }} />;
-}
-
-function Triangle({ color }: { color: string }) {
-  return (
-    <div
-      style={{
-        width: 0,
-        height: 0,
-        borderLeft: '5px solid transparent',
-        borderRight: '5px solid transparent',
-        borderBottom: `9px solid ${color}`,
-      }}
-    />
-  );
-}
-
 // ── Estilos ───────────────────────────────────────────────
 
 const sidebar: CSSProperties = {
@@ -469,8 +404,8 @@ const sidebar: CSSProperties = {
   minWidth: 220,
   height: '100%',
   overflowY: 'auto',
-  backgroundColor: 'white',
-  borderRight: '1px solid #E3E7EE',
+  backgroundColor: 'var(--map-surface)',
+  borderRight: '1px solid var(--map-border)',
   padding: '20px 16px',
   display: 'flex',
   flexDirection: 'column',
@@ -487,7 +422,7 @@ const sectionHeaderRow: CSSProperties = {
 const sectionLabel: CSSProperties = {
   fontSize: 10,
   fontWeight: '700',
-  color: '#8B9BB4',
+  color: 'var(--map-text-muted)',
   letterSpacing: 0.8,
 };
 
@@ -505,15 +440,8 @@ const collapsibleHeaderRow: CSSProperties = {
 
 const chevron: CSSProperties = {
   fontSize: 11,
-  color: '#8B9BB4',
+  color: 'var(--map-text-muted)',
   transition: 'transform 150ms',
-};
-
-const subsectionLabel: CSSProperties = {
-  fontSize: 11,
-  fontWeight: '600',
-  color: '#3A4453',
-  margin: '10px 0 6px',
 };
 
 const clearBtn: CSSProperties = {
@@ -521,7 +449,7 @@ const clearBtn: CSSProperties = {
   border: 'none',
   fontSize: 12,
   fontWeight: '600',
-  color: '#0152AC',
+  color: 'var(--map-accent)',
   cursor: 'pointer',
   padding: 0,
 };
@@ -529,25 +457,73 @@ const clearBtn: CSSProperties = {
 const fieldLabel: CSSProperties = {
   fontSize: 11,
   fontWeight: '600',
-  color: '#8B9BB4',
+  color: 'var(--map-text-muted)',
   marginBottom: 4,
 };
 
-const selectBase: CSSProperties = {
+const dropdownWrap: CSSProperties = {
+  position: 'relative',
+};
+
+const dropdownTrigger: CSSProperties = {
   width: '100%',
+  display: 'flex',
+  alignItems: 'center',
+  justifyContent: 'space-between',
+  gap: 8,
   padding: '8px 10px',
-  border: '1px solid #E3E7EE',
+  border: '1px solid var(--map-border)',
   borderRadius: 8,
   fontSize: 13,
-  color: '#212121',
-  backgroundColor: 'white',
+  color: 'var(--map-text)',
+  backgroundColor: 'var(--map-surface)',
   cursor: 'pointer',
-  outline: 'none',
+  textAlign: 'left',
+};
+
+const dropdownTriggerLabel: CSSProperties = {
+  overflow: 'hidden',
+  textOverflow: 'ellipsis',
+  whiteSpace: 'nowrap',
+};
+
+const dropdownMenu: CSSProperties = {
+  position: 'absolute',
+  top: 'calc(100% + 4px)',
+  left: 0,
+  right: 0,
+  backgroundColor: 'var(--map-surface)',
+  border: '1px solid var(--map-border)',
+  borderRadius: 8,
+  boxShadow: '0 4px 16px var(--map-shadow)',
+  padding: 4,
+  zIndex: 20,
+  maxHeight: 240,
+  overflowY: 'auto',
+};
+
+const dropdownOption: CSSProperties = {
+  display: 'block',
+  width: '100%',
+  textAlign: 'left',
+  border: 'none',
+  background: 'none',
+  borderRadius: 6,
+  padding: '7px 8px',
+  fontSize: 13,
+  color: 'var(--map-text)',
+  cursor: 'pointer',
+};
+
+const dropdownOptionActive: CSSProperties = {
+  backgroundColor: 'var(--map-accent-bg)',
+  color: 'var(--map-accent)',
+  fontWeight: 600,
 };
 
 const divider: CSSProperties = {
   height: 1,
-  backgroundColor: '#E3E7EE',
+  backgroundColor: 'var(--map-border)',
   margin: '12px 0',
 };
 
@@ -557,7 +533,7 @@ const capaRow: CSSProperties = {
   justifyContent: 'space-between',
   paddingTop: 7,
   paddingBottom: 7,
-  borderBottom: '1px solid #F5F6F8',
+  borderBottom: '1px solid var(--map-surface-alt)',
 };
 
 const provinciaRow: CSSProperties = {
@@ -583,7 +559,7 @@ const provinciaToggleBtn: CSSProperties = {
 const provinciaLabel: CSSProperties = {
   fontSize: 12.5,
   fontWeight: '600',
-  color: '#212121',
+  color: 'var(--map-text)',
 };
 
 const distritoList: CSSProperties = {
@@ -591,7 +567,7 @@ const distritoList: CSSProperties = {
   flexDirection: 'column',
   marginLeft: 22,
   paddingLeft: 10,
-  borderLeft: '1.5px solid #E3E7EE',
+  borderLeft: '1.5px solid var(--map-border)',
   marginBottom: 4,
 };
 
@@ -606,7 +582,7 @@ const distritoRow: CSSProperties = {
 
 const distritoLabel: CSSProperties = {
   fontSize: 12,
-  color: '#4B5768',
+  color: 'var(--map-text-muted)',
 };
 
 const sectorList: CSSProperties = {
@@ -614,7 +590,7 @@ const sectorList: CSSProperties = {
   flexDirection: 'column',
   marginLeft: 20,
   paddingLeft: 9,
-  borderLeft: '1.5px solid #EEF1F5',
+  borderLeft: '1.5px solid var(--map-surface-alt)',
   marginBottom: 2,
 };
 
@@ -629,13 +605,13 @@ const sectorRow: CSSProperties = {
 
 const sectorLabel: CSSProperties = {
   fontSize: 11.5,
-  color: '#6B7684',
+  color: 'var(--map-text-muted)',
 };
 
 const checkboxInput: CSSProperties = {
   width: 15,
   height: 15,
-  accentColor: '#0152AC',
+  accentColor: 'var(--map-accent)',
   cursor: 'pointer',
   flexShrink: 0,
 };
@@ -643,7 +619,7 @@ const checkboxInput: CSSProperties = {
 const checkboxInputSmall: CSSProperties = {
   width: 13,
   height: 13,
-  accentColor: '#0152AC',
+  accentColor: 'var(--map-accent)',
   cursor: 'pointer',
   flexShrink: 0,
 };
@@ -651,7 +627,7 @@ const checkboxInputSmall: CSSProperties = {
 const checkboxInputTiny: CSSProperties = {
   width: 12,
   height: 12,
-  accentColor: '#0152AC',
+  accentColor: 'var(--map-accent)',
   cursor: 'pointer',
   flexShrink: 0,
 };

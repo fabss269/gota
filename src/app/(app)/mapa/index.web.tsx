@@ -7,18 +7,22 @@ import Animated, { useAnimatedStyle, useSharedValue, withTiming } from 'react-na
 import { SafeAreaView } from 'react-native-safe-area-context';
 
 import { DetailPanel } from '@/components/incident-detail/DetailPanel';
+import { CatastroFloatingPanel } from '@/components/map/CatastroFloatingPanel';
 import { ClusterListSheet } from '@/components/map/ClusterListSheet';
 import { FiltersSidebar } from '@/components/map/FiltersSidebar';
 import { LocationSearchBar } from '@/components/map/LocationSearchBar';
+import { MapThemeVars } from '@/components/map/MapThemeVars.web';
 import { EpselMapView } from '@/components/map/MapView';
 import { MapModeSheet } from '@/components/map/MapModeSheet';
 import { MapBottomSheet } from '@/components/sheet/MapBottomSheet';
-import { Colors, Radius } from '@/constants/theme';
+import { Radius, type ColorPalette } from '@/constants/theme';
 import { useIncidentsToday } from '@/hooks/useIncidentsToday';
 import type { Incidencia } from '@/mocks/incidentsMock';
 import { openDrawer } from '@/navigation/openDrawer';
 import { useFiltersStore } from '@/state/filtersStore';
+import { useMapSearchStore } from '@/state/mapSearchStore';
 import { useSimulacionStore } from '@/state/simulacionStore';
+import { useThemeColors } from '@/state/themeStore';
 import { clusterIncidents, type IncidentCluster } from '@/utils/clusterIncidents';
 
 const DESKTOP_BP = 768;
@@ -49,6 +53,7 @@ export default function MapaScreen() {
   };
 
   const handleClusterPress = (cluster: IncidentCluster) => {
+    useMapSearchStore.getState().flyTo({ lat: cluster.lat, lon: cluster.lon });
     if (cluster.count === 1) {
       abrirDetalle(cluster.incidencias[0].id);
       return;
@@ -62,6 +67,7 @@ export default function MapaScreen() {
 
   const handleSelectFromCluster = (incidencia: Incidencia) => {
     setClusterSeleccionado(null);
+    useMapSearchStore.getState().flyTo({ lat: incidencia.lat, lon: incidencia.lon });
     abrirDetalle(incidencia.id);
   };
 
@@ -82,6 +88,8 @@ export default function MapaScreen() {
 
   return (
     <div style={desktopRoot}>
+      <MapThemeVars />
+
       {/* Columna izquierda: filtros + capas — oculta en modo vista (bloqueo total,
           "no interactuar con nada" salvo el ← de SimulacionControl). */}
       {!modoVista && <FiltersSidebar />}
@@ -93,11 +101,14 @@ export default function MapaScreen() {
         {/* Buscador de dirección / suministro */}
         {!modoVista && <LocationSearchBar />}
 
+        {/* Capas de catastro (Predio/Alcantarillado/Agua) — panel flotante inferior */}
+        {!modoVista && <CatastroFloatingPanel />}
+
         {/* Banners de estado */}
         {!modoVista && isLoading && <div style={banner}>Cargando incidencias de hoy…</div>}
         {!modoVista && isError && (
           <div
-            style={{ ...banner, backgroundColor: '#FDECEC', cursor: 'pointer' }}
+            style={{ ...banner, backgroundColor: 'var(--map-danger-bg)', color: 'var(--map-danger-text)', cursor: 'pointer' }}
             onClick={() => refetch()}
           >
             No se pudo cargar. Clic para reintentar.
@@ -143,6 +154,8 @@ function MobileLayout({
   onSelectFromCluster: (incidencia: Incidencia) => void;
   onCloseCluster: () => void;
 }) {
+  const t = useThemeColors();
+  const mobile = useMemo(() => makeMobileStyles(t), [t]);
   const navigation = useNavigation();
   const bottomSheetRef = useRef<BottomSheet>(null);
   const [mapModeVisible, setMapModeVisible] = useState(false);
@@ -217,7 +230,7 @@ const desktopRoot: CSSProperties = {
   display: 'flex',
   height: '100vh',
   overflow: 'hidden',
-  backgroundColor: '#F0F2F5',
+  backgroundColor: 'var(--map-bg)',
 };
 
 const centerCol: CSSProperties = {
@@ -231,49 +244,51 @@ const banner: CSSProperties = {
   top: 52,
   left: '50%',
   transform: 'translateX(-50%)',
-  backgroundColor: 'white',
+  backgroundColor: 'var(--map-surface)',
   padding: '6px 14px',
   borderRadius: 999,
   fontSize: 12,
   fontWeight: '600',
-  color: '#212121',
-  boxShadow: '0 1px 4px rgba(0,0,0,0.12)',
+  color: 'var(--map-text)',
+  boxShadow: '0 1px 4px var(--map-shadow)',
   zIndex: 10,
   whiteSpace: 'nowrap',
 };
 
 // ── Estilos móvil (RN StyleSheet) ────────────────────────────────────
 
-const mobile = StyleSheet.create({
-  flex: { flex: 1 },
-  overlay: { position: 'absolute', top: 0, left: 0, right: 0, bottom: 0 },
-  menuBtn: {
-    position: 'absolute', top: 16, left: 16,
-    width: 48, height: 48, borderRadius: 24,
-    backgroundColor: Colors.primaryDark,
-    alignItems: 'center', justifyContent: 'center', elevation: 4,
-  },
-  menuIcon: { color: Colors.white, fontSize: 20 },
-  mapModeBtn: {
-    position: 'absolute', left: 16,
-    width: 48, height: 48, borderRadius: 24,
-    backgroundColor: Colors.white,
-    alignItems: 'center', justifyContent: 'center', elevation: 4,
-  },
-  mapModeIcon: { fontSize: 20 },
-  modeBadge: {
-    position: 'absolute', top: 16, alignSelf: 'center',
-    backgroundColor: Colors.primaryDark,
-    paddingHorizontal: 12, paddingVertical: 6,
-    borderRadius: Radius.pill,
-  },
-  modeBadgeText: { color: Colors.white, fontWeight: '700', fontSize: 12 },
-  statusBanner: {
-    position: 'absolute', top: 76, alignSelf: 'center',
-    backgroundColor: Colors.white,
-    paddingHorizontal: 14, paddingVertical: 8,
-    borderRadius: Radius.pill, elevation: 4,
-  },
-  errorBanner: { backgroundColor: '#FDECEC' },
-  statusText: { fontSize: 12, fontWeight: '600', color: Colors.textBody },
-});
+function makeMobileStyles(t: ColorPalette) {
+  return StyleSheet.create({
+    flex: { flex: 1 },
+    overlay: { position: 'absolute', top: 0, left: 0, right: 0, bottom: 0 },
+    menuBtn: {
+      position: 'absolute', top: 16, left: 16,
+      width: 48, height: 48, borderRadius: 24,
+      backgroundColor: t.primaryDark,
+      alignItems: 'center', justifyContent: 'center', elevation: 4,
+    },
+    menuIcon: { color: t.white, fontSize: 20 },
+    mapModeBtn: {
+      position: 'absolute', left: 16,
+      width: 48, height: 48, borderRadius: 24,
+      backgroundColor: t.surface,
+      alignItems: 'center', justifyContent: 'center', elevation: 4,
+    },
+    mapModeIcon: { fontSize: 20 },
+    modeBadge: {
+      position: 'absolute', top: 16, alignSelf: 'center',
+      backgroundColor: t.primaryDark,
+      paddingHorizontal: 12, paddingVertical: 6,
+      borderRadius: Radius.pill,
+    },
+    modeBadgeText: { color: t.white, fontWeight: '700', fontSize: 12 },
+    statusBanner: {
+      position: 'absolute', top: 76, alignSelf: 'center',
+      backgroundColor: t.surface,
+      paddingHorizontal: 14, paddingVertical: 8,
+      borderRadius: Radius.pill, elevation: 4,
+    },
+    errorBanner: { backgroundColor: t.dangerBg },
+    statusText: { fontSize: 12, fontWeight: '600', color: t.textBody },
+  });
+}

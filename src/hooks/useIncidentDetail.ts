@@ -66,10 +66,11 @@ export function useIncidentDetail(id: string | undefined) {
         prioridad: detalle.prioridad ?? 'a_tiempo',
         estado: detalle.estado,
         antiguedadDias: detalle.antiguedadDias,
-        // No usados por ninguna pantalla de Detalle (solo Mapa/Lista los necesitan) —
-        // el endpoint de detalle del backend no los devuelve.
-        lat: 0,
-        lon: 0,
+        // Backend los resuelve vía catastro (mismo predio_catastral que arma
+        // `catastro` acá abajo) — pueden salir null si el suministro no matcheó
+        // en `sig` (ver memoria backend), de ahí el fallback a 0.
+        lat: detalle.lat ?? 0,
+        lon: detalle.lon ?? 0,
         fechaCreacion: detalle.reclamo?.fechaRegistro ?? new Date().toISOString(),
         tecnicoAsignado: detalle.tecnicoAsignado
           ? { id: detalle.tecnicoAsignado.id, nombre: detalle.tecnicoAsignado.nombre, rol: 'tecnico', sector: '' }

@@ -1,6 +1,8 @@
+import { useMemo } from 'react';
 import { StyleSheet, Text, View } from 'react-native';
 
-import { Colors, Radius, Spacing } from '@/constants/theme';
+import { Colors, Radius, Spacing, type ColorPalette } from '@/constants/theme';
+import { useThemeColors } from '@/state/themeStore';
 import type { ApiAfectado } from '@/api/types';
 
 export const PRIORIDAD_PILL: Record<string, { bg: string; text: string }> = {
@@ -13,6 +15,8 @@ export const PRIORIDAD_PILL: Record<string, { bg: string; text: string }> = {
  * Compartida entre ImpactoTab.tsx (tab "Impacto" del detalle de incidencia) y
  * SimulacionControl.web.tsx (modo vista del mapa) — mismo shape ApiAfectado. */
 export function AfectadoRow({ afectado }: { afectado: ApiAfectado }) {
+  const t = useThemeColors();
+  const styles = useMemo(() => makeStyles(t), [t]);
   const pill = afectado.prioridad ? PRIORIDAD_PILL[afectado.prioridad] : null;
   return (
     <View style={styles.row}>
@@ -32,19 +36,21 @@ export function AfectadoRow({ afectado }: { afectado: ApiAfectado }) {
   );
 }
 
-const styles = StyleSheet.create({
-  row: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'space-between',
-    gap: Spacing.sm,
-    paddingVertical: 6,
-    borderBottomWidth: 1,
-    borderBottomColor: Colors.border,
-  },
-  rowTextCol: { flex: 1, gap: 2 },
-  rowTitle: { fontSize: 13, fontWeight: '600', color: Colors.textBody },
-  rowSubtitle: { fontSize: 11, color: Colors.textMuted },
-  pill: { borderRadius: Radius.pill, paddingHorizontal: Spacing.sm, paddingVertical: 4 },
-  pillLabel: { fontSize: 11, fontWeight: '600' },
-});
+function makeStyles(t: ColorPalette) {
+  return StyleSheet.create({
+    row: {
+      flexDirection: 'row',
+      alignItems: 'center',
+      justifyContent: 'space-between',
+      gap: Spacing.sm,
+      paddingVertical: 6,
+      borderBottomWidth: 1,
+      borderBottomColor: t.border,
+    },
+    rowTextCol: { flex: 1, gap: 2 },
+    rowTitle: { fontSize: 13, fontWeight: '600', color: t.textBody },
+    rowSubtitle: { fontSize: 11, color: t.textMuted },
+    pill: { borderRadius: Radius.pill, paddingHorizontal: Spacing.sm, paddingVertical: 4 },
+    pillLabel: { fontSize: 11, fontWeight: '600' },
+  });
+}

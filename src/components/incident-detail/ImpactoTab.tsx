@@ -1,14 +1,18 @@
+import { useMemo } from 'react';
 import { StyleSheet, Text, View } from 'react-native';
 
-import { Colors, Spacing } from '@/constants/theme';
+import { Spacing, type ColorPalette } from '@/constants/theme';
 import { AfectadoRow } from '@/components/shared/AfectadoRow';
 import { useIncidentImpacto } from '@/hooks/useIncidentImpacto';
+import { useThemeColors } from '@/state/themeStore';
 
 type Props = { incidenciaId: string; active: boolean };
 
 /** Tab "Impacto" — qué afecta esta incidencia aguas abajo/arriba, por causa raíz
  * hidráulica (grafo). Consulta propia, se pide solo con el tab activo. */
 export function ImpactoTab({ incidenciaId, active }: Props) {
+  const t = useThemeColors();
+  const styles = useMemo(() => makeStyles(t), [t]);
   const { data: impacto, isLoading, isError } = useIncidentImpacto(incidenciaId, active);
 
   if (isLoading) {
@@ -66,9 +70,11 @@ export function ImpactoTab({ incidenciaId, active }: Props) {
   );
 }
 
-const styles = StyleSheet.create({
-  card: { gap: Spacing.sm },
-  cardTitle: { fontSize: 13, fontWeight: '700', color: Colors.accent },
-  subtitle: { fontSize: 11.5, color: Colors.textMuted },
-  emptyText: { fontSize: 13, color: Colors.textMuted },
-});
+function makeStyles(t: ColorPalette) {
+  return StyleSheet.create({
+    card: { gap: Spacing.sm },
+    cardTitle: { fontSize: 13, fontWeight: '700', color: t.accent },
+    subtitle: { fontSize: 11.5, color: t.textMuted },
+    emptyText: { fontSize: 13, color: t.textMuted },
+  });
+}

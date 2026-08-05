@@ -6,7 +6,7 @@ import {
   type StyleSpecification,
 } from '@maplibre/maplibre-react-native';
 import { useEffect, useMemo, useRef, useState } from 'react';
-import { StyleSheet } from 'react-native';
+import { StyleSheet, View } from 'react-native';
 
 import type { ApiBbox } from '@/api/types';
 import { IncidentMarker } from '@/components/map/IncidentMarker';
@@ -20,6 +20,7 @@ import {
 } from '@/components/map/mapLayers';
 import { useCapasStore } from '@/state/capasStore';
 import { useMapSearchStore } from '@/state/mapSearchStore';
+import { useThemeStore } from '@/state/themeStore';
 import { useUbicacionStore } from '@/state/ubicacionStore';
 import type { IncidentCluster } from '@/utils/clusterIncidents';
 
@@ -189,28 +190,46 @@ export function EpselMapView({ clusters, onPressCluster }: Props) {
     cameraRef.current?.flyTo({ center: [flyTarget.lon, flyTarget.lat], zoom: flyTarget.zoom, duration: 1000 });
   }, [flyTarget]);
 
+  // Sin variante oscura del basemap demo y sin filtro CSS disponible en nativo (a
+  // diferencia de MapView.web.tsx, que sí puede invertir el canvas) — un scrim
+  // semitransparente es el mejor esfuerzo razonable acá; no toca los marcadores
+  // porque se dibuja encima de todo el mapa, no como parte de su estilo.
+  const isDark = useThemeStore((state) => state.mode === 'dark');
+
   return (
-    <MapLibreMap
-      style={styles.map}
-      mapStyle={(effectiveStyle as StyleSpecification | null) ?? MAP_STYLE_URL}
-      logo={false}
-      attribution={false}
-    >
-      <Camera ref={cameraRef} initialViewState={{ center, zoom: 13 }} />
-      {clusters.map((cluster) => (
-        <Marker
-          key={cluster.id}
-          lngLat={[cluster.lon, cluster.lat]}
-          anchor="bottom"
-          onPress={() => onPressCluster(cluster)}
-        >
-          <IncidentMarker cluster={cluster} />
-        </Marker>
-      ))}
-    </MapLibreMap>
+    <View style={styles.map}>
+      <MapLibreMap
+        style={styles.map}
+        mapStyle={(effectiveStyle as StyleSpecification | null) ?? MAP_STYLE_URL}
+        logo={false}
+        attribution={false}
+      >
+        <Camera ref={cameraRef} initialViewState={{ center, zoom: 13 }} />
+        {clusters.map((cluster) => (
+          <Marker
+            key={cluster.id}
+            lngLat={[cluster.lon, cluster.lat]}
+            anchor="bottom"
+            onPress={() => onPressCluster(cluster)}
+          >
+            <IncidentMarker cluster={cluster} />
+          </Marker>
+        ))}
+      </MapLibreMap>
+      {isDark && <View style={styles.darkScrim} pointerEvents="none" />}
+    </View>
   );
 }
 
 const styles = StyleSheet.create({
   map: { flex: 1 },
+  darkScrim: {
+    position: 'absolute',
+    top: 0,
+    left: 0,
+    right: 0,
+    bottom: 0,
+    backgroundColor: '#0B1220',
+    opacity: 0.55,
+  },
 });

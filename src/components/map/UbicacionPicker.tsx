@@ -2,7 +2,8 @@ import { useEffect, useMemo, useState } from 'react';
 import { ActivityIndicator, Modal, Pressable, ScrollView, StyleSheet, Text, TextInput, View } from 'react-native';
 
 import type { ApiSector } from '@/api/types';
-import { Colors, Radius, Spacing } from '@/constants/theme';
+import { Radius, Spacing, type ColorPalette } from '@/constants/theme';
+import { useThemeColors } from '@/state/themeStore';
 import { useUbicacionStore } from '@/state/ubicacionStore';
 
 /**
@@ -15,6 +16,8 @@ import { useUbicacionStore } from '@/state/ubicacionStore';
  * en la UI, igual que ya hacía FiltrosTab con "Chiclayo · Todos los distritos...".
  */
 export function UbicacionPicker() {
+  const t = useThemeColors();
+  const styles = useMemo(() => makeStyles(t), [t]);
   const distritos = useUbicacionStore((s) => s.distritos);
   const sectores = useUbicacionStore((s) => s.sectores);
   const cargando = useUbicacionStore((s) => s.cargando);
@@ -48,7 +51,7 @@ export function UbicacionPicker() {
   if (cargando && distritosDisponibles.length === 0) {
     return (
       <View style={styles.loadingRow}>
-        <ActivityIndicator size="small" color={Colors.textMuted} />
+        <ActivityIndicator size="small" color={t.textMuted} />
         <Text style={styles.loadingLabel}>Cargando ubicaciones…</Text>
       </View>
     );
@@ -90,6 +93,7 @@ export function UbicacionPicker() {
       )}
 
       <DistritoModal
+        styles={styles}
         visible={distritoModalAbierto}
         onClose={() => setDistritoModalAbierto(false)}
         distritos={distritosDisponibles}
@@ -97,6 +101,8 @@ export function UbicacionPicker() {
         onSeleccionar={seleccionarDistrito}
       />
       <SectorMultiSelectModal
+        styles={styles}
+        colors={t}
         visible={sectorModalAbierto}
         onClose={() => setSectorModalAbierto(false)}
         sectores={sectoresDelDistrito}
@@ -107,15 +113,19 @@ export function UbicacionPicker() {
   );
 }
 
+type Styles = ReturnType<typeof makeStyles>;
+
 // ── Combo box de distrito (selección única) ──────────────────────────
 
 function DistritoModal({
+  styles,
   visible,
   onClose,
   distritos,
   seleccionado,
   onSeleccionar,
 }: {
+  styles: Styles;
   visible: boolean;
   onClose: () => void;
   distritos: { id: string; nombre: string }[];
@@ -160,12 +170,16 @@ function DistritoModal({
 // ── Multi-select de sectores con búsqueda (estilo Jira) ──────────────
 
 function SectorMultiSelectModal({
+  styles,
+  colors,
   visible,
   onClose,
   sectores,
   seleccionados,
   onToggle,
 }: {
+  styles: Styles;
+  colors: ColorPalette;
   visible: boolean;
   onClose: () => void;
   sectores: ApiSector[];
@@ -189,7 +203,7 @@ function SectorMultiSelectModal({
             value={busqueda}
             onChangeText={setBusqueda}
             placeholder="Buscar sector…"
-            placeholderTextColor={Colors.textMuted}
+            placeholderTextColor={colors.textMuted}
             autoFocus
           />
           <ScrollView style={styles.sectorList}>
@@ -215,120 +229,122 @@ function SectorMultiSelectModal({
   );
 }
 
-const styles = StyleSheet.create({
-  container: { gap: 4 },
-  loadingRow: { flexDirection: 'row', alignItems: 'center', gap: Spacing.xs, paddingVertical: Spacing.xs },
-  loadingLabel: { fontSize: 12, color: Colors.textMuted },
-  fieldLabel: { fontSize: 11, fontWeight: '700', color: Colors.textMuted, marginTop: Spacing.xs },
+function makeStyles(t: ColorPalette) {
+  return StyleSheet.create({
+    container: { gap: 4 },
+    loadingRow: { flexDirection: 'row', alignItems: 'center', gap: Spacing.xs, paddingVertical: Spacing.xs },
+    loadingLabel: { fontSize: 12, color: t.textMuted },
+    fieldLabel: { fontSize: 11, fontWeight: '700', color: t.textMuted, marginTop: Spacing.xs },
 
-  comboBox: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'space-between',
-    borderWidth: 1,
-    borderColor: Colors.border,
-    borderRadius: Radius.sm,
-    paddingHorizontal: Spacing.sm,
-    paddingVertical: 10,
-  },
-  comboValue: { fontSize: 13, fontWeight: '600', color: Colors.textBody },
-  chevron: { color: Colors.textMuted, fontSize: 12 },
+    comboBox: {
+      flexDirection: 'row',
+      alignItems: 'center',
+      justifyContent: 'space-between',
+      borderWidth: 1,
+      borderColor: t.border,
+      borderRadius: Radius.sm,
+      paddingHorizontal: Spacing.sm,
+      paddingVertical: 10,
+    },
+    comboValue: { fontSize: 13, fontWeight: '600', color: t.textBody },
+    chevron: { color: t.textMuted, fontSize: 12 },
 
-  multiSelectBox: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'space-between',
-    borderWidth: 1,
-    borderColor: Colors.border,
-    borderRadius: Radius.sm,
-    paddingHorizontal: Spacing.sm,
-    paddingVertical: 8,
-    minHeight: 40,
-    gap: Spacing.xs,
-  },
-  multiSelectPlaceholder: { fontSize: 13, color: Colors.textMuted, flex: 1 },
-  chipWrap: { flex: 1, flexDirection: 'row', flexWrap: 'wrap', gap: 6 },
-  chip: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 4,
-    backgroundColor: Colors.background,
-    borderWidth: 1,
-    borderColor: Colors.accent,
-    borderRadius: Radius.pill,
-    paddingLeft: 10,
-    paddingRight: 6,
-    paddingVertical: 3,
-    maxWidth: 150,
-  },
-  chipLabel: { fontSize: 12, color: Colors.accent, fontWeight: '600' },
-  chipRemove: { fontSize: 14, color: Colors.accent, fontWeight: '700', paddingHorizontal: 2 },
+    multiSelectBox: {
+      flexDirection: 'row',
+      alignItems: 'center',
+      justifyContent: 'space-between',
+      borderWidth: 1,
+      borderColor: t.border,
+      borderRadius: Radius.sm,
+      paddingHorizontal: Spacing.sm,
+      paddingVertical: 8,
+      minHeight: 40,
+      gap: Spacing.xs,
+    },
+    multiSelectPlaceholder: { fontSize: 13, color: t.textMuted, flex: 1 },
+    chipWrap: { flex: 1, flexDirection: 'row', flexWrap: 'wrap', gap: 6 },
+    chip: {
+      flexDirection: 'row',
+      alignItems: 'center',
+      gap: 4,
+      backgroundColor: t.background,
+      borderWidth: 1,
+      borderColor: t.accent,
+      borderRadius: Radius.pill,
+      paddingLeft: 10,
+      paddingRight: 6,
+      paddingVertical: 3,
+      maxWidth: 150,
+    },
+    chipLabel: { fontSize: 12, color: t.accent, fontWeight: '600' },
+    chipRemove: { fontSize: 14, color: t.accent, fontWeight: '700', paddingHorizontal: 2 },
 
-  modalBackdrop: {
-    flex: 1,
-    backgroundColor: 'rgba(13, 43, 82, 0.25)',
-    justifyContent: 'center',
-    alignItems: 'center',
-  },
-  modalCard: {
-    width: 260,
-    maxHeight: '70%',
-    backgroundColor: Colors.white,
-    borderRadius: Radius.lg,
-    paddingVertical: Spacing.sm,
-    shadowColor: '#000',
-    shadowOpacity: 0.15,
-    shadowRadius: 12,
-    shadowOffset: { width: 0, height: 4 },
-    elevation: 6,
-  },
-  modalOption: { paddingHorizontal: Spacing.md, paddingVertical: Spacing.sm },
-  modalOptionLabel: { fontSize: 15, fontWeight: '700', color: Colors.primaryDark },
-  modalOptionLabelActive: { color: Colors.accent },
+    modalBackdrop: {
+      flex: 1,
+      backgroundColor: 'rgba(13, 43, 82, 0.25)',
+      justifyContent: 'center',
+      alignItems: 'center',
+    },
+    modalCard: {
+      width: 260,
+      maxHeight: '70%',
+      backgroundColor: t.surface,
+      borderRadius: Radius.lg,
+      paddingVertical: Spacing.sm,
+      shadowColor: '#000',
+      shadowOpacity: 0.15,
+      shadowRadius: 12,
+      shadowOffset: { width: 0, height: 4 },
+      elevation: 6,
+    },
+    modalOption: { paddingHorizontal: Spacing.md, paddingVertical: Spacing.sm },
+    modalOptionLabel: { fontSize: 15, fontWeight: '700', color: t.primaryDark },
+    modalOptionLabelActive: { color: t.accent },
 
-  sectorModalCard: {
-    width: 280,
-    maxHeight: '75%',
-    backgroundColor: Colors.white,
-    borderRadius: Radius.lg,
-    padding: Spacing.sm,
-    shadowColor: '#000',
-    shadowOpacity: 0.15,
-    shadowRadius: 12,
-    shadowOffset: { width: 0, height: 4 },
-    elevation: 6,
-  },
-  searchInput: {
-    borderWidth: 1,
-    borderColor: Colors.border,
-    borderRadius: Radius.sm,
-    paddingHorizontal: Spacing.sm,
-    paddingVertical: 8,
-    fontSize: 13,
-    color: Colors.textBody,
-    marginBottom: Spacing.xs,
-  },
-  sectorList: { maxHeight: 280 },
-  noResults: { fontSize: 12, color: Colors.textMuted, paddingVertical: Spacing.sm, textAlign: 'center' },
-  sectorRow: { flexDirection: 'row', alignItems: 'center', gap: Spacing.xs, paddingVertical: 8 },
-  checkbox: {
-    width: 18,
-    height: 18,
-    borderRadius: 4,
-    borderWidth: 1.5,
-    borderColor: Colors.border,
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
-  checkboxChecked: { backgroundColor: Colors.accent, borderColor: Colors.accent },
-  checkmark: { color: Colors.white, fontSize: 12, fontWeight: '700' },
-  sectorRowLabel: { fontSize: 13, color: Colors.textBody, flex: 1 },
-  doneButton: {
-    marginTop: Spacing.xs,
-    backgroundColor: Colors.primary,
-    borderRadius: Radius.pill,
-    paddingVertical: 10,
-    alignItems: 'center',
-  },
-  doneButtonLabel: { color: Colors.white, fontWeight: '700', fontSize: 14 },
-});
+    sectorModalCard: {
+      width: 280,
+      maxHeight: '75%',
+      backgroundColor: t.surface,
+      borderRadius: Radius.lg,
+      padding: Spacing.sm,
+      shadowColor: '#000',
+      shadowOpacity: 0.15,
+      shadowRadius: 12,
+      shadowOffset: { width: 0, height: 4 },
+      elevation: 6,
+    },
+    searchInput: {
+      borderWidth: 1,
+      borderColor: t.border,
+      borderRadius: Radius.sm,
+      paddingHorizontal: Spacing.sm,
+      paddingVertical: 8,
+      fontSize: 13,
+      color: t.textBody,
+      marginBottom: Spacing.xs,
+    },
+    sectorList: { maxHeight: 280 },
+    noResults: { fontSize: 12, color: t.textMuted, paddingVertical: Spacing.sm, textAlign: 'center' },
+    sectorRow: { flexDirection: 'row', alignItems: 'center', gap: Spacing.xs, paddingVertical: 8 },
+    checkbox: {
+      width: 18,
+      height: 18,
+      borderRadius: 4,
+      borderWidth: 1.5,
+      borderColor: t.border,
+      alignItems: 'center',
+      justifyContent: 'center',
+    },
+    checkboxChecked: { backgroundColor: t.accent, borderColor: t.accent },
+    checkmark: { color: t.white, fontSize: 12, fontWeight: '700' },
+    sectorRowLabel: { fontSize: 13, color: t.textBody, flex: 1 },
+    doneButton: {
+      marginTop: Spacing.xs,
+      backgroundColor: t.accent,
+      borderRadius: Radius.pill,
+      paddingVertical: 10,
+      alignItems: 'center',
+    },
+    doneButtonLabel: { color: t.white, fontWeight: '700', fontSize: 14 },
+  });
+}

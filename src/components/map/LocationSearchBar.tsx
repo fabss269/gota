@@ -1,12 +1,13 @@
 import { Ionicons } from '@expo/vector-icons';
-import { useEffect, useRef, useState } from 'react';
+import { useEffect, useMemo, useRef, useState } from 'react';
 import { ActivityIndicator, Pressable, StyleSheet, Text, TextInput, View } from 'react-native';
 
 import { buscarSuministro } from '@/api/catalogos';
 import { ApiError } from '@/api/client';
 import { buscarDireccion, type DireccionResultado } from '@/api/geocoding';
-import { Colors, Radius, Spacing } from '@/constants/theme';
+import { Radius, Spacing, type ColorPalette } from '@/constants/theme';
 import { useMapSearchStore } from '@/state/mapSearchStore';
+import { useThemeColors } from '@/state/themeStore';
 
 type Modo = 'direccion' | 'suministro';
 
@@ -28,6 +29,8 @@ const detectarModo = (texto: string): Modo =>
  * pasada (no hay expo-location/expo-speech instalados todavía), solo texto.
  */
 export function LocationSearchBar() {
+  const t = useThemeColors();
+  const styles = useMemo(() => makeStyles(t), [t]);
   const flyTo = useMapSearchStore((state) => state.flyTo);
 
   const [query, setQuery] = useState('');
@@ -139,7 +142,7 @@ export function LocationSearchBar() {
   return (
     <View style={styles.wrapper}>
       <View style={styles.formRow}>
-        <Ionicons name="search-outline" size={16} color={Colors.textMuted} style={styles.searchIcon} />
+        <Ionicons name="search-outline" size={16} color={t.textMuted} style={styles.searchIcon} />
         <TextInput
           style={styles.input}
           value={query}
@@ -147,7 +150,7 @@ export function LocationSearchBar() {
           onFocus={() => resultados.length > 0 && setMostrarResultados(true)}
           onSubmitEditing={handleSubmit}
           placeholder="Buscar dirección o código de suministro (8 dígitos)…"
-          placeholderTextColor={Colors.textMuted}
+          placeholderTextColor={t.textMuted}
           returnKeyType="search"
         />
       </View>
@@ -157,7 +160,7 @@ export function LocationSearchBar() {
           <Ionicons
             name={modo === 'suministro' ? 'barcode-outline' : 'location-outline'}
             size={12}
-            color={Colors.textMuted}
+            color={t.textMuted}
           />
           <Text style={styles.modeChipLabel}>
             {modo === 'suministro' ? 'Buscando por suministro' : 'Buscando por dirección'}
@@ -192,12 +195,13 @@ export function LocationSearchBar() {
         </View>
       )}
 
-      {buscando && modo === 'suministro' && <ActivityIndicator style={styles.spinner} size="small" color={Colors.accent} />}
+      {buscando && modo === 'suministro' && <ActivityIndicator style={styles.spinner} size="small" color={t.accent} />}
     </View>
   );
 }
 
-const styles = StyleSheet.create({
+function makeStyles(t: ColorPalette) {
+  return StyleSheet.create({
   wrapper: { width: '100%' },
   modeChip: {
     flexDirection: 'row',
@@ -207,37 +211,37 @@ const styles = StyleSheet.create({
     marginTop: 4,
     paddingHorizontal: 8,
     paddingVertical: 3,
-    backgroundColor: 'rgba(255,255,255,0.92)',
+    backgroundColor: t.surface,
     borderRadius: 6,
     elevation: 2,
   },
-  modeChipLabel: { fontSize: 10, fontWeight: '600', color: Colors.textMuted },
+  modeChipLabel: { fontSize: 10, fontWeight: '600', color: t.textMuted },
   formRow: {
     flexDirection: 'row',
     alignItems: 'center',
     gap: Spacing.xs,
-    backgroundColor: Colors.white,
+    backgroundColor: t.surface,
     borderRadius: Radius.sm,
     paddingHorizontal: 10,
     paddingVertical: 8,
     elevation: 3,
   },
   searchIcon: { fontSize: 13 },
-  input: { flex: 1, fontSize: 13, color: Colors.textBody, padding: 0 },
+  input: { flex: 1, fontSize: 13, color: t.textBody, padding: 0 },
   statusMsg: {
     marginTop: 4,
     alignSelf: 'flex-start',
-    backgroundColor: Colors.white,
+    backgroundColor: t.surface,
     paddingHorizontal: 10,
     paddingVertical: 4,
     borderRadius: Radius.sm,
     elevation: 2,
   },
-  statusText: { fontSize: 11, color: Colors.textMuted },
-  errorText: { color: Colors.statusCritica },
+  statusText: { fontSize: 11, color: t.textMuted },
+  errorText: { color: t.statusCritica },
   dropdown: {
     marginTop: 4,
-    backgroundColor: Colors.white,
+    backgroundColor: t.surface,
     borderRadius: Radius.sm,
     overflow: 'hidden',
     maxHeight: 220,
@@ -247,8 +251,9 @@ const styles = StyleSheet.create({
     paddingHorizontal: 10,
     paddingVertical: 8,
     borderBottomWidth: 1,
-    borderBottomColor: Colors.border,
+    borderBottomColor: t.border,
   },
-  resultLabel: { fontSize: 12, color: Colors.textBody },
+  resultLabel: { fontSize: 12, color: t.textBody },
   spinner: { marginTop: 6, alignSelf: 'flex-start' },
-});
+  });
+}

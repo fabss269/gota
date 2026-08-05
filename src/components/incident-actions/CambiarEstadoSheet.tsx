@@ -1,18 +1,12 @@
-import { useEffect } from 'react';
+import { useEffect, useMemo } from 'react';
 import { Alert, Modal, Pressable, StyleSheet, Text, View } from 'react-native';
 import Animated, { useAnimatedStyle, useSharedValue, withTiming } from 'react-native-reanimated';
 
-import { Colors, Radius, Spacing } from '@/constants/theme';
+import { Radius, Spacing, type ColorPalette } from '@/constants/theme';
 import { getTransicionesDisponibles, type TransicionEstado } from '@/mocks/estadoWorkflowMock';
 import type { EstadoIncidencia } from '@/mocks/incidentsMock';
 import { useCambiarEstado } from '@/hooks/useCambiarEstado';
-
-const ESTADO_COLOR: Record<EstadoIncidencia, string> = {
-  CREADO: Colors.textMuted,
-  PENDIENTE: Colors.accent,
-  EN_PROGRESO: Colors.accent,
-  ATENDIDO: '#1A7D3A',
-};
+import { useThemeColors } from '@/state/themeStore';
 
 type Props = {
   visible: boolean;
@@ -24,6 +18,14 @@ type Props = {
 
 /** Overlay - Cambiar Estado (Spec 07, RF-07.1, RF-07.2). */
 export function CambiarEstadoSheet({ visible, incidenciaId, estado, onClose, onAbrirAvance }: Props) {
+  const t = useThemeColors();
+  const styles = useMemo(() => makeStyles(t), [t]);
+  const ESTADO_COLOR: Record<EstadoIncidencia, string> = {
+    CREADO: t.textMuted,
+    PENDIENTE: t.accent,
+    EN_PROGRESO: t.accent,
+    ATENDIDO: '#1A7D3A',
+  };
   const cambiarEstado = useCambiarEstado();
   const transiciones = getTransicionesDisponibles(estado);
 
@@ -72,11 +74,11 @@ export function CambiarEstadoSheet({ visible, incidenciaId, estado, onClose, onA
             <Pressable style={styles.sheet}>
               <Text style={styles.title}>Cambiar estado</Text>
               {transiciones.length === 0 && <Text style={styles.emptyText}>Esta incidencia ya fue atendida.</Text>}
-              {transiciones.map((t, i) => (
-                <Pressable key={`${t.desde}-${t.hacia}-${i}`} style={styles.item} onPress={() => handlePress(t)}>
-                  <Text style={styles.itemLabel}>{t.label}</Text>
-                  <Text style={[styles.itemTarget, { color: ESTADO_COLOR[t.hacia] }]}>
-                    → {t.hacia.replace('_', ' ')}
+              {transiciones.map((trans, i) => (
+                <Pressable key={`${trans.desde}-${trans.hacia}-${i}`} style={styles.item} onPress={() => handlePress(trans)}>
+                  <Text style={styles.itemLabel}>{trans.label}</Text>
+                  <Text style={[styles.itemTarget, { color: ESTADO_COLOR[trans.hacia] }]}>
+                    → {trans.hacia.replace('_', ' ')}
                   </Text>
                 </Pressable>
               ))}
@@ -88,25 +90,27 @@ export function CambiarEstadoSheet({ visible, incidenciaId, estado, onClose, onA
   );
 }
 
-const styles = StyleSheet.create({
-  root: { flex: 1 },
-  backdropColor: { ...StyleSheet.absoluteFill, backgroundColor: 'rgba(13, 43, 82, 0.25)' },
-  backdropTouchable: { flex: 1, justifyContent: 'flex-end' },
-  sheet: {
-    backgroundColor: Colors.white,
-    borderTopLeftRadius: Radius.lg,
-    borderTopRightRadius: Radius.lg,
-    padding: Spacing.md,
-    gap: Spacing.xs,
-  },
-  title: { fontSize: 16, fontWeight: '800', color: Colors.primaryDark, marginBottom: Spacing.xs },
-  emptyText: { fontSize: 13, color: Colors.textMuted, paddingVertical: Spacing.sm },
-  item: {
-    backgroundColor: '#F4F6FB',
-    borderRadius: Radius.md,
-    padding: Spacing.sm,
-    gap: 2,
-  },
-  itemLabel: { fontSize: 13, fontWeight: '700', color: Colors.textBody },
-  itemTarget: { fontSize: 11, fontWeight: '600' },
-});
+function makeStyles(t: ColorPalette) {
+  return StyleSheet.create({
+    root: { flex: 1 },
+    backdropColor: { ...StyleSheet.absoluteFill, backgroundColor: 'rgba(13, 43, 82, 0.25)' },
+    backdropTouchable: { flex: 1, justifyContent: 'flex-end' },
+    sheet: {
+      backgroundColor: t.surface,
+      borderTopLeftRadius: Radius.lg,
+      borderTopRightRadius: Radius.lg,
+      padding: Spacing.md,
+      gap: Spacing.xs,
+    },
+    title: { fontSize: 16, fontWeight: '800', color: t.primaryDark, marginBottom: Spacing.xs },
+    emptyText: { fontSize: 13, color: t.textMuted, paddingVertical: Spacing.sm },
+    item: {
+      backgroundColor: t.border,
+      borderRadius: Radius.md,
+      padding: Spacing.sm,
+      gap: 2,
+    },
+    itemLabel: { fontSize: 13, fontWeight: '700', color: t.textBody },
+    itemTarget: { fontSize: 11, fontWeight: '600' },
+  });
+}

@@ -1,8 +1,10 @@
+import { useMemo } from 'react';
 import { Pressable, StyleSheet, Text, View } from 'react-native';
 
-import { Colors, Radius, Spacing } from '@/constants/theme';
+import { Radius, Spacing, type ColorPalette } from '@/constants/theme';
 import { useUsuarios } from '@/hooks/useUsuarios';
 import type { Usuario } from '@/mocks/usuariosMock';
+import { useThemeColors } from '@/state/themeStore';
 
 const ROL_LABEL: Record<Usuario['rol'], string> = {
   tecnico: 'Técnico',
@@ -21,6 +23,8 @@ type Props = {
  * flujos usen el mismo componente en vez de duplicar el listado.
  */
 export function TecnicoOptionsList({ selectedId, onSelect }: Props) {
+  const t = useThemeColors();
+  const styles = useMemo(() => makeStyles(t), [t]);
   const { data: usuarios = [] } = useUsuarios();
 
   return (
@@ -54,25 +58,27 @@ export function TecnicoOptionsList({ selectedId, onSelect }: Props) {
   );
 }
 
-const styles = StyleSheet.create({
-  row: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: Spacing.sm,
-    borderRadius: Radius.md,
-    padding: Spacing.xs,
-  },
-  rowSelected: { backgroundColor: '#E0E4FF' },
-  avatar: {
-    width: 30,
-    height: 30,
-    borderRadius: 15,
-    backgroundColor: Colors.accent,
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
-  avatarLabel: { fontSize: 11, fontWeight: '700', color: Colors.white },
-  userCol: { gap: 1 },
-  userName: { fontSize: 12, fontWeight: '600', color: Colors.textBody },
-  userRole: { fontSize: 10, color: Colors.textMuted },
-});
+function makeStyles(t: ColorPalette) {
+  return StyleSheet.create({
+    row: {
+      flexDirection: 'row',
+      alignItems: 'center',
+      gap: Spacing.sm,
+      borderRadius: Radius.md,
+      padding: Spacing.xs,
+    },
+    rowSelected: { backgroundColor: t.accentBg },
+    avatar: {
+      width: 30,
+      height: 30,
+      borderRadius: 15,
+      backgroundColor: t.accent,
+      alignItems: 'center',
+      justifyContent: 'center',
+    },
+    avatarLabel: { fontSize: 11, fontWeight: '700', color: t.white },
+    userCol: { gap: 1 },
+    userName: { fontSize: 12, fontWeight: '600', color: t.textBody },
+    userRole: { fontSize: 10, color: t.textMuted },
+  });
+}

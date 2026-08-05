@@ -226,7 +226,7 @@ export function LocationSearchBar() {
     <div style={wrapper}>
       <form onSubmit={handleSubmit} style={formRow}>
         <span style={searchIcon}>
-          <Ionicons name="search-outline" size={16} color="#8B9BB4" />
+          <Ionicons name="search-outline" size={16} color="var(--map-text-muted)" />
         </span>
         <input
           style={input}
@@ -243,7 +243,7 @@ export function LocationSearchBar() {
           aria-label="Usar mi ubicación"
           title="Usar mi ubicación"
         >
-          <Ionicons name="locate-outline" size={18} color="#0152AC" />
+          <Ionicons name="locate-outline" size={18} color="var(--map-accent)" />
         </button>
         {soportaVoz && (
           <button
@@ -253,7 +253,7 @@ export function LocationSearchBar() {
             aria-label="Dictar por voz"
             title="Dictar por voz"
           >
-            <Ionicons name="mic-outline" size={18} color={escuchando ? '#C0392B' : '#8B9BB4'} />
+            <Ionicons name="mic-outline" size={18} color={escuchando ? 'var(--map-danger-text)' : 'var(--map-text-muted)'} />
           </button>
         )}
       </form>
@@ -263,13 +263,13 @@ export function LocationSearchBar() {
           <Ionicons
             name={modo === 'suministro' ? 'barcode-outline' : 'location-outline'}
             size={12}
-            color="#8B9BB4"
+            color="var(--map-text-muted)"
           />
           <span>{modo === 'suministro' ? 'Buscando por suministro' : 'Buscando por dirección'}</span>
         </div>
       )}
       {buscando && <div style={statusMsg}>Buscando…</div>}
-      {!buscando && error && <div style={{ ...statusMsg, color: '#C0392B' }}>{error}</div>}
+      {!buscando && error && <div style={{ ...statusMsg, color: 'var(--map-danger-text)' }}>{error}</div>}
 
       {modo === 'direccion' && mostrarResultados && resultados.length > 0 && (
         <div style={dropdown}>
@@ -308,7 +308,7 @@ const modeChip: CSSProperties = {
   padding: '3px 8px',
   fontSize: 10,
   fontWeight: 600,
-  color: '#8B9BB4',
+  color: 'var(--map-text-muted)',
   backgroundColor: 'rgba(255,255,255,0.92)',
   borderRadius: 6,
   boxShadow: '0 1px 3px rgba(0,0,0,0.12)',
@@ -319,7 +319,7 @@ const formRow: CSSProperties = {
   display: 'flex',
   alignItems: 'center',
   gap: 6,
-  backgroundColor: 'white',
+  backgroundColor: 'var(--map-surface)',
   borderRadius: 8,
   padding: '8px 10px',
   boxShadow: '0 1px 4px rgba(0,0,0,0.18)',
@@ -336,7 +336,7 @@ const input: CSSProperties = {
   border: 'none',
   outline: 'none',
   fontSize: 13,
-  color: '#212121',
+  color: 'var(--map-text)',
   backgroundColor: 'transparent',
 };
 
@@ -353,14 +353,14 @@ const iconBtn: CSSProperties = {
 };
 
 const iconBtnActive: CSSProperties = {
-  backgroundColor: '#FDECEC',
+  backgroundColor: 'var(--map-danger-bg)',
 };
 
 const statusMsg: CSSProperties = {
   marginTop: 4,
   fontSize: 11,
-  color: '#8B9BB4',
-  backgroundColor: 'white',
+  color: 'var(--map-text-muted)',
+  backgroundColor: 'var(--map-surface)',
   padding: '4px 10px',
   borderRadius: 6,
   boxShadow: '0 1px 4px rgba(0,0,0,0.12)',
@@ -369,7 +369,7 @@ const statusMsg: CSSProperties = {
 
 const dropdown: CSSProperties = {
   marginTop: 4,
-  backgroundColor: 'white',
+  backgroundColor: 'var(--map-surface)',
   borderRadius: 8,
   boxShadow: '0 2px 8px rgba(0,0,0,0.18)',
   overflow: 'hidden',
@@ -383,9 +383,9 @@ const resultRow: CSSProperties = {
   textAlign: 'left',
   padding: '8px 10px',
   fontSize: 12,
-  color: '#212121',
+  color: 'var(--map-text)',
   border: 'none',
-  borderBottom: '1px solid #F5F6F8',
-  backgroundColor: 'white',
+  borderBottom: '1px solid var(--map-surface-alt)',
+  backgroundColor: 'var(--map-surface)',
   cursor: 'pointer',
 };

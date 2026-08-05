@@ -1,5 +1,5 @@
 import { useLocalSearchParams, useRouter } from 'expo-router';
-import { useState } from 'react';
+import { useMemo, useState } from 'react';
 import { Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 
@@ -13,14 +13,17 @@ import { IncidentDetailHeader } from '@/components/incident-detail/IncidentDetai
 import { PredioTab } from '@/components/incident-detail/PredioTab';
 import { TabsBar, type DetailTab } from '@/components/incident-detail/TabsBar';
 import { TrazabilidadTab } from '@/components/incident-detail/TrazabilidadTab';
-import { Colors, Radius, Spacing } from '@/constants/theme';
+import { Radius, Spacing, type ColorPalette } from '@/constants/theme';
 import { useIncidentDetail } from '@/hooks/useIncidentDetail';
 import type { TransicionEstado } from '@/mocks/estadoWorkflowMock';
+import { useThemeColors } from '@/state/themeStore';
 
 type ActiveSheet = 'estado' | 'avance' | 'responsable' | null;
 
 /** Detalle de Incidencia (Spec 06) — modal ruteado, accesible desde Mapa y Lista. */
 export default function IncidenciaDetalleScreen() {
+  const t = useThemeColors();
+  const styles = useMemo(() => makeStyles(t), [t]);
   const { id } = useLocalSearchParams<{ id: string }>();
   const router = useRouter();
   const [tab, setTab] = useState<DetailTab>('detalle');
@@ -98,29 +101,31 @@ export default function IncidenciaDetalleScreen() {
   );
 }
 
-const styles = StyleSheet.create({
-  // El "modal" no se notaba porque ocupaba toda la pantalla — este backdrop + el
-  // margen/borderRadius de `container` son lo que lo hace leerse como modal, igual
-  // que el resto de overlays de la app (CambiarEstadoSheet, FiltersOverlay, etc.).
-  backdrop: {
-    flex: 1,
-    backgroundColor: 'rgba(13, 43, 82, 0.35)',
-    padding: Spacing.sm,
-  },
-  container: {
-    flex: 1,
-    backgroundColor: Colors.background,
-    borderRadius: Radius.lg,
-    overflow: 'hidden',
-    shadowColor: '#000',
-    shadowOpacity: 0.2,
-    shadowRadius: 20,
-    shadowOffset: { width: 0, height: 8 },
-    elevation: 12,
-  },
-  headerWrap: { paddingHorizontal: Spacing.md, paddingTop: Spacing.sm, gap: Spacing.sm },
-  body: { padding: Spacing.md, paddingTop: Spacing.md },
-  statusBox: { flex: 1, alignItems: 'center', justifyContent: 'center', gap: Spacing.sm },
-  statusText: { color: Colors.textMuted, fontSize: 13 },
-  backLink: { color: Colors.accent, fontWeight: '700' },
-});
+function makeStyles(t: ColorPalette) {
+  return StyleSheet.create({
+    // El "modal" no se notaba porque ocupaba toda la pantalla — este backdrop + el
+    // margen/borderRadius de `container` son lo que lo hace leerse como modal, igual
+    // que el resto de overlays de la app (CambiarEstadoSheet, FiltersOverlay, etc.).
+    backdrop: {
+      flex: 1,
+      backgroundColor: 'rgba(13, 43, 82, 0.35)',
+      padding: Spacing.sm,
+    },
+    container: {
+      flex: 1,
+      backgroundColor: t.background,
+      borderRadius: Radius.lg,
+      overflow: 'hidden',
+      shadowColor: '#000',
+      shadowOpacity: 0.2,
+      shadowRadius: 20,
+      shadowOffset: { width: 0, height: 8 },
+      elevation: 12,
+    },
+    headerWrap: { paddingHorizontal: Spacing.md, paddingTop: Spacing.sm, gap: Spacing.sm },
+    body: { padding: Spacing.md, paddingTop: Spacing.md },
+    statusBox: { flex: 1, alignItems: 'center', justifyContent: 'center', gap: Spacing.sm },
+    statusText: { color: t.textMuted, fontSize: 13 },
+    backLink: { color: t.accent, fontWeight: '700' },
+  });
+}

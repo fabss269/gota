@@ -11,6 +11,7 @@ import { TrazabilidadTab } from '@/components/incident-detail/TrazabilidadTab';
 import { Colors } from '@/constants/theme';
 import { useIncidentDetail } from '@/hooks/useIncidentDetail';
 import type { TransicionEstado } from '@/mocks/estadoWorkflowMock';
+import { useMapSearchStore } from '@/state/mapSearchStore';
 
 const PRIORIDAD_COLOR: Record<string, string> = {
   a_tiempo: Colors.statusATiempo,
@@ -38,7 +39,7 @@ export function DetailPanel({ incidenciaId, onClose }: Props) {
     return (
       <div style={panel}>
         <div style={statusBox}>
-          <span style={{ color: Colors.textMuted, fontSize: 13 }}>Cargando…</span>
+          <span style={{ color: 'var(--map-text-muted)', fontSize: 13 }}>Cargando…</span>
         </div>
       </div>
     );
@@ -48,14 +49,14 @@ export function DetailPanel({ incidenciaId, onClose }: Props) {
     return (
       <div style={panel}>
         <div style={statusBox}>
-          <span style={{ color: Colors.textMuted, fontSize: 13 }}>No se encontró la incidencia.</span>
+          <span style={{ color: 'var(--map-text-muted)', fontSize: 13 }}>No se encontró la incidencia.</span>
           <button style={linkBtn} onClick={onClose}>Cerrar panel</button>
         </div>
       </div>
     );
   }
 
-  const prioColor = PRIORIDAD_COLOR[incidencia.prioridad] ?? Colors.textMuted;
+  const prioColor = PRIORIDAD_COLOR[incidencia.prioridad] ?? 'var(--map-text-muted)';
 
   return (
     <div style={panel}>
@@ -67,16 +68,24 @@ export function DetailPanel({ incidenciaId, onClose }: Props) {
             <span style={{ fontSize: 11, fontWeight: '700', color: prioColor }}>
               {PRIORIDAD_LABEL[incidencia.prioridad]}
             </span>
-            <span style={{ fontSize: 11, color: Colors.textMuted }}>DANA #{incidencia.id}</span>
+            <span style={{ fontSize: 11, color: 'var(--map-text-muted)' }}>DANA #{incidencia.id}</span>
           </div>
           <button style={closeBtn} onClick={onClose} aria-label="Cerrar panel">×</button>
         </div>
 
-        <div style={{ fontSize: 17, fontWeight: '700', color: Colors.primaryDark, marginTop: 6, lineHeight: 1.25 }}>
+        <div style={{ fontSize: 17, fontWeight: '700', color: 'var(--map-text)', marginTop: 6, lineHeight: 1.25 }}>
           {incidencia.tipo}
         </div>
-        <div style={{ fontSize: 12, color: Colors.textMuted, marginTop: 3 }}>
-          {incidencia.direccion} · {incidencia.sector.split('·')[0].trim()}
+        <div style={{ display: 'flex', alignItems: 'center', gap: 6, marginTop: 3 }}>
+          <span style={{ fontSize: 12, color: 'var(--map-text-muted)' }}>
+            {incidencia.direccion} · {incidencia.sector.split('·')[0].trim()}
+          </span>
+          <button
+            style={centrarBtn}
+            onClick={() => useMapSearchStore.getState().flyTo({ lat: incidencia.lat, lon: incidencia.lon })}
+          >
+            Ver en el mapa
+          </button>
         </div>
 
         {/* Estado + técnico asignado */}
@@ -210,16 +219,16 @@ function Section({ title, children }: { title: string; children: ReactNode }) {
 }
 
 function Divider() {
-  return <div style={{ height: 1, backgroundColor: '#F0F2F5' }} />;
+  return <div style={{ height: 1, backgroundColor: 'var(--map-border)' }} />;
 }
 
 function DataRow({ label, value, accent }: { label: string; value: string; accent?: boolean }) {
   return (
     <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', padding: '5px 0', gap: 8 }}>
-      <span style={{ fontSize: 11, color: Colors.textMuted, fontWeight: '600', flexShrink: 0, width: 90 }}>
+      <span style={{ fontSize: 11, color: 'var(--map-text-muted)', fontWeight: '600', flexShrink: 0, width: 90 }}>
         {label}
       </span>
-      <span style={{ fontSize: 12.5, color: accent ? '#D32F2F' : Colors.textBody, fontWeight: accent ? '600' : '400', textAlign: 'right' }}>
+      <span style={{ fontSize: 12.5, color: accent ? '#D32F2F' : 'var(--map-text)', fontWeight: accent ? '600' : '400', textAlign: 'right' }}>
         {value}
       </span>
     </div>
@@ -234,8 +243,8 @@ const panel: CSSProperties = {
   height: '100%',
   display: 'flex',
   flexDirection: 'column',
-  backgroundColor: 'white',
-  borderLeft: '1px solid #E3E7EE',
+  backgroundColor: 'var(--map-surface)',
+  borderLeft: '1px solid var(--map-border)',
   overflow: 'hidden',
 };
 
@@ -251,7 +260,7 @@ const statusBox: CSSProperties = {
 
 const header: CSSProperties = {
   padding: '14px 16px 12px',
-  borderBottom: '1px solid #E3E7EE',
+  borderBottom: '1px solid var(--map-border)',
   flexShrink: 0,
 };
 
@@ -262,7 +271,7 @@ const scrollable: CSSProperties = {
 
 const footer: CSSProperties = {
   padding: '12px 16px',
-  borderTop: '1px solid #E3E7EE',
+  borderTop: '1px solid var(--map-border)',
   display: 'flex',
   flexDirection: 'column',
   gap: 8,
@@ -272,7 +281,7 @@ const footer: CSSProperties = {
 const sectionTitle: CSSProperties = {
   fontSize: 10,
   fontWeight: '700',
-  color: Colors.textMuted,
+  color: 'var(--map-text-muted)',
   letterSpacing: 0.6,
   marginBottom: 10,
 };
@@ -281,12 +290,12 @@ const closeBtn: CSSProperties = {
   width: 24,
   height: 24,
   borderRadius: 12,
-  backgroundColor: '#E3E4E8',
+  backgroundColor: 'var(--map-surface-alt)',
   border: 'none',
   fontSize: 18,
   lineHeight: '24px',
   cursor: 'pointer',
-  color: '#212121',
+  color: 'var(--map-text)',
   display: 'flex',
   alignItems: 'center',
   justifyContent: 'center',
@@ -295,8 +304,8 @@ const closeBtn: CSSProperties = {
 };
 
 const estadoChip: CSSProperties = {
-  backgroundColor: '#E0E4FF',
-  color: '#0152AC',
+  backgroundColor: 'var(--map-accent-bg)',
+  color: 'var(--map-accent)',
   border: 'none',
   borderRadius: 20,
   padding: '4px 10px',
@@ -307,25 +316,37 @@ const estadoChip: CSSProperties = {
 
 const reassignBtn: CSSProperties = {
   background: 'none',
-  border: '1px solid #E3E7EE',
+  border: '1px solid var(--map-border)',
   borderRadius: 20,
   padding: '4px 10px',
   fontSize: 11,
-  color: '#212121',
+  color: 'var(--map-text)',
   cursor: 'pointer',
+};
+
+const centrarBtn: CSSProperties = {
+  background: 'none',
+  border: 'none',
+  color: 'var(--map-accent)',
+  fontSize: 11,
+  fontWeight: '700',
+  cursor: 'pointer',
+  padding: 0,
+  whiteSpace: 'nowrap',
+  flexShrink: 0,
 };
 
 const linkBtn: CSSProperties = {
   background: 'none',
   border: 'none',
-  color: '#0152AC',
+  color: 'var(--map-accent)',
   fontSize: 13,
   fontWeight: '700',
   cursor: 'pointer',
 };
 
 const btnPrimary: CSSProperties = {
-  backgroundColor: '#0152AC',
+  backgroundColor: 'var(--map-accent)',
   color: 'white',
   border: 'none',
   borderRadius: 8,
@@ -338,8 +359,8 @@ const btnPrimary: CSSProperties = {
 
 const btnSecondary: CSSProperties = {
   flex: 1,
-  backgroundColor: '#EEF1F6',
-  color: '#0D2B52',
+  backgroundColor: 'var(--map-surface-alt)',
+  color: 'var(--map-text)',
   border: 'none',
   borderRadius: 8,
   padding: '10px',

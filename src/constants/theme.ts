@@ -16,9 +16,41 @@ export const Colors = {
   textBody: '#212121',
   textMuted: '#8B9BB8',
   background: '#FFFFFF',
+  surface: '#FFFFFF',
   border: '#E3E7EE',
   white: '#FFFFFF',
+  dangerBg: '#FDECEC',
+  dangerText: '#C0392B',
+  accentBg: '#E0E4FF',
 } as const;
+
+/**
+ * Paleta oscura — alcance acotado a las pantallas de Mapa (mapa, sidebar/panel de
+ * capas, detalle de incidencia, bottom sheet), pedido de Edgar 2026-08-05. `white`
+ * se mantiene fijo en ambos modos: es texto sobre superficies de color saturado
+ * (badges de prioridad, chips activos), no texto de página.
+ */
+export const ColorsDark = {
+  primary: '#B9C7DE',
+  primaryDark: '#1C2C42',
+  accent: '#4C8DFF',
+  agua: '#5B9BF7',
+  desague: '#D080E8',
+  statusATiempo: '#34C759',
+  statusAlerta: '#FFCC00',
+  statusCritica: '#F26A69',
+  textBody: '#E7EAF0',
+  textMuted: '#8B95A8',
+  background: '#10151D',
+  surface: '#1A212C',
+  border: '#2B3444',
+  white: '#FFFFFF',
+  dangerBg: '#3A1F1F',
+  dangerText: '#F1897F',
+  accentBg: '#1E2E4A',
+} as const;
+
+export type ColorPalette = { [K in keyof typeof Colors]: string };
 
 export const Spacing = {
   xs: 4,

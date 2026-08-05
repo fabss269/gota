@@ -1,8 +1,8 @@
-import { useEffect, useState } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import { Modal, Pressable, StyleSheet, Text, TextInput, View } from 'react-native';
 import Animated, { useAnimatedStyle, useSharedValue, withTiming } from 'react-native-reanimated';
 
-import { Colors, Radius, Spacing } from '@/constants/theme';
+import { Radius, Spacing, type ColorPalette } from '@/constants/theme';
 import { TecnicoOptionsList } from '@/components/incident-actions/TecnicoOptionsList';
 import {
   AREA_OPTIONS,
@@ -14,6 +14,7 @@ import {
 import type { Usuario } from '@/mocks/usuariosMock';
 import { useRegistrarAvance } from '@/hooks/useRegistrarAvance';
 import { useReasignarResponsable } from '@/hooks/useReasignarResponsable';
+import { useThemeColors } from '@/state/themeStore';
 
 type Props = {
   visible: boolean;
@@ -46,6 +47,8 @@ export function RegistrarAvanceSheet({
   onClose,
   onRegistrado,
 }: Props) {
+  const t = useThemeColors();
+  const styles = useMemo(() => makeStyles(t), [t]);
   const [motivo, setMotivo] = useState<MotivoAvance | null>(null);
   const [equipo, setEquipo] = useState<string | null>(null);
   const [area, setArea] = useState<string | null>(null);
@@ -128,6 +131,7 @@ export function RegistrarAvanceSheet({
               <View style={styles.grid}>
                 {MOTIVOS_AVANCE.map((m) => (
                   <Chip
+                    styles={styles}
                     key={m.value}
                     label={m.label}
                     active={motivo === m.value}
@@ -141,7 +145,7 @@ export function RegistrarAvanceSheet({
                   <Text style={styles.sectionLabel}>¿Qué pasó?</Text>
                   <View style={styles.grid}>
                     {EQUIPO_OPTIONS.map((opt) => (
-                      <Chip key={opt} label={opt} active={equipo === opt} onPress={() => setEquipo(opt)} />
+                      <Chip styles={styles} key={opt} label={opt} active={equipo === opt} onPress={() => setEquipo(opt)} />
                     ))}
                   </View>
                 </>
@@ -152,7 +156,7 @@ export function RegistrarAvanceSheet({
                   <Text style={styles.sectionLabel}>Área:</Text>
                   <View style={styles.grid}>
                     {AREA_OPTIONS.map((opt) => (
-                      <Chip key={opt} label={opt} active={area === opt} onPress={() => setArea(opt)} />
+                      <Chip styles={styles} key={opt} label={opt} active={area === opt} onPress={() => setArea(opt)} />
                     ))}
                   </View>
                 </>
@@ -170,7 +174,7 @@ export function RegistrarAvanceSheet({
                 value={nota}
                 onChangeText={setNota}
                 placeholder="Solo si hace falta un detalle extra..."
-                placeholderTextColor={Colors.textMuted}
+                placeholderTextColor={t.textMuted}
                 style={styles.notaBox}
                 multiline
               />
@@ -195,7 +199,19 @@ export function RegistrarAvanceSheet({
   );
 }
 
-function Chip({ label, active, onPress }: { label: string; active: boolean; onPress: () => void }) {
+type Styles = ReturnType<typeof makeStyles>;
+
+function Chip({
+  styles,
+  label,
+  active,
+  onPress,
+}: {
+  styles: Styles;
+  label: string;
+  active: boolean;
+  onPress: () => void;
+}) {
   return (
     <Pressable style={[styles.chip, active && styles.chipActive]} onPress={onPress}>
       <Text style={[styles.chipLabel, active && styles.chipLabelActive]}>{label}</Text>
@@ -203,69 +219,71 @@ function Chip({ label, active, onPress }: { label: string; active: boolean; onPr
   );
 }
 
-const styles = StyleSheet.create({
-  root: { flex: 1 },
-  backdropColor: { ...StyleSheet.absoluteFill, backgroundColor: 'rgba(13, 43, 82, 0.25)' },
-  backdropTouchable: { flex: 1, justifyContent: 'flex-end' },
-  sheet: {
-    backgroundColor: Colors.white,
-    borderTopLeftRadius: Radius.lg,
-    borderTopRightRadius: Radius.lg,
-    padding: Spacing.md,
-    gap: Spacing.xs,
-  },
-  head: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' },
-  title: { fontSize: 15, fontWeight: '700', color: Colors.primaryDark },
-  closeBtn: {
-    width: 24,
-    height: 24,
-    borderRadius: 12,
-    backgroundColor: '#E3E4E8',
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
-  closeGlyph: { fontSize: 14, fontWeight: '700', color: Colors.textMuted },
-  subtitle: { fontSize: 11, color: Colors.textMuted, marginBottom: Spacing.xs },
-  sectionLabel: { fontSize: 10, fontWeight: '700', color: Colors.textMuted, marginTop: Spacing.sm },
-  grid: { flexDirection: 'row', flexWrap: 'wrap', gap: Spacing.xs, marginTop: 4 },
-  chip: {
-    borderWidth: 1,
-    borderColor: Colors.border,
-    borderRadius: Radius.pill,
-    paddingHorizontal: Spacing.sm,
-    paddingVertical: 8,
-  },
-  chipActive: { backgroundColor: Colors.accent, borderColor: Colors.accent },
-  chipLabel: { fontSize: 11, fontWeight: '600', color: Colors.textBody },
-  chipLabelActive: { color: Colors.white },
-  notaBox: {
-    borderWidth: 1,
-    borderColor: Colors.border,
-    borderRadius: Radius.md,
-    padding: Spacing.sm,
-    minHeight: 70,
-    fontSize: 12.5,
-    color: Colors.textBody,
-    textAlignVertical: 'top',
-    marginTop: 4,
-  },
-  buttonsRow: { flexDirection: 'row', gap: Spacing.sm, marginTop: Spacing.md },
-  cancelBtn: {
-    flex: 1,
-    borderWidth: 1.5,
-    borderColor: Colors.accent,
-    borderRadius: Radius.pill,
-    alignItems: 'center',
-    paddingVertical: 12,
-  },
-  cancelLabel: { color: Colors.accent, fontWeight: '700', fontSize: 13 },
-  confirmBtn: {
-    flex: 1,
-    backgroundColor: Colors.primary,
-    borderRadius: Radius.pill,
-    alignItems: 'center',
-    paddingVertical: 12,
-  },
-  confirmBtnDisabled: { opacity: 0.4 },
-  confirmLabel: { color: Colors.white, fontWeight: '700', fontSize: 13 },
-});
+function makeStyles(t: ColorPalette) {
+  return StyleSheet.create({
+    root: { flex: 1 },
+    backdropColor: { ...StyleSheet.absoluteFill, backgroundColor: 'rgba(13, 43, 82, 0.25)' },
+    backdropTouchable: { flex: 1, justifyContent: 'flex-end' },
+    sheet: {
+      backgroundColor: t.surface,
+      borderTopLeftRadius: Radius.lg,
+      borderTopRightRadius: Radius.lg,
+      padding: Spacing.md,
+      gap: Spacing.xs,
+    },
+    head: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' },
+    title: { fontSize: 15, fontWeight: '700', color: t.primaryDark },
+    closeBtn: {
+      width: 24,
+      height: 24,
+      borderRadius: 12,
+      backgroundColor: t.border,
+      alignItems: 'center',
+      justifyContent: 'center',
+    },
+    closeGlyph: { fontSize: 14, fontWeight: '700', color: t.textMuted },
+    subtitle: { fontSize: 11, color: t.textMuted, marginBottom: Spacing.xs },
+    sectionLabel: { fontSize: 10, fontWeight: '700', color: t.textMuted, marginTop: Spacing.sm },
+    grid: { flexDirection: 'row', flexWrap: 'wrap', gap: Spacing.xs, marginTop: 4 },
+    chip: {
+      borderWidth: 1,
+      borderColor: t.border,
+      borderRadius: Radius.pill,
+      paddingHorizontal: Spacing.sm,
+      paddingVertical: 8,
+    },
+    chipActive: { backgroundColor: t.accent, borderColor: t.accent },
+    chipLabel: { fontSize: 11, fontWeight: '600', color: t.textBody },
+    chipLabelActive: { color: t.white },
+    notaBox: {
+      borderWidth: 1,
+      borderColor: t.border,
+      borderRadius: Radius.md,
+      padding: Spacing.sm,
+      minHeight: 70,
+      fontSize: 12.5,
+      color: t.textBody,
+      textAlignVertical: 'top',
+      marginTop: 4,
+    },
+    buttonsRow: { flexDirection: 'row', gap: Spacing.sm, marginTop: Spacing.md },
+    cancelBtn: {
+      flex: 1,
+      borderWidth: 1.5,
+      borderColor: t.accent,
+      borderRadius: Radius.pill,
+      alignItems: 'center',
+      paddingVertical: 12,
+    },
+    cancelLabel: { color: t.accent, fontWeight: '700', fontSize: 13 },
+    confirmBtn: {
+      flex: 1,
+      backgroundColor: t.accent,
+      borderRadius: Radius.pill,
+      alignItems: 'center',
+      paddingVertical: 12,
+    },
+    confirmBtnDisabled: { opacity: 0.4 },
+    confirmLabel: { color: t.white, fontWeight: '700', fontSize: 13 },
+  });
+}

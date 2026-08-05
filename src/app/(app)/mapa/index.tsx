@@ -10,16 +10,20 @@ import { LocationSearchBar } from '@/components/map/LocationSearchBar';
 import { EpselMapView } from '@/components/map/MapView';
 import { MapModeSheet } from '@/components/map/MapModeSheet';
 import { MapBottomSheet } from '@/components/sheet/MapBottomSheet';
-import { Colors, Radius } from '@/constants/theme';
+import { Radius, type ColorPalette } from '@/constants/theme';
 import { useIncidentsToday } from '@/hooks/useIncidentsToday';
 import { openDrawer } from '@/navigation/openDrawer';
 import { useFiltersStore } from '@/state/filtersStore';
+import { useMapSearchStore } from '@/state/mapSearchStore';
+import { useThemeColors } from '@/state/themeStore';
 import { clusterIncidents, type IncidentCluster } from '@/utils/clusterIncidents';
 
 const AnimatedPressable = Animated.createAnimatedComponent(Pressable);
 
 /** Mapa de incidencias (Spec 03) — pantalla principal de la app. */
 export default function MapaScreen() {
+  const t = useThemeColors();
+  const styles = useMemo(() => makeStyles(t), [t]);
   const navigation = useNavigation();
   const router = useRouter();
   const bottomSheetRef = useRef<BottomSheet>(null);
@@ -48,6 +52,7 @@ export default function MapaScreen() {
   const [clusterSeleccionado, setClusterSeleccionado] = useState<IncidentCluster | null>(null);
 
   const handleClusterPress = (cluster: IncidentCluster) => {
+    useMapSearchStore.getState().flyTo({ lat: cluster.lat, lon: cluster.lon });
     if (cluster.count === 1) {
       router.push({ pathname: '/incidencia/[id]', params: { id: cluster.incidencias[0].id } });
       return;
@@ -107,6 +112,7 @@ export default function MapaScreen() {
         incidencias={clusterSeleccionado?.incidencias ?? []}
         onSelect={(incidencia) => {
           setClusterSeleccionado(null);
+          useMapSearchStore.getState().flyTo({ lat: incidencia.lat, lon: incidencia.lon });
           router.push({ pathname: '/incidencia/[id]', params: { id: incidencia.id } });
         }}
         onClose={() => setClusterSeleccionado(null)}
@@ -115,67 +121,69 @@ export default function MapaScreen() {
   );
 }
 
-const styles = StyleSheet.create({
-  flex: { flex: 1 },
-  overlay: {
-    position: 'absolute',
-    top: 0,
-    left: 0,
-    right: 0,
-    bottom: 0,
-  },
-  searchBarSlot: {
-    position: 'absolute',
-    top: 16,
-    left: 72,
-    right: 12,
-  },
-  menuButton: {
-    position: 'absolute',
-    top: 16,
-    left: 16,
-    width: 48,
-    height: 48,
-    borderRadius: 24,
-    backgroundColor: Colors.primaryDark,
-    alignItems: 'center',
-    justifyContent: 'center',
-    elevation: 4,
-  },
-  menuIcon: { color: Colors.white, fontSize: 20 },
-  mapModeButton: {
-    // `bottom` real lo controla mapModeButtonAnimatedStyle (sigue al Bottom Sheet).
-    position: 'absolute',
-    left: 16,
-    width: 48,
-    height: 48,
-    borderRadius: 24,
-    backgroundColor: Colors.white,
-    alignItems: 'center',
-    justifyContent: 'center',
-    elevation: 4,
-  },
-  mapModeIcon: { fontSize: 20 },
-  modeBadge: {
-    position: 'absolute',
-    top: 16,
-    alignSelf: 'center',
-    backgroundColor: Colors.primaryDark,
-    paddingHorizontal: 12,
-    paddingVertical: 6,
-    borderRadius: Radius.pill,
-  },
-  modeBadgeText: { color: Colors.white, fontWeight: '700', fontSize: 12 },
-  statusBanner: {
-    position: 'absolute',
-    top: 76,
-    alignSelf: 'center',
-    backgroundColor: Colors.white,
-    paddingHorizontal: 14,
-    paddingVertical: 8,
-    borderRadius: Radius.pill,
-    elevation: 4,
-  },
-  errorBanner: { backgroundColor: '#FDECEC' },
-  statusText: { fontSize: 12, fontWeight: '600', color: Colors.textBody },
-});
+function makeStyles(t: ColorPalette) {
+  return StyleSheet.create({
+    flex: { flex: 1 },
+    overlay: {
+      position: 'absolute',
+      top: 0,
+      left: 0,
+      right: 0,
+      bottom: 0,
+    },
+    searchBarSlot: {
+      position: 'absolute',
+      top: 16,
+      left: 72,
+      right: 12,
+    },
+    menuButton: {
+      position: 'absolute',
+      top: 16,
+      left: 16,
+      width: 48,
+      height: 48,
+      borderRadius: 24,
+      backgroundColor: t.primaryDark,
+      alignItems: 'center',
+      justifyContent: 'center',
+      elevation: 4,
+    },
+    menuIcon: { color: t.white, fontSize: 20 },
+    mapModeButton: {
+      // `bottom` real lo controla mapModeButtonAnimatedStyle (sigue al Bottom Sheet).
+      position: 'absolute',
+      left: 16,
+      width: 48,
+      height: 48,
+      borderRadius: 24,
+      backgroundColor: t.surface,
+      alignItems: 'center',
+      justifyContent: 'center',
+      elevation: 4,
+    },
+    mapModeIcon: { fontSize: 20 },
+    modeBadge: {
+      position: 'absolute',
+      top: 16,
+      alignSelf: 'center',
+      backgroundColor: t.primaryDark,
+      paddingHorizontal: 12,
+      paddingVertical: 6,
+      borderRadius: Radius.pill,
+    },
+    modeBadgeText: { color: t.white, fontWeight: '700', fontSize: 12 },
+    statusBanner: {
+      position: 'absolute',
+      top: 76,
+      alignSelf: 'center',
+      backgroundColor: t.surface,
+      paddingHorizontal: 14,
+      paddingVertical: 8,
+      borderRadius: Radius.pill,
+      elevation: 4,
+    },
+    errorBanner: { backgroundColor: t.dangerBg },
+    statusText: { fontSize: 12, fontWeight: '600', color: t.textBody },
+  });
+}

@@ -1,8 +1,10 @@
+import { useMemo } from 'react';
 import { Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
 
-import { Colors, Radius, Spacing } from '@/constants/theme';
+import { Radius, Spacing, type ColorPalette } from '@/constants/theme';
 import { AfectadoRow } from '@/components/shared/AfectadoRow';
 import { useSimulacionStore } from '@/state/simulacionStore';
+import { useThemeColors } from '@/state/themeStore';
 
 /** Control flotante del modo simulación (web) — toggle + selector de falla para
  * buzones (colapso vs. tapa faltante; tramos/tuberías/accesorios/caja desagüe infieren
@@ -10,6 +12,8 @@ import { useSimulacionStore } from '@/state/simulacionStore';
  * resultado. Tras un click exitoso entra a modo vista: bloquea el resto de la pantalla
  * (ver mapa/index.web.tsx) y solo queda el botón ← + la lista de afectados. */
 export function SimulacionControl() {
+  const t = useThemeColors();
+  const styles = useMemo(() => makeStyles(t), [t]);
   const activo = useSimulacionStore((s) => s.activo);
   const modoVista = useSimulacionStore((s) => s.modoVista);
   const tipoFallaBuzon = useSimulacionStore((s) => s.tipoFallaBuzon);
@@ -92,70 +96,72 @@ export function SimulacionControl() {
   );
 }
 
-const styles = StyleSheet.create({
-  // top-right: top-left ya lo ocupa la barra de búsqueda de dirección/suministro
-  // (LocationSearchBar), bottom-right lo ocupa NavigationControl de MapLibre.
-  container: { position: 'absolute', top: Spacing.md, right: Spacing.md, gap: Spacing.xs, zIndex: 10 },
-  toggle: {
-    backgroundColor: Colors.white,
-    borderRadius: Radius.pill,
-    paddingHorizontal: Spacing.md,
-    paddingVertical: Spacing.sm,
-    shadowColor: '#000',
-    shadowOpacity: 0.15,
-    shadowRadius: 6,
-    shadowOffset: { width: 0, height: 2 },
-    elevation: 4,
-  },
-  toggleActive: { backgroundColor: Colors.accent },
-  toggleLabel: { fontSize: 12.5, fontWeight: '700', color: Colors.textBody },
-  toggleLabelActive: { color: Colors.white },
-  panel: {
-    backgroundColor: Colors.white,
-    borderRadius: Radius.md,
-    padding: Spacing.sm,
-    gap: 6,
-    maxWidth: 230,
-    shadowColor: '#000',
-    shadowOpacity: 0.15,
-    shadowRadius: 6,
-    shadowOffset: { width: 0, height: 2 },
-    elevation: 4,
-  },
-  panelTitle: { fontSize: 11, color: Colors.textMuted },
-  panelLabel: { fontSize: 10.5, fontWeight: '600', color: Colors.textBody, marginTop: 2 },
-  buzonPicker: { flexDirection: 'row', gap: 6 },
-  buzonOpt: { flex: 1, paddingVertical: 6, borderRadius: Radius.sm, backgroundColor: '#F1F3F8', alignItems: 'center' },
-  buzonOptActive: { backgroundColor: Colors.accent },
-  buzonOptLabel: { fontSize: 10.5, fontWeight: '600', color: Colors.textBody },
-  buzonOptLabelActive: { color: Colors.white },
-  resultRow: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', marginTop: 2 },
-  status: { fontSize: 12, fontWeight: '600', color: Colors.textBody },
-  clearLink: { fontSize: 11, color: Colors.accent, fontWeight: '600' },
-  backBtn: {
-    backgroundColor: Colors.white,
-    borderRadius: Radius.pill,
-    paddingHorizontal: Spacing.md,
-    paddingVertical: Spacing.sm,
-    alignSelf: 'flex-end',
-    shadowColor: '#000',
-    shadowOpacity: 0.15,
-    shadowRadius: 6,
-    shadowOffset: { width: 0, height: 2 },
-    elevation: 4,
-  },
-  backBtnLabel: { fontSize: 12.5, fontWeight: '700', color: Colors.textBody },
-  panelVista: {
-    backgroundColor: Colors.white,
-    borderRadius: Radius.md,
-    padding: Spacing.sm,
-    gap: 6,
-    width: 260,
-    shadowColor: '#000',
-    shadowOpacity: 0.15,
-    shadowRadius: 6,
-    shadowOffset: { width: 0, height: 2 },
-    elevation: 4,
-  },
-  vistaScroll: { maxHeight: 320 },
-});
+function makeStyles(t: ColorPalette) {
+  return StyleSheet.create({
+    // top-right: top-left ya lo ocupa la barra de búsqueda de dirección/suministro
+    // (LocationSearchBar), bottom-right lo ocupa NavigationControl de MapLibre.
+    container: { position: 'absolute', top: Spacing.md, right: Spacing.md, gap: Spacing.xs, zIndex: 10 },
+    toggle: {
+      backgroundColor: t.surface,
+      borderRadius: Radius.pill,
+      paddingHorizontal: Spacing.md,
+      paddingVertical: Spacing.sm,
+      shadowColor: '#000',
+      shadowOpacity: 0.15,
+      shadowRadius: 6,
+      shadowOffset: { width: 0, height: 2 },
+      elevation: 4,
+    },
+    toggleActive: { backgroundColor: t.accent },
+    toggleLabel: { fontSize: 12.5, fontWeight: '700', color: t.textBody },
+    toggleLabelActive: { color: t.white },
+    panel: {
+      backgroundColor: t.surface,
+      borderRadius: Radius.md,
+      padding: Spacing.sm,
+      gap: 6,
+      maxWidth: 230,
+      shadowColor: '#000',
+      shadowOpacity: 0.15,
+      shadowRadius: 6,
+      shadowOffset: { width: 0, height: 2 },
+      elevation: 4,
+    },
+    panelTitle: { fontSize: 11, color: t.textMuted },
+    panelLabel: { fontSize: 10.5, fontWeight: '600', color: t.textBody, marginTop: 2 },
+    buzonPicker: { flexDirection: 'row', gap: 6 },
+    buzonOpt: { flex: 1, paddingVertical: 6, borderRadius: Radius.sm, backgroundColor: t.border, alignItems: 'center' },
+    buzonOptActive: { backgroundColor: t.accent },
+    buzonOptLabel: { fontSize: 10.5, fontWeight: '600', color: t.textBody },
+    buzonOptLabelActive: { color: t.white },
+    resultRow: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', marginTop: 2 },
+    status: { fontSize: 12, fontWeight: '600', color: t.textBody },
+    clearLink: { fontSize: 11, color: t.accent, fontWeight: '600' },
+    backBtn: {
+      backgroundColor: t.surface,
+      borderRadius: Radius.pill,
+      paddingHorizontal: Spacing.md,
+      paddingVertical: Spacing.sm,
+      alignSelf: 'flex-end',
+      shadowColor: '#000',
+      shadowOpacity: 0.15,
+      shadowRadius: 6,
+      shadowOffset: { width: 0, height: 2 },
+      elevation: 4,
+    },
+    backBtnLabel: { fontSize: 12.5, fontWeight: '700', color: t.textBody },
+    panelVista: {
+      backgroundColor: t.surface,
+      borderRadius: Radius.md,
+      padding: Spacing.sm,
+      gap: 6,
+      width: 260,
+      shadowColor: '#000',
+      shadowOpacity: 0.15,
+      shadowRadius: 6,
+      shadowOffset: { width: 0, height: 2 },
+      elevation: 4,
+    },
+    vistaScroll: { maxHeight: 320 },
+  });
+}

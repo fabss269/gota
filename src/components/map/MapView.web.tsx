@@ -23,6 +23,7 @@ import { SimulacionControl } from '@/components/map/SimulacionControl.web';
 import { type CapaKey, useCapasStore } from '@/state/capasStore';
 import { useMapSearchStore } from '@/state/mapSearchStore';
 import { useSimulacionStore } from '@/state/simulacionStore';
+import { useThemeStore } from '@/state/themeStore';
 import { useUbicacionStore } from '@/state/ubicacionStore';
 import type { IncidentCluster } from '@/utils/clusterIncidents';
 
@@ -144,6 +145,19 @@ export function EpselMapView({ clusters, onPressCluster }: Props) {
     // de la Cámara nativa (no se re-centra en updates posteriores).
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
+
+  // El basemap demo (demotiles) no tiene variante oscura propia — se invierte el
+  // canvas por CSS (truco estándar cuando no controlás el vector style) en vez del
+  // contenedor entero, para no invertir también los marcadores/popups que cuelgan
+  // del mismo container.
+  const themeMode = useThemeStore((state) => state.mode);
+  useEffect(() => {
+    const map = mapRef.current;
+    if (!map) return;
+    const canvas = map.getCanvas();
+    canvas.style.filter =
+      themeMode === 'dark' ? 'invert(1) hue-rotate(180deg) brightness(0.92) contrast(0.92)' : '';
+  }, [themeMode]);
 
   const capasVisibles = useCapasStore((state) => state.capasVisibles);
 
