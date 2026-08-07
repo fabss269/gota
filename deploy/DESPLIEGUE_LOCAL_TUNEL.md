@@ -79,6 +79,28 @@ psql -h 127.0.0.1 -p 5432 -U postgres -d bd_conhydra_local -f sql/fixes_post_res
   (estaba mal etiquetado como Pimentel, es Chiclayo) — dato sucio puntual de este
   backup, no una migración de schema.
 
+**Después de los dos fixes de arriba, SIEMPRE reconstruir la caché Redis** — si
+no, `GET /incidencias` con el filtro de prioridad (el que manda el mapa por
+defecto) devuelve casi nada, aunque la BD tenga los 16,971 incidentes bien:
+
+```bash
+.venv/bin/python -m scripts.rebuild_incidencia_cache
+```
+
+**Por qué es obligatorio, no opcional** (encontrado en vivo 2026-08-07 — el
+síntoma reportado fue "solo me cargan dos incidencias"): `GET /incidencias`
+filtra por prioridad/estado/sector contra índices invertidos en Redis
+(`idx:prioridad:*` etc, specs/00-arquitectura.md §7), no contra Postgres
+directamente. Esos índices quedan apuntando a los `incidente_id` (UUID) de la
+BD *anterior* al restore — un restore completo reemplaza la tabla `gota.incidente`
+entera con UUIDs nuevos, así que la caché vieja queda huérfana (620 claves
+apuntando a incidentes que ya no existen, verificado). El filtro de prioridad
+intersecta contra esos índices vacíos/viejos y el resultado colapsa a casi 0,
+aunque la query sin ese filtro sí devuelva los 625 reales. El script primero
+borra TODO lo viejo (`_limpiar_claves`) y repuebla desde cero solo con lo que
+hay hoy en `gota.incidente` — tarda unos 3-4 minutos para ~17k incidentes
+(secuencial, un lookup a `sig` por incidente).
+
 **Verificado compatible con este backup (2026-08-07)**, sin perder funcionalidad
 propia — análisis completo hecho antes de restaurar, comparando el schema del
 backup contra todo lo que usa el código de este repo:
