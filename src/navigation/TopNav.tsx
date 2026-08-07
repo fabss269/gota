@@ -1,7 +1,7 @@
 import { Ionicons } from '@expo/vector-icons';
 import { usePathname, useRouter } from 'expo-router';
 import { useState } from 'react';
-import { Modal, Pressable, StyleSheet, Text, TouchableWithoutFeedback, View } from 'react-native';
+import { Image, Modal, Pressable, StyleSheet, Text, TouchableWithoutFeedback, View } from 'react-native';
 
 import { useAuth } from '@/auth/AuthContext';
 import { Colors, Radius, Spacing } from '@/constants/theme';
@@ -33,7 +33,12 @@ export function TopNav() {
 
   return (
     <View style={styles.bar}>
-      <Text style={styles.brand}>GOTA</Text>
+      <Image
+        source={require('@/assets/images/epsel-logo.png')}
+        style={styles.brandLogo}
+        resizeMode="contain"
+        accessibilityLabel="EPSEL"
+      />
 
       <View style={styles.links}>
         {NAV_ITEMS.map((item) => {
@@ -100,7 +105,7 @@ const styles = StyleSheet.create({
     paddingHorizontal: Spacing.lg,
     gap: Spacing.lg,
   },
-  brand: { fontSize: 20, fontWeight: '800', color: Colors.primaryDark, letterSpacing: 1 },
+  brandLogo: { width: 58, height: 40 },
   links: { flex: 1, flexDirection: 'row', gap: Spacing.xs },
   link: {
     flexDirection: 'row',
