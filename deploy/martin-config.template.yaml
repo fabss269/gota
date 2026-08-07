@@ -14,6 +14,7 @@ postgres:
         aguaid: int4
         aguatipoid: int4
         sectorid: int4
+        diametro: numeric
     alcantarillado:
       schema: gota
       table: alcantarillado_2d
@@ -43,6 +44,7 @@ postgres:
       srid: 32719
       geometry_column: geom
       properties:
+        cajaaguaid: int4
         inscripcion: varchar
         sectorid: int4
         distritoid: int4

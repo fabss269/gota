@@ -1,7 +1,9 @@
 from contextlib import asynccontextmanager
+from pathlib import Path
 
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
+from fastapi.responses import FileResponse
 
 from app.core.config import settings
 from app.core.exceptions import register_exception_handlers
@@ -53,3 +55,17 @@ app.include_router(grafo_router)
 @app.get("/health", tags=["health"])
 async def health() -> dict[str, str]:
     return {"status": "ok"}
+
+
+# TEMPORAL — solo para el túnel público de demo (2026-08-05): Expo sirve
+# map-style.json como estático sin cabecera CORS, y MapLibre lo pide desde un
+# Worker (origen "null" para el navegador), así que se bloquea igual siendo
+# mismo dominio. Se re-sirve acá porque este proceso ya tiene CORSMiddleware
+# configurado. Asume que EPSEL-MOVIL vive al lado de este repo — no pensado
+# para producción, quitar cuando se cierre el túnel de demo.
+_MAP_STYLE_PATH = Path(__file__).resolve().parent.parent.parent / "EPSEL-MOVIL" / "public" / "map-style.json"
+
+
+@app.get("/map-style.json", tags=["health"])
+async def map_style() -> FileResponse:
+    return FileResponse(_MAP_STYLE_PATH, media_type="application/json")

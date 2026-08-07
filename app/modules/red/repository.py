@@ -107,3 +107,188 @@ class SigRedRepository:
             WHERE t.geom IS NOT NULL {where}
         """
         return await self._feature_collection(inner, params)
+
+    # ── Detalle de un elemento individual (click en el mapa fuera de modo simulación,
+    # ver mapLayers.ts/MapView.web.tsx) — un lookup por PK (índice, no table scan) +
+    # joins a catálogos chicos (materiales/tipos/sectores/distritos, todos <100 filas),
+    # mismo patrón de bajo costo que ya usa CatastroEnrichmentService. Cada método
+    # devuelve `None` si el id no existe; el service traduce eso a 404.
+
+    async def elemento_tuberia(self, aguaid: int) -> dict | None:
+        stmt = text("""
+            SELECT t.aguaid AS id, t.codigo, t.diametro, m.material, at.aguatipo,
+                   t.sectorid, s.sector, t.distritoid, d.distrito
+            FROM sig.agua t
+            LEFT JOIN sig.materiales m ON m.materialid = t.materialid
+            LEFT JOIN sig.aguatipos at ON at.aguatipoid = t.aguatipoid
+            LEFT JOIN sig.sectores s ON s.sectorid = t.sectorid
+            LEFT JOIN sig.distritos d ON d.distritoid = t.distritoid
+            WHERE t.aguaid = :id
+        """)
+        row = (await self._session.execute(stmt, {"id": aguaid})).mappings().first()
+        if row is None:
+            return None
+        return {
+            "id": row["id"],
+            "codigo": row["codigo"],
+            "diametroPulgadas": float(row["diametro"]) if row["diametro"] is not None else None,
+            "material": row["material"],
+            "tipoNombre": row["aguatipo"],
+            "sectorId": row["sectorid"],
+            "sectorNombre": (row["sector"] or "").title() or None,
+            "distritoId": row["distritoid"],
+            "distritoNombre": (row["distrito"] or "").title() or None,
+        }
+
+    async def elemento_tramo(self, alcantarilladoid: int) -> dict | None:
+        stmt = text("""
+            SELECT t.alcantarilladoid AS id, t.codigo, t.primaria, m.material, at.alcantarilladotipo,
+                   t.sectorid, s.sector, t.distritoid, d.distrito
+            FROM sig.alcantarillado t
+            LEFT JOIN sig.materiales m ON m.materialid = t.materialid
+            LEFT JOIN sig.alcantarilladotipos at ON at.alcantarilladotipoid = t.alcantarilladotipoid
+            LEFT JOIN sig.sectores s ON s.sectorid = t.sectorid
+            LEFT JOIN sig.distritos d ON d.distritoid = t.distritoid
+            WHERE t.alcantarilladoid = :id
+        """)
+        row = (await self._session.execute(stmt, {"id": alcantarilladoid})).mappings().first()
+        if row is None:
+            return None
+        return {
+            "id": row["id"],
+            "codigo": row["codigo"],
+            "primaria": row["primaria"],
+            "material": row["material"],
+            "tipoNombre": row["alcantarilladotipo"],
+            "sectorId": row["sectorid"],
+            "sectorNombre": (row["sector"] or "").title() or None,
+            "distritoId": row["distritoid"],
+            "distritoNombre": (row["distrito"] or "").title() or None,
+        }
+
+    async def elemento_buzon(self, buzonid: int) -> dict | None:
+        stmt = text("""
+            SELECT t.buzonid AS id, t.codigo, t.referencia, t.tapa, t.fondo,
+                   t.sectorid, s.sector, t.distritoid, d.distrito
+            FROM sig.buzones t
+            LEFT JOIN sig.sectores s ON s.sectorid = t.sectorid
+            LEFT JOIN sig.distritos d ON d.distritoid = t.distritoid
+            WHERE t.buzonid = :id
+        """)
+        row = (await self._session.execute(stmt, {"id": buzonid})).mappings().first()
+        if row is None:
+            return None
+        return {
+            "id": row["id"],
+            "codigo": row["codigo"],
+            "referencia": row["referencia"],
+            "cota": float(row["tapa"]) if row["tapa"] is not None else None,
+            "cotaFondo": float(row["fondo"]) if row["fondo"] is not None else None,
+            "sectorId": row["sectorid"],
+            "sectorNombre": (row["sector"] or "").title() or None,
+            "distritoId": row["distritoid"],
+            "distritoNombre": (row["distrito"] or "").title() or None,
+        }
+
+    async def elemento_accesorio(self, accesorioid: int) -> dict | None:
+        stmt = text("""
+            SELECT t.accesorioid AS id, t.codigo, t.diametro, t.profundidad, at.accesoriotipo,
+                   t.sectorid, s.sector, t.distritoid, d.distrito
+            FROM sig.accesorios t
+            LEFT JOIN sig.accesoriotipos at ON at.accesoriotipoid = t.accesoriotipoid
+            LEFT JOIN sig.sectores s ON s.sectorid = t.sectorid
+            LEFT JOIN sig.distritos d ON d.distritoid = t.distritoid
+            WHERE t.accesorioid = :id
+        """)
+        row = (await self._session.execute(stmt, {"id": accesorioid})).mappings().first()
+        if row is None:
+            return None
+        return {
+            "id": row["id"],
+            "codigo": row["codigo"],
+            "diametroPulgadas": float(row["diametro"]) if row["diametro"] is not None else None,
+            "profundidad": float(row["profundidad"]) if row["profundidad"] is not None else None,
+            "tipoNombre": row["accesoriotipo"],
+            "sectorId": row["sectorid"],
+            "sectorNombre": (row["sector"] or "").title() or None,
+            "distritoId": row["distritoid"],
+            "distritoNombre": (row["distrito"] or "").title() or None,
+        }
+
+    async def _elemento_caja(self, tabla: str, id_col: str, id_valor: int) -> dict | None:
+        stmt = text(f"""
+            SELECT t.{id_col} AS id, t.inscripcion, t.tipo, t.cota,
+                   t.sectorid, s.sector, t.distritoid, d.distrito
+            FROM sig.{tabla} t
+            LEFT JOIN sig.sectores s ON s.sectorid = t.sectorid
+            LEFT JOIN sig.distritos d ON d.distritoid = t.distritoid
+            WHERE t.{id_col} = :id
+        """)
+        row = (await self._session.execute(stmt, {"id": id_valor})).mappings().first()
+        if row is None:
+            return None
+        return {
+            "id": row["id"],
+            "inscripcion": row["inscripcion"],
+            "tipoNombre": row["tipo"],
+            "cota": float(row["cota"]) if row["cota"] is not None else None,
+            "sectorId": row["sectorid"],
+            "sectorNombre": (row["sector"] or "").title() or None,
+            "distritoId": row["distritoid"],
+            "distritoNombre": (row["distrito"] or "").title() or None,
+        }
+
+    async def elemento_cajaagua(self, cajaaguaid: int) -> dict | None:
+        return await self._elemento_caja("cajaagua", "cajaaguaid", cajaaguaid)
+
+    async def elemento_cajadesague(self, cajadesagueid: int) -> dict | None:
+        return await self._elemento_caja("cajadesague", "cajadesagueid", cajadesagueid)
+
+    async def elemento_manzana(self, manzanaid: int) -> dict | None:
+        stmt = text("""
+            SELECT t.manzanaid AS id, t.manzana, t.area, t.perimetro,
+                   t.sectorid, s.sector, t.distritoid, d.distrito
+            FROM sig.manzanas t
+            LEFT JOIN sig.sectores s ON s.sectorid = t.sectorid
+            LEFT JOIN sig.distritos d ON d.distritoid = t.distritoid
+            WHERE t.manzanaid = :id
+        """)
+        row = (await self._session.execute(stmt, {"id": manzanaid})).mappings().first()
+        if row is None:
+            return None
+        return {
+            "id": row["id"],
+            "nombre": row["manzana"],
+            "area": float(row["area"]) if row["area"] is not None else None,
+            "perimetro": float(row["perimetro"]) if row["perimetro"] is not None else None,
+            "sectorId": row["sectorid"],
+            "sectorNombre": (row["sector"] or "").title() or None,
+            "distritoId": row["distritoid"],
+            "distritoNombre": (row["distrito"] or "").title() or None,
+        }
+
+    async def elemento_lote(self, loteid: int) -> dict | None:
+        stmt = text("""
+            SELECT t.loteid AS id, t.cod_lote, t.zonificaci, t.sector_uso, t.area, t.perimetro,
+                   t.sectorid, s.sector, t.distritoid, d.distrito
+            FROM sig.lotes t
+            LEFT JOIN sig.sectores s ON s.sectorid = t.sectorid
+            LEFT JOIN sig.distritos d ON d.distritoid = t.distritoid
+            WHERE t.loteid = :id
+        """)
+        row = (await self._session.execute(stmt, {"id": loteid})).mappings().first()
+        if row is None:
+            return None
+        nombre = row["cod_lote"] or None
+        tipo_nombre = " · ".join(v for v in (row["zonificaci"], row["sector_uso"]) if v) or None
+        return {
+            "id": row["id"],
+            "nombre": nombre,
+            "tipoNombre": tipo_nombre,
+            "area": float(row["area"]) if row["area"] is not None else None,
+            "perimetro": float(row["perimetro"]) if row["perimetro"] is not None else None,
+            "sectorId": row["sectorid"],
+            "sectorNombre": (row["sector"] or "").title() or None,
+            "distritoId": row["distritoid"],
+            "distritoNombre": (row["distrito"] or "").title() or None,
+        }

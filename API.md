@@ -228,6 +228,41 @@ Response: GeoJSON `FeatureCollection` por tipo de capa, para dibujar líneas/pun
 infraestructura sobre el mapa. `tipos` posibles: `red_potable`, `valvulas`,
 `grifos_contra_incendio`, `red_primaria_desague`, `red_secundaria_desague`, `buzones`.
 
+### `GET /red/elemento/{tipo}/{id}` (nuevo — panel de info al hacer click en el mapa)
+`tipo`: `tuberia|tramo|buzon|accesorio|cajaagua|cajadesague|manzana|lote` (mismo id que
+el frontend ya lee de las properties de la vector tile clickeada). `id` es el id propio
+del elemento (`aguaid`, `alcantarilladoid`, etc.). Devuelve datos enriquecidos con joins
+a catálogos de `sig` (material, tipo, sector, distrito) — no solo los ids crudos que
+publica Martin. Campos no aplicables al `tipo` consultado vienen `null`.
+```json
+{
+  "tipo": "tuberia",
+  "id": 140,
+  "codigo": null,
+  "inscripcion": null,
+  "tipoNombre": "Línea de Conducción",
+  "material": "Fierro fundido",
+  "diametroPulgadas": 6.0,
+  "primaria": null,
+  "profundidad": null,
+  "cota": null,
+  "cotaFondo": null,
+  "referencia": null,
+  "nombre": null,
+  "area": null,
+  "perimetro": null,
+  "sectorId": 2,
+  "sectorNombre": "Chiclayo - Sector 01",
+  "distritoId": 3437,
+  "distritoNombre": "Chiclayo"
+}
+```
+404 `NO_ENCONTRADO` si el id no existe. **Nota real de datos**: `sig.agua.diametro` (y
+`sig.accesorios.diametro`) están en **pulgadas** (valores típicos 2–40, no milímetros —
+verificado contra la BD real), de ahí `diametroPulgadas` y no `diametroMm`. `sig.alcantarillado`
+no tiene columna de diámetro (gap real del schema, ver `specs/04-detalle-incidencia.md`),
+por eso `tramo` nunca trae `diametroPulgadas`.
+
 ---
 
 ## 8. Dashboard (Spec 09)
