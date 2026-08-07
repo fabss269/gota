@@ -29,6 +29,7 @@ class PropiaIncidenciaRepository:
         tipo_atencion_codigo: str | None,
         q: str | None,
         bbox: tuple[float, float, float, float] | None,
+        resuelto: bool | None,
     ) -> Select:
         stmt = select(Incidente).join(Incidente.tipo_atencion)
         condiciones = []
@@ -38,6 +39,10 @@ class PropiaIncidenciaRepository:
             condiciones.append(Incidente.creado_en >= fecha_desde)
         if fecha_hasta is not None:
             condiciones.append(Incidente.creado_en <= fecha_hasta)
+        if resuelto is not None:
+            condiciones.append(
+                Incidente.fecha_solucion.is_not(None) if resuelto else Incidente.fecha_solucion.is_(None)
+            )
         if categorias:
             stmt = stmt.join(CatalogoTipoAtencion.tipo_grupo)
             condiciones.append(CatalogoTipoGrupo.codigo.in_(categorias))
@@ -66,6 +71,7 @@ class PropiaIncidenciaRepository:
         tipo_atencion_codigo: str | None = None,
         q: str | None = None,
         bbox: tuple[float, float, float, float] | None = None,
+        resuelto: bool | None = None,
         candidatos: set[str] | None = None,
         page: int = 1,
         page_size: int = 10,
@@ -78,6 +84,7 @@ class PropiaIncidenciaRepository:
             tipo_atencion_codigo=tipo_atencion_codigo,
             q=q,
             bbox=bbox,
+            resuelto=resuelto,
         )
         if candidatos is not None:
             ids = [uuid.UUID(c) for c in candidatos]

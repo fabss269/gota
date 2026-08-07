@@ -117,6 +117,9 @@ class Incidente(Base):
     creado_en: Mapped[datetime] = mapped_column(server_default=text("now()"))
     latitud: Mapped[float | None]
     longitud: Mapped[float | None]
+    # Columnas del backup real de Fabiana (2026-08-07) — no existían en el DDL
+    # original, resuelto/no resuelto se decide por fecha_solucion IS NULL.
+    fecha_solucion: Mapped[datetime | None]
 
     tipo_atencion: Mapped[CatalogoTipoAtencion] = relationship(lazy="joined")
 

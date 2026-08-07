@@ -71,6 +71,7 @@ class IncidenciaFilterParams(BaseModel):
     tipoAtencionId: str | None = None
     q: str | None = None
     bbox: str | None = None
+    resuelto: bool | None = None
     page: int = 1
     pageSize: int = 10
 
@@ -96,6 +97,7 @@ def incidencia_filter_params(
     tipoAtencionId: Annotated[str | None, Query()] = None,
     q: Annotated[str | None, Query()] = None,
     bbox: Annotated[str | None, Query()] = None,
+    resuelto: Annotated[bool | None, Query()] = None,
     page: Annotated[int, Query(ge=1)] = 1,
     pageSize: Annotated[int, Query(ge=1, le=100)] = 10,
 ) -> IncidenciaFilterParams:
@@ -111,6 +113,7 @@ def incidencia_filter_params(
         tipoAtencionId=tipoAtencionId,
         q=q,
         bbox=bbox,
+        resuelto=resuelto,
         page=page,
         pageSize=pageSize,
     )

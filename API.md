@@ -87,6 +87,7 @@ Query params (todos opcionales salvo lo indicado):
 | `tipoAtencionId` | string | |
 | `q` | string | Búsqueda libre (tipo + dirección), lista (Spec 05) |
 | `bbox` | `minLon,minLat,maxLon,maxLat` | Recorte espacial para el mapa (evita traer todo el país) |
+| `resuelto` | `true` \| `false` | Filtra por `incidente.fecha_solucion` (nuevo 2026-08-07, columna del backup real de Fabiana). `false` = sin resolver. Sin este param, no filtra por estado de resolución. |
 | `page`, `pageSize` | int | Paginación, lista (Spec 05). Default `pageSize=10` |
 
 Response `200` (forma de lista, usada tanto por mapa como por lista de incidencias):

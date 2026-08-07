@@ -190,6 +190,7 @@ class IncidenciaService:
             tipo_atencion_codigo=filtros.tipoAtencionId,
             q=filtros.q,
             bbox=filtros.bbox_tuple(),
+            resuelto=filtros.resuelto,
             candidatos=candidatos,
             page=filtros.page,
             page_size=filtros.pageSize,
