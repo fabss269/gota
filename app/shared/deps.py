@@ -12,10 +12,11 @@ from app.core.security import decode_token
 from app.db.models_propia import Usuario
 from app.db.propia import get_propia_session
 from app.db.redis import redis_client
-from app.db.sig import get_sig_session
+from app.db.sig import get_sig_session, get_sig_write_session
 
 PropiaSession = Annotated[AsyncSession, Depends(get_propia_session)]
 SigSession = Annotated[AsyncSession, Depends(get_sig_session)]
+SigWriteSession = Annotated[AsyncSession, Depends(get_sig_write_session)]
 
 
 def get_redis() -> RedisClient:

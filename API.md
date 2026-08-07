@@ -264,6 +264,29 @@ verificado contra la BD real), de ahí `diametroPulgadas` y no `diametroMm`. `si
 no tiene columna de diámetro (gap real del schema, ver `specs/04-detalle-incidencia.md`),
 por eso `tramo` nunca trae `diametroPulgadas`.
 
+### `PATCH /red/elemento/{tipo}/{id}` (nuevo 2026-08-07 — edición inline estilo Jira)
+`tipo`: solo `tuberia` (sig.agua) o `tramo` (sig.alcantarillado). Body, ambos campos
+opcionales pero al menos uno requerido:
+```json
+{ "diametroPulgadas": 6.0, "materialId": 22 }
+```
+`materialId` sale de `GET /red/materiales/{tipo}`. `diametroPulgadas` en `tramo` es
+`400 VALIDACION` (sig.alcantarillado no tiene esa columna, mismo gap de arriba).
+`204` sin body si actualiza, `404 NO_ENCONTRADO` si el id no existe.
+
+**Escribe directo sobre `sig`** (no una tabla de correcciones aparte) — decisión
+explícita de Edgar 2026-08-07 sabiendo que un restore futuro de un backup de
+Fabiana pisa estas ediciones sin aviso (ver `app/db/sig.py:get_sig_write_session`
+y memoria del proyecto). `sig` sigue siendo solo-lectura para todo el resto del
+código — esta es la única excepción, acotada a este endpoint.
+
+### `GET /red/materiales/{tipo}`
+`tipo`: `tuberia` o `tramo`. Catálogo para el selector del PATCH de arriba —
+`sig.materiales` filtrado por grupo (`AGUA POTABLE`/`ALCANTARILLADO`).
+```json
+[{ "id": 22, "nombre": "Fierro fundido" }]
+```
+
 ---
 
 ## 8. Dashboard (Spec 09)

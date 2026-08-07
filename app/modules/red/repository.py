@@ -292,3 +292,38 @@ class SigRedRepository:
             "distritoId": row["distritoid"],
             "distritoNombre": (row["distrito"] or "").title() or None,
         }
+
+
+# ── Escritura sobre sig.agua/sig.alcantarillado (excepción explícita al
+# read-only, ver app/db/sig.py get_sig_write_session) — edición inline de
+# diámetro/material desde el panel de detalle del mapa.
+
+
+class SigRedWriteRepository:
+    def __init__(self, session: AsyncSession) -> None:
+        self._session = session
+
+    async def actualizar_tuberia(self, aguaid: int, diametro: float | None, material_id: int | None) -> bool:
+        sets = []
+        params: dict = {"id": aguaid}
+        if diametro is not None:
+            sets.append("diametro = :diametro")
+            params["diametro"] = diametro
+        if material_id is not None:
+            sets.append("materialid = :material_id")
+            params["material_id"] = material_id
+        stmt = text(f"UPDATE sig.agua SET {', '.join(sets)} WHERE aguaid = :id")
+        result = await self._session.execute(stmt, params)
+        return result.rowcount > 0
+
+    async def actualizar_tramo(self, alcantarilladoid: int, material_id: int) -> bool:
+        stmt = text("UPDATE sig.alcantarillado SET materialid = :material_id WHERE alcantarilladoid = :id")
+        result = await self._session.execute(stmt, {"id": alcantarilladoid, "material_id": material_id})
+        return result.rowcount > 0
+
+    async def listar_materiales(self, grupo: str) -> list[dict]:
+        stmt = text(
+            "SELECT materialid, material FROM sig.materiales WHERE grupo = :grupo ORDER BY material"
+        )
+        result = await self._session.execute(stmt, {"grupo": grupo})
+        return [{"id": row.materialid, "nombre": row.material} for row in result]

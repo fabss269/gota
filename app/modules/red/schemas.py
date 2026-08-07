@@ -1,4 +1,4 @@
-from pydantic import BaseModel
+from pydantic import BaseModel, model_validator
 
 
 class ElementoRedOut(BaseModel):
@@ -26,3 +26,24 @@ class ElementoRedOut(BaseModel):
     sectorNombre: str | None = None
     distritoId: int | None = None
     distritoNombre: str | None = None
+
+
+class ElementoRedPatchIn(BaseModel):
+    """Body de PATCH /red/elemento/{tipo}/{id} — edición inline (estilo Jira) de
+    diámetro/material de un tramo. Ambos opcionales, pero al menos uno requerido;
+    el service valida cuáles aplican según `tipo` (diametroPulgadas solo en
+    tuberia — sig.alcantarillado no tiene esa columna, ver memoria del proyecto)."""
+
+    diametroPulgadas: float | None = None
+    materialId: int | None = None
+
+    @model_validator(mode="after")
+    def _al_menos_uno(self) -> "ElementoRedPatchIn":
+        if self.diametroPulgadas is None and self.materialId is None:
+            raise ValueError("Debe enviar diametroPulgadas y/o materialId")
+        return self
+
+
+class MaterialOut(BaseModel):
+    id: int
+    nombre: str

@@ -25,3 +25,17 @@ async def get_sig_session() -> AsyncGenerator[AsyncSession, None]:
     async with SigSessionFactory() as session:
         await session.execute(text("SET SESSION CHARACTERISTICS AS TRANSACTION READ ONLY"))
         yield session
+
+
+async def get_sig_write_session() -> AsyncGenerator[AsyncSession, None]:
+    """Excepción explícita y acotada al READ ONLY de arriba — decisión de Edgar
+    2026-08-07: la edición inline de diámetro/material de tramos (agua/
+    alcantarillado) escribe directo sobre `sig.agua`/`sig.alcantarillado`, sabiendo
+    que un restore futuro de un backup de Fabiana pisa esos valores sin aviso (no
+    hay tabla de "correcciones" separada — se evaluó y se descartó). Usar
+    ÚNICAMENTE desde `app/modules/red/router.py` (el PATCH de edición) — cualquier
+    otro acceso de escritura a `sig` necesita la misma conversación explícita, no
+    asumir que esta sesión es de uso general."""
+    async with SigSessionFactory() as session:
+        yield session
+        await session.commit()
