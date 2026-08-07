@@ -9,8 +9,10 @@ import { SafeAreaView } from 'react-native-safe-area-context';
 import { DetailPanel } from '@/components/incident-detail/DetailPanel';
 import { CatastroFloatingPanel } from '@/components/map/CatastroFloatingPanel';
 import { ClusterListSheet } from '@/components/map/ClusterListSheet';
+import { ElementoInfoPanel } from '@/components/map/ElementoInfoPanel.web';
 import { FiltersSidebar } from '@/components/map/FiltersSidebar';
 import { LocationSearchBar } from '@/components/map/LocationSearchBar';
+import type { ElementoRedTipo } from '@/components/map/mapLayers';
 import { MapThemeVars } from '@/components/map/MapThemeVars.web';
 import { EpselMapView } from '@/components/map/MapView';
 import { MapModeSheet } from '@/components/map/MapModeSheet';
@@ -41,15 +43,24 @@ export default function MapaScreen() {
   const clusters = useMemo(() => clusterIncidents(incidencias), [incidencias]);
 
   const [selectedId, setSelectedId] = useState<string | null>(null);
+  const [elementoSeleccionado, setElementoSeleccionado] = useState<{ tipo: ElementoRedTipo; id: number } | null>(
+    null
+  );
   const [clusterSeleccionado, setClusterSeleccionado] = useState<IncidentCluster | null>(null);
   const modoVista = useSimulacionStore((s) => s.modoVista);
 
   const abrirDetalle = (id: string) => {
+    setElementoSeleccionado(null);
     if (isDesktop) {
       setSelectedId(id);
     } else {
       router.push({ pathname: '/incidencia/[id]', params: { id } });
     }
+  };
+
+  const handleElementClick = (tipo: ElementoRedTipo, id: number) => {
+    setSelectedId(null);
+    setElementoSeleccionado({ tipo, id });
   };
 
   const handleClusterPress = (cluster: IncidentCluster) => {
@@ -96,7 +107,11 @@ export default function MapaScreen() {
 
       {/* Columna central: mapa */}
       <div style={centerCol}>
-        <EpselMapView clusters={clusters} onPressCluster={handleClusterPress} />
+        <EpselMapView
+          clusters={clusters}
+          onPressCluster={handleClusterPress}
+          onElementClick={handleElementClick}
+        />
 
         {/* Buscador de dirección / suministro */}
         {!modoVista && <LocationSearchBar />}
@@ -116,9 +131,17 @@ export default function MapaScreen() {
         )}
       </div>
 
-      {/* Columna derecha: panel de detalle (visible al seleccionar un marcador) */}
+      {/* Columna derecha: panel de detalle de incidencia o de elemento de catastro —
+          mutuamente excluyentes (abrirDetalle/handleElementClick limpian el otro). */}
       {!modoVista && selectedId && (
         <DetailPanel incidenciaId={selectedId} onClose={() => setSelectedId(null)} />
+      )}
+      {!modoVista && elementoSeleccionado && (
+        <ElementoInfoPanel
+          tipo={elementoSeleccionado.tipo}
+          id={elementoSeleccionado.id}
+          onClose={() => setElementoSeleccionado(null)}
+        />
       )}
 
       <ClusterListSheet

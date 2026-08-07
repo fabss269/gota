@@ -71,6 +71,30 @@ export type ApiDistrito = { id: string; nombre: string; provinciaId: string; bbo
 export type ApiSector = { id: string; nombre: string; distritoId: string; bbox: ApiBbox };
 export type ApiSuministro = { lat: number; lon: number; sectorId: number | null; sectorNombre: string | null };
 
+// GET /red/elemento/{tipo}/{id} — panel de info al hacer click en un elemento de
+// catastro (ver API.md § 7). Campos no aplicables al `tipo` consultado vienen `null`.
+export type ApiElementoRedDetalle = {
+  tipo: string;
+  id: number;
+  codigo: string | null;
+  inscripcion: string | null;
+  tipoNombre: string | null;
+  material: string | null;
+  diametroPulgadas: number | null;
+  primaria: boolean | null;
+  profundidad: number | null;
+  cota: number | null;
+  cotaFondo: number | null;
+  referencia: string | null;
+  nombre: string | null;
+  area: number | null;
+  perimetro: number | null;
+  sectorId: number | null;
+  sectorNombre: string | null;
+  distritoId: number | null;
+  distritoNombre: string | null;
+};
+
 // Grafo hidráulico (impacto/foco por causa raíz/simulación) — ver API.md § 11.
 export type TipoFalla =
   | 'atoro_tramo'
