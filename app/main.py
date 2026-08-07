@@ -18,9 +18,9 @@ from app.modules.usuarios.router import router as usuarios_router
 
 @asynccontextmanager
 async def lifespan(app: FastAPI):
-    iniciar_scheduler()
+    #iniciar_scheduler()
     yield
-    detener_scheduler()
+    #detener_scheduler()
 
 
 app = FastAPI(title="GOTA backend", version="0.1.0", lifespan=lifespan)
