@@ -233,7 +233,7 @@ async def _seed_dim_estado(dm: asyncpg.Connection) -> dict[str, int]:
 async def _seed_dim_fecha(dm: asyncpg.Connection, min_d: date, max_d: date) -> None:
     # +30 días de colchón por adelante para cubrir fechas de solución posteriores
     # a la última fecha_registro observada, y CURRENT_DATE que usa vw_backlog_abierto.
-    hoy = date.today()
+    hoy = date.today()  # noqa: DTZ011
     max_d = max(max_d, hoy) + timedelta(days=30)
     rows: list[tuple[Any, ...]] = []
     d = min_d
@@ -742,9 +742,9 @@ async def _diagnosticar_duplicados(propia: asyncpg.Connection) -> None:
           f"repetido (top 10 tickets con más duplicados):")
     for d in dupes:
         print(f"      TICKET {d['ticket_original']}: {d['n']} filas")
-    print(f"    → El datamart se queda con la fila más vieja por ticket "
-          f"(desempate por creado_en). Para limpiar la BD operacional, borrar "
-          f"los duplicados manualmente por reclamo_id.")
+    print("    → El datamart se queda con la fila más vieja por ticket "
+          "(desempate por creado_en). Para limpiar la BD operacional, borrar "
+          "los duplicados manualmente por reclamo_id.")
 
 
 async def main() -> None:

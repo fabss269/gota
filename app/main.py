@@ -5,7 +5,6 @@ from fastapi.middleware.cors import CORSMiddleware
 
 from app.core.config import settings
 from app.core.exceptions import register_exception_handlers
-from app.core.scheduler import detener_scheduler, iniciar_scheduler
 from app.modules.auth.router import router as auth_router
 from app.modules.catalogos.router import router as catalogos_router
 from app.modules.dashboard.router import router as dashboard_router

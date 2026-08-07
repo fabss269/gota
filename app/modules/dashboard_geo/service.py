@@ -3,8 +3,10 @@
 Convierte los rows crudos del repository en schemas Pydantic y encapsula la
 lógica de "período" (anual / mensual) que compara ventana actual vs. previa.
 """
-from datetime import date, datetime, timedelta
+from datetime import datetime, timedelta
 from typing import Literal
+
+from sqlalchemy import text
 
 from app.core.exceptions import NoEncontradoError
 from app.modules.dashboard_geo.repository import DashboardGeoRepository
@@ -40,7 +42,6 @@ from app.modules.dashboard_geo.schemas import (
 # tengan siempre data adentro.
 
 async def _fecha_ancla_desde_mv(repo: DashboardGeoRepository) -> datetime:
-    from sqlalchemy import text
     res = (
         await repo._session.execute(
             text("SELECT COALESCE(MAX(creado_en), now()) AS ancla FROM gota.mv_incidente_enriquecido")
@@ -52,7 +53,6 @@ async def _fecha_ancla_desde_mv(repo: DashboardGeoRepository) -> datetime:
 async def _fecha_min_desde_mv(repo: DashboardGeoRepository) -> datetime | None:
     """Fecha del primer incidente en la MV — para saber si un período previo
     está totalmente antes de que existan datos."""
-    from sqlalchemy import text
     res = (
         await repo._session.execute(
             text("SELECT MIN(creado_en) AS min FROM gota.mv_incidente_enriquecido")
@@ -72,23 +72,27 @@ def _rangos_periodo(
     Si `anio` (y `mes` cuando mensual) están definidos, se usan; caso contrario
     se toma el año/mes de la fecha ancla (último con data).
     """
+    # Los timestamps `creado_en` en la BD son naive (timestamp without time zone),
+    # así que los rangos también se construyen naive.
     if periodo == "anual":
         y = anio or ancla.year
-        actual_desde = datetime(y, 1, 1)
-        actual_hasta = datetime(y + 1, 1, 1)
-        previo_desde = datetime(y - 1, 1, 1)
-        previo_hasta = datetime(y, 1, 1)
+        actual_desde = datetime(y, 1, 1)          # noqa: DTZ001
+        actual_hasta = datetime(y + 1, 1, 1)      # noqa: DTZ001
+        previo_desde = datetime(y - 1, 1, 1)      # noqa: DTZ001
+        previo_hasta = datetime(y, 1, 1)          # noqa: DTZ001
     else:  # mensual
         y = anio or ancla.year
         m = mes or ancla.month
-        actual_desde = datetime(y, m, 1)
-        actual_hasta = datetime(y + 1, 1, 1) if m == 12 else datetime(y, m + 1, 1)
+        actual_desde = datetime(y, m, 1)          # noqa: DTZ001
+        actual_hasta = (                          # noqa: DTZ001
+            datetime(y + 1, 1, 1) if m == 12 else datetime(y, m + 1, 1)   # noqa: DTZ001
+        )
         if m == 1:
-            previo_desde = datetime(y - 1, 12, 1)
-            previo_hasta = datetime(y, 1, 1)
+            previo_desde = datetime(y - 1, 12, 1)  # noqa: DTZ001
+            previo_hasta = datetime(y, 1, 1)       # noqa: DTZ001
         else:
-            previo_desde = datetime(y, m - 1, 1)
-            previo_hasta = datetime(y, m, 1)
+            previo_desde = datetime(y, m - 1, 1)   # noqa: DTZ001
+            previo_hasta = datetime(y, m, 1)       # noqa: DTZ001
     return actual_desde, actual_hasta, previo_desde, previo_hasta
 
 
@@ -340,7 +344,7 @@ class DashboardGeoService:
         pred: list[SeriePuntoOut] = []
         # Un mes en segundos (aprox 30.4 días)
         seg_mes = 30.4 * 86400
-        base_dt = datetime.fromtimestamp(ult)
+        base_dt = datetime.fromtimestamp(ult)  # noqa: DTZ006
         for i in (1, 2):
             t_i = ult + i * seg_mes
             y_i = max(0, m * t_i + b)
@@ -450,8 +454,7 @@ class DashboardGeoService:
         rows = await self._repo.regresion_sectores(lookback)
         result = []
         for r in rows:
-            pend = float(r["pendiente"] or 0)
-            # Umbral de 1% mensual para considerar "estable"
+            # Umbral de 5% mensual para considerar "estable"
             cambio_pct = float(r["cambio_pct_mensual"] or 0)
             if cambio_pct > 5:
                 tend = "creciente"
