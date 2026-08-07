@@ -139,14 +139,16 @@
         "symbol-placement": "line",
         "symbol-spacing": 220,
         "text-field": ["concat", ["to-string", ["round", ["to-number", ["get", "diametro"]]]], "\""],
-        "text-font": ["Noto Sans Regular"],
-        "text-size": 11,
+        "text-font": ["Noto Sans Bold"],
+        "text-size": 12,
+        "text-anchor": "bottom",
+        "text-offset": [0, -0.7],
         "text-allow-overlap": false
       },
       "paint": {
-        "text-color": "#01579B",
+        "text-color": "#000000",
         "text-halo-color": "#FFFFFF",
-        "text-halo-width": 1.4
+        "text-halo-width": 1.6
       }
     },
     {
