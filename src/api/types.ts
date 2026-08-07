@@ -95,6 +95,9 @@ export type ApiElementoRedDetalle = {
   distritoNombre: string | null;
 };
 
+// GET /red/materiales/{tipo} — catálogo para el selector de edición inline.
+export type ApiMaterial = { id: number; nombre: string };
+
 // Grafo hidráulico (impacto/foco por causa raíz/simulación) — ver API.md § 11.
 export type TipoFalla =
   | 'atoro_tramo'

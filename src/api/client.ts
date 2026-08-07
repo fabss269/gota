@@ -69,5 +69,9 @@ export async function apiFetch<T>(path: string, init: RequestInit = {}, _retried
     throw new ApiError(response.status, body?.error?.code ?? 'ERROR', body?.error?.message ?? 'Error de red');
   }
 
+  // 204 No Content (ej. PATCH /red/elemento) no tiene body — .json() sobre una
+  // respuesta vacía tira SyntaxError.
+  if (response.status === 204) return undefined as T;
+
   return response.json();
 }
