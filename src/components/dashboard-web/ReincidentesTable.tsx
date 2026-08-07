@@ -2,7 +2,7 @@ import { View } from 'react-native';
 
 import { useReincidentes, useReincidentesRobo } from '@/hooks/useDashboardGeo';
 import { useDashboardFilters } from '@/state/dashboardFilters';
-import { Colors, Spacing } from '@/constants/theme';
+import { Spacing } from '@/constants/theme';
 
 import { DataTable } from './DataTable';
 import { OptionSlider } from './Slider';

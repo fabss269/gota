@@ -12,8 +12,6 @@ ensureChartRegistered();
 export function MonthlyLineChart() {
   const { data, isLoading } = useSerieMensual();
 
-  // Etiquetas del eje X: meses del año actual (2026)
-  const meses2026 = (data?.actual ?? []).map((p) => p.x.slice(5)); // "MM"
   const chartLabels = [
     'Ene', 'Feb', 'Mar', 'Abr', 'May', 'Jun',
     'Jul', 'Ago', 'Sep', 'Oct', 'Nov', 'Dic',
