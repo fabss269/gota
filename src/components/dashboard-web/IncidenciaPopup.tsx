@@ -16,7 +16,7 @@ function formatearFecha(iso: string): string {
 
 function formatearFechaCorta(iso: string): string {
   const d = new Date(iso);
-  return d.toLocaleDateString('es-PE', { day: '2-digit', month: 'short' });
+  return d.toLocaleDateString('es-PE', { day: '2-digit', month: 'short', year: '2-digit' });
 }
 
 export function IncidenciaPopup({ codigo, onClose }: Props) {
