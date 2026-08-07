@@ -27,7 +27,13 @@ const BASEMAP_STYLE: maplibregl.StyleSpecification = {
   glyphs: 'https://demotiles.maplibre.org/font/{fontstack}/{range}.pbf',
 };
 
-const MARTIN_URL = process.env.EXPO_PUBLIC_MARTIN_URL ?? 'http://localhost:3000';
+// Fallback real (túnel), no localhost — bug encontrado 2026-08-07: un fallback a
+// 'localhost:3000' solo resuelve para quien navega desde la MISMA máquina que
+// corre Martin, así que cualquier otra PC veía "Failed to fetch" al entrar al
+// dashboard (EXPO_PUBLIC_MARTIN_URL nunca estaba seteada). Mismo criterio que
+// EXPO_PUBLIC_API_BASE_URL en api/client.ts, que ya usa un dominio real como
+// default, no localhost.
+const MARTIN_URL = process.env.EXPO_PUBLIC_MARTIN_URL ?? 'https://tiles-gota.kasqan.com';
 const DEFAULT_CENTER: [number, number] = [-79.8409, -6.7714];
 
 // Umbral de zoom para cambiar entre heatmap agregado y pines individuales.
