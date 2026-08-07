@@ -35,9 +35,7 @@ Esta función abre una única conexión a `sig`, hace hasta 2 queries y la cierr
 levantarlo de nuevo después (`docker start gota-martin`).
 """
 
-import re
 import secrets
-import unicodedata
 
 import asyncpg
 import pandas as pd
@@ -58,12 +56,6 @@ MEDIO_RECEPCION_MAP = {
     "formulario web": "formulario-web",
     "redes sociales": "redes-sociales",
 }
-MEDIO_RECEPCION_NOMBRES = {
-    "correo-electronico": "Correo electrónico",
-    "formulario-web": "Formulario web",
-    "redes-sociales": "Redes sociales",
-}
-
 # PARENTESCO (dataset, tal como viene) -> catalogo_parentesco.codigo
 PARENTESCO_MAP = {
     "TITULAR": "titular",
@@ -71,14 +63,6 @@ PARENTESCO_MAP = {
     "EXTRAÑO": "extrano",
     "INQUILINO": "inquilino",
 }
-PARENTESCO_NOMBRES = {"extrano": "Extraño", "inquilino": "Inquilino"}
-
-
-def slugify(value: str, maxlen: int = 50) -> str:
-    normalized = unicodedata.normalize("NFKD", value).encode("ascii", "ignore").decode("ascii")
-    slug = re.sub(r"[^a-z0-9]+", "-", normalized.lower()).strip("-")
-    slug = re.sub(r"-{2,}", "-", slug)
-    return slug[:maxlen].rstrip("-")
 
 
 def username_from_raw(raw: str) -> str:
@@ -145,7 +129,7 @@ async def cargar_dataframe(df: pd.DataFrame) -> None:
             for r in await propia.fetch("SELECT codigo, estado_id FROM catalogo_estado")
         }
         motivo_resuelto_id = await propia.fetchval(
-            "SELECT motivo_id FROM catalogo_motivo WHERE codigo = 'SE_RESOLVIO'"
+            "SELECT motivo_id FROM catalogo_motivo WHERE nombre = 'Se resolvió'"
         )
         usuario_ids = await _ensure_usuarios(propia, pendientes)
 
@@ -238,6 +222,9 @@ async def cargar_sin_suministro(df_sin: pd.DataFrame) -> None:
                 fecha_solucion,
                 usuario_soluciona_id,
                 usuario_ids[row.USUARIO_REGISTRA],
+                _str_or_none(row.SUMINISTRO),
+                _str_or_none(row.DIRECCION),
+                _str_or_none(row.direccion_detalle),
             ))
 
         async with propia.transaction():
@@ -248,8 +235,10 @@ async def cargar_sin_suministro(df_sin: pd.DataFrame) -> None:
                      correo, parentesco_id, distrito, tipo_atencion_id, alcance_id,
                      medio_recepcion_id, detalle_del_ticket, problema, tecnico_nombre,
                      es_robo, detalle_solucion, fecha_solucion, usuario_soluciona_id,
-                     usuario_registra_id)
-                VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,$15,$16,$17,$18,$19,$20)
+                     usuario_registra_id,
+                     suministro, direccion, direccion_detalle)
+                VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,$15,$16,$17,$18,$19,$20,
+                        $21,$22,$23)
                 """,
                 rows,
             )
@@ -324,12 +313,13 @@ async def _buscar_incidente_dedup(
 async def _ensure_tipo_atencion(
     conn: asyncpg.Connection, df: pd.DataFrame, tipo_grupo_ids: dict[str, int]
 ) -> dict[tuple[str, str], int]:
-    pares = (
+    pares = list(
         df[["TIPO_GRUPO", "TIPO_DE_ATENCION"]]
         .drop_duplicates()
         .itertuples(index=False, name=None)
     )
     result: dict[tuple[str, str], int] = {}
+    faltantes: list[tuple[str, str]] = []
     for tipo_grupo, tipo_atencion in pares:
         grupo_codigo = tipo_grupo.lower()
         existente = await conn.fetchrow(
@@ -340,16 +330,13 @@ async def _ensure_tipo_atencion(
         )
         if existente:
             result[(tipo_grupo, tipo_atencion)] = existente["tipo_atencion_id"]
-            continue
-        codigo = f"hist-{slugify(tipo_atencion, 44)}"
-        tipo_atencion_id = await conn.fetchval(
-            "INSERT INTO catalogo_tipo_atencion (codigo, nombre, tipo_grupo_id) "
-            "VALUES ($1, $2, $3) RETURNING tipo_atencion_id",
-            codigo,
-            tipo_atencion,
-            tipo_grupo_ids[grupo_codigo],
+        else:
+            faltantes.append((tipo_grupo, tipo_atencion))
+    if faltantes:
+        raise RuntimeError(
+            f"catalogo_tipo_atencion no tiene estos (TIPO_GRUPO, TIPO_DE_ATENCION): {faltantes}. "
+            "Insértalos manualmente antes de correr el ETL."
         )
-        result[(tipo_grupo, tipo_atencion)] = tipo_atencion_id
     print(f"catalogo_tipo_atencion: {len(result)} categorías mapeadas")
     return result
 
@@ -359,17 +346,12 @@ async def _ensure_medio_recepcion(conn: asyncpg.Connection) -> dict[str, int]:
         r["codigo"]: r["medio_recepcion_id"]
         for r in await conn.fetch("SELECT codigo, medio_recepcion_id FROM catalogo_medio_recepcion")
     }
-    for codigo in MEDIO_RECEPCION_MAP.values():
-        if codigo in existentes:
-            continue
-        nombre = MEDIO_RECEPCION_NOMBRES[codigo]
-        medio_id = await conn.fetchval(
-            "INSERT INTO catalogo_medio_recepcion (codigo, nombre) VALUES ($1, $2) "
-            "RETURNING medio_recepcion_id",
-            codigo,
-            nombre,
+    faltantes = set(MEDIO_RECEPCION_MAP.values()) - set(existentes.keys())
+    if faltantes:
+        raise RuntimeError(
+            f"catalogo_medio_recepcion no tiene los códigos requeridos: {sorted(faltantes)}. "
+            "Insértalos manualmente antes de correr el ETL."
         )
-        existentes[codigo] = medio_id
     return existentes
 
 
@@ -378,16 +360,12 @@ async def _ensure_parentesco(conn: asyncpg.Connection) -> dict[str, int]:
         r["codigo"]: r["parentesco_id"]
         for r in await conn.fetch("SELECT codigo, parentesco_id FROM catalogo_parentesco")
     }
-    for codigo in ("extrano", "inquilino"):
-        if codigo in existentes:
-            continue
-        parentesco_id = await conn.fetchval(
-            "INSERT INTO catalogo_parentesco (codigo, nombre) VALUES ($1, $2) "
-            "RETURNING parentesco_id",
-            codigo,
-            PARENTESCO_NOMBRES[codigo],
+    faltantes = set(PARENTESCO_MAP.values()) - set(existentes.keys())
+    if faltantes:
+        raise RuntimeError(
+            f"catalogo_parentesco no tiene los códigos requeridos: {sorted(faltantes)}. "
+            "Insértalos manualmente antes de correr el ETL."
         )
-        existentes[codigo] = parentesco_id
     return existentes
 
 

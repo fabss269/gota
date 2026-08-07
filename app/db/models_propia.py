@@ -96,7 +96,6 @@ class Area(Base):
     __tablename__ = "area"
 
     area_id: Mapped[int] = mapped_column(primary_key=True)
-    codigo: Mapped[str] = mapped_column(unique=True)
     nombre: Mapped[str]
     color_hex: Mapped[str | None]
     activo: Mapped[bool] = mapped_column(server_default=text("true"))

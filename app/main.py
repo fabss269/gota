@@ -7,10 +7,10 @@ from fastapi.responses import FileResponse
 
 from app.core.config import settings
 from app.core.exceptions import register_exception_handlers
-from app.core.scheduler import detener_scheduler, iniciar_scheduler
 from app.modules.auth.router import router as auth_router
 from app.modules.catalogos.router import router as catalogos_router
 from app.modules.dashboard.router import router as dashboard_router
+from app.modules.dashboard_geo.router import router as dashboard_geo_router
 from app.modules.grafo.router import router as grafo_router
 from app.modules.incidencias.ingest_router import router as ingest_router
 from app.modules.incidencias.router import router as incidencias_router
@@ -20,9 +20,9 @@ from app.modules.usuarios.router import router as usuarios_router
 
 @asynccontextmanager
 async def lifespan(app: FastAPI):
-    iniciar_scheduler()
+    #iniciar_scheduler()
     yield
-    detener_scheduler()
+    #detener_scheduler()
 
 
 app = FastAPI(title="GOTA backend", version="0.1.0", lifespan=lifespan)
@@ -49,6 +49,7 @@ app.include_router(ingest_router)
 app.include_router(usuarios_router)
 app.include_router(red_router)
 app.include_router(dashboard_router)
+app.include_router(dashboard_geo_router)
 app.include_router(grafo_router)
 
 
