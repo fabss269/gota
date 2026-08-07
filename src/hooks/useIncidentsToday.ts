@@ -41,6 +41,7 @@ export function useIncidentsToday() {
   const tipoAtencion = useFiltersStore((s) => s.tipoAtencion);
   const estado = useFiltersStore((s) => s.estado);
   const rangoFechas = useFiltersStore((s) => s.rangoFechas);
+  const soloNoResueltas = useFiltersStore((s) => s.soloNoResueltas);
   const distritosActivos = useUbicacionStore((s) => s.distritosActivos);
   const sectoresActivos = useUbicacionStore((s) => s.sectoresActivos);
 
@@ -52,6 +53,7 @@ export function useIncidentsToday() {
       tipoAtencion,
       estado,
       rangoFechas,
+      soloNoResueltas,
       [...distritosActivos],
       [...sectoresActivos],
     ],
@@ -64,6 +66,7 @@ export function useIncidentsToday() {
       });
       if (tipoAtencion) params.set('tipoAtencionId', tipoAtencion);
       if (estado) params.set('estado', estado);
+      if (soloNoResueltas) params.set('resuelto', 'false');
       // Sector manda sobre distrito si hay ambos (más específico) — mismo criterio
       // que ya usa MapView.web.tsx para centrar la cámara. distritoId es un solo
       // valor en el backend (IncidenciaService.listar lo pasa directo a

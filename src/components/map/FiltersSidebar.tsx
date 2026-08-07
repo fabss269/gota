@@ -29,8 +29,17 @@ const ESTADO_OPTIONS: { value: EstadoIncidencia | ''; label: string }[] = [
  * ver CatastroFloatingPanel.
  */
 export function FiltersSidebar() {
-  const { tipoAtencion, setTipoAtencion, estado, setEstado, prioridades, setPrioridades, reset } =
-    useFiltersStore();
+  const {
+    tipoAtencion,
+    setTipoAtencion,
+    estado,
+    setEstado,
+    prioridades,
+    setPrioridades,
+    soloNoResueltas,
+    setSoloNoResueltas,
+    reset,
+  } = useFiltersStore();
   const { capasVisibles, aplicarCapas } = useCapasStore();
   const {
     provincias,
@@ -83,6 +92,12 @@ export function FiltersSidebar() {
           <ThemeToggleButton />
         </div>
       </div>
+
+      <CapaRow
+        label="Solo no resueltas"
+        value={soloNoResueltas}
+        onChange={() => setSoloNoResueltas(!soloNoResueltas)}
+      />
 
       <FilterField label="Tipo de incidencia">
         <Dropdown
