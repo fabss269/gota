@@ -33,7 +33,6 @@ from app.modules.dashboard_geo.schemas import (
     TramoRankOut,
 )
 
-
 # ============ Helpers de período ============
 #
 # Toda la data histórica llega hasta 2026-08-04 (aprox). No usamos now() como
@@ -84,7 +83,7 @@ def _rangos_periodo(
         y = anio or ancla.year
         m = mes or ancla.month
         actual_desde = datetime(y, m, 1)          # noqa: DTZ001
-        actual_hasta = (                          # noqa: DTZ001
+        actual_hasta = (
             datetime(y + 1, 1, 1) if m == 12 else datetime(y, m + 1, 1)   # noqa: DTZ001
         )
         if m == 1:
