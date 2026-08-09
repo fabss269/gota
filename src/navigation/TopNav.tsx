@@ -34,7 +34,7 @@ export function TopNav() {
   return (
     <View style={styles.bar}>
       <Image
-        source={require('@/assets/images/epsel-logo.png')}
+        source={require('@/assets/images/epsel/epsel-logo.png')}
         style={styles.brandLogo}
         resizeMode="contain"
         accessibilityLabel="EPSEL"

@@ -16,6 +16,17 @@ export const MOCK_USERS: { correo: string; password: string; usuario: StoredUser
       avatarUrl: null,
     },
   },
+  {
+    correo: 'supervisor@epsel.gob.pe',
+    password: 'epsel2026',
+    usuario: {
+      id: 'u_002',
+      nombre: 'María Vásquez Torres',
+      rol: 'Supervisor · Operaciones',
+      sector: 'Sector 5',
+      avatarUrl: null,
+    },
+  },
 ];
 
 function randomToken(): string {
