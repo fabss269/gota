@@ -44,9 +44,21 @@ services:
     image: ghcr.io/maplibre/martin:latest
     container_name: gota-martin
     restart: unless-stopped
-    command: ["--config", "/config/martin-config.yaml", "--listen-addresses", "0.0.0.0:3000"]
+    # --cache-expiry: sin esto el cache de tiles de Martin no tiene invalidación
+    # ligada a cambios de datos (confirmado en vivo 2026-08-07 con curl: mismo
+    # etag/bytes antes y después de un UPDATE en sig.agua) — un edit de
+    # diámetro/material vía PATCH /red/elemento/... no se refleja en el mapa
+    # hasta que el tile expira. No existe como key del YAML (solo CLI flag).
+    command: ["--config", "/config/martin-config.yaml", "--listen-addresses", "0.0.0.0:3000", "--cache-expiry", "60s"]
     volumes:
       - ./martin-config.yaml:/config/martin-config.yaml:ro
+    # host.docker.internal no se resuelve por defecto en Docker Engine (Linux) —
+    # solo en Docker Desktop. Sin esto Martin no puede conectar a Postgres si la
+    # connection_string apunta a host.docker.internal (confirmado en vivo
+    # 2026-08-07: "failed to lookup address information: Name or service not
+    # known").
+    extra_hosts:
+      - "host.docker.internal:host-gateway"
     networks: [gota]
 
 networks:

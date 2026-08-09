@@ -1,4 +1,13 @@
 cache_size_mb: 2048
+# El TTL (cache_expiry/cache_idle_timeout) NO existe como key de este YAML en
+# Martin 1.12 — confirmado en vivo con `martin --save-config -`: "Ignoring
+# unrecognized configuration key 'cache_expiry'". Solo existe como flag de CLI
+# (--cache-expiry), hay que pasarlo en el comando del contenedor (ver
+# docker-compose.yml, servicio `martin`, y deploy/DESPLIEGUE_LOCAL_TUNEL.md).
+# Sin esto, un edit de diámetro/material vía PATCH /red/elemento/... cambia la
+# BD pero el tile servido queda con el valor viejo indefinidamente (confirmado
+# con curl: mismo etag/bytes antes y después del UPDATE) hasta que el
+# contenedor se reinicie.
 
 postgres:
   connection_string: '${SIG_DATABASE_URL}'

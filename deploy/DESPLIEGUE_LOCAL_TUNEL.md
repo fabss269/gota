@@ -138,6 +138,42 @@ archivo). Si se edita el `.template.yaml`, hay que reflejar el cambio a mano en
 docker restart gota-martin
 ```
 
+Si el contenedor no existe (primera vez, o hubo que recrearlo), el comando
+completo es:
+
+```bash
+docker run -d --name gota-martin \
+  -p 3000:3000 \
+  -v /home/ivaned/gota-backend/deploy/martin-config.yaml:/config.yaml:ro \
+  --add-host=host.docker.internal:host-gateway \
+  --restart unless-stopped \
+  ghcr.io/maplibre/martin:latest \
+  --config /config.yaml --listen-addresses 0.0.0.0:3000 --cache-expiry 60s
+```
+
+Dos flags NO son opcionales, aunque no estén en `martin-config.yaml`:
+
+- `--add-host=host.docker.internal:host-gateway`: Docker Engine en Linux (a
+  diferencia de Docker Desktop) no resuelve `host.docker.internal` por
+  defecto. Sin esto Martin no conecta a Postgres (error confirmado en vivo
+  2026-08-07: `failed to lookup address information: Name or service not
+  known`).
+- `--cache-expiry 60s`: Martin cachea tiles en memoria SIN invalidación ligada
+  a cambios de datos. Confirmado en vivo con curl (mismo `etag`/bytes antes y
+  después de un `UPDATE sig.agua SET diametro=...`): un edit de
+  diámetro/material vía `PATCH /red/elemento/{tipo}/{id}` cambia la BD
+  correctamente pero la etiqueta/grosor en el mapa no se actualiza hasta que
+  el tile expira o el contenedor reinicia. `cache_expiry`/`cache_idle_timeout`
+  NO son keys válidas del YAML (confirmado con
+  `docker exec gota-martin martin --config /config.yaml --save-config -`, que
+  loguea `"Ignoring unrecognized configuration key 'cache_expiry'"`) — solo
+  existen como flags de CLI, van en el comando del contenedor.
+
+El `docker-compose.yml` de este mismo directorio ya trae ambos flags para el
+servicio `martin` (deploy remoto vía compose), pero el setup local actual usa
+un contenedor `docker run` suelto, no compose — de ahí que este runbook
+documente el comando explícito.
+
 `gota-redis` (Docker) también debe estar arriba — caché externa de
 sector/prioridad/estado (`specs/00-arquitectura.md` §7).
 
