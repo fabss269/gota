@@ -10,6 +10,8 @@ import {
   CAPA_KEY_POR_LAYER_ID,
   CAPA_LAYER_IDS,
   CATASTRO_SECTOR_FILTER_LAYERS,
+  ELEMENTO_INFO_LAYERS,
+  HOVER_INTERACTIVE_LAYERS,
   SECTOR_COLOR_LAYER_IDS,
   SECTOR_LAYER_IDS,
   SIMULACION_AFECTADO_COLOR,
@@ -18,7 +20,9 @@ import {
   SIMULACION_OCULTAR_EN_VISTA,
   colorForSectorId,
   unionBbox,
+  type ElementoRedTipo,
 } from '@/components/map/mapLayers';
+import { SimulacionBorderOverlay } from '@/components/map/SimulacionBorderOverlay.web';
 import { SimulacionControl } from '@/components/map/SimulacionControl.web';
 import { type CapaKey, useCapasStore } from '@/state/capasStore';
 import { useMapSearchStore } from '@/state/mapSearchStore';
@@ -87,9 +91,16 @@ const DEFAULT_CENTER: [number, number] = [-79.8409, -6.7714];
 // Mismo estilo demo público que la versión nativa (ver MapView.tsx).
 const MAP_STYLE_URL = process.env.EXPO_PUBLIC_MAP_STYLE_URL ?? 'https://demotiles.maplibre.org/style.json';
 
+// Cursor de "esto va a fallar" durante la fase de elegir elemento en modo simulación
+// (sim.activo && !sim.modoVista) — SVG armado a mano (no un emoji), círculo rojo con
+// una X blanca, mismo rojo que SIMULACION_AFECTADO_COLOR.
+const CURSOR_FALLA_SVG = `<svg xmlns='http://www.w3.org/2000/svg' width='28' height='28'><circle cx='14' cy='14' r='12' fill='${SIMULACION_AFECTADO_COLOR}' stroke='white' stroke-width='2'/><path d='M9 9L19 19M19 9L9 19' stroke='white' stroke-width='2.5' stroke-linecap='round'/></svg>`;
+const CURSOR_FALLA = `url("data:image/svg+xml,${encodeURIComponent(CURSOR_FALLA_SVG)}") 14 14, not-allowed`;
+
 type Props = {
   clusters: IncidentCluster[];
   onPressCluster: (cluster: IncidentCluster) => void;
+  onElementClick?: (tipo: ElementoRedTipo, id: number) => void;
 };
 
 type MarkerEntry = {
@@ -106,10 +117,15 @@ function unmountRootSafely(root: Root) {
   queueMicrotask(() => root.unmount());
 }
 
-export function EpselMapView({ clusters, onPressCluster }: Props) {
+export function EpselMapView({ clusters, onPressCluster, onElementClick }: Props) {
   const containerRef = useRef<HTMLDivElement | null>(null);
   const mapRef = useRef<maplibregl.Map | null>(null);
   const markersRef = useRef<Map<string, MarkerEntry>>(new Map());
+  const onElementClickRef = useRef(onElementClick);
+
+  useEffect(() => {
+    onElementClickRef.current = onElementClick;
+  }, [onElementClick]);
   const onPressClusterRef = useRef(onPressCluster);
 
   useEffect(() => {
@@ -445,6 +461,118 @@ export function EpselMapView({ clusters, onPressCluster }: Props) {
     };
   }, []);
 
+  // Hover: resalta (feature-state 'hover', ver paint de cada layer en map-style.json)
+  // cualquier elemento de catastro visible bajo el cursor — tramo, tubería, buzón,
+  // accesorio, caja, manzana o lote. Universo de layers = HOVER_INTERACTIVE_LAYERS
+  // (mismo criterio "capa realmente prendida" que el resto de efectos de este
+  // archivo). El cursor de "pointer" se cede durante la fase de elegir elemento en
+  // modo simulación: ese cursor lo maneja el efecto de más abajo (CURSOR_FALLA).
+  const hoveredFeatureRef = useRef<{ source: string; sourceLayer: string; id: string | number } | null>(null);
+
+  useEffect(() => {
+    const map = mapRef.current;
+    if (!map) return;
+
+    const clearHover = () => {
+      const prev = hoveredFeatureRef.current;
+      if (prev) {
+        map.setFeatureState({ source: prev.source, sourceLayer: prev.sourceLayer, id: prev.id }, { hover: false });
+        hoveredFeatureRef.current = null;
+      }
+    };
+
+    const handleMouseMove = (event: maplibregl.MapMouseEvent) => {
+      const capas = useCapasStore.getState().capasVisibles;
+      const layersPresentes = HOVER_INTERACTIVE_LAYERS.filter((id) => {
+        if (!map.getLayer(id)) return false;
+        const capaKey = CAPA_KEY_POR_LAYER_ID[id];
+        return capaKey ? capas.has(capaKey) : true;
+      });
+
+      const feature =
+        layersPresentes.length > 0
+          ? map.queryRenderedFeatures(event.point, { layers: layersPresentes })[0]
+          : undefined;
+
+      if (!feature || feature.id === undefined || feature.sourceLayer === undefined) {
+        clearHover();
+      } else {
+        const prev = hoveredFeatureRef.current;
+        const same =
+          prev && prev.source === feature.source && prev.sourceLayer === feature.sourceLayer && prev.id === feature.id;
+        if (!same) {
+          clearHover();
+          map.setFeatureState(
+            { source: feature.source, sourceLayer: feature.sourceLayer, id: feature.id },
+            { hover: true }
+          );
+          hoveredFeatureRef.current = { source: feature.source, sourceLayer: feature.sourceLayer, id: feature.id };
+        }
+      }
+
+      const sim = useSimulacionStore.getState();
+      if (!(sim.activo && !sim.modoVista)) {
+        map.getCanvas().style.cursor = feature ? 'pointer' : '';
+      }
+    };
+
+    map.on('mousemove', handleMouseMove);
+    map.on('mouseout', clearHover);
+    return () => {
+      map.off('mousemove', handleMouseMove);
+      map.off('mouseout', clearHover);
+      clearHover();
+    };
+  }, [capasVisibles]);
+
+  // Click fuera de modo simulación: abre el panel de info de catastro
+  // (GET /red/elemento/{tipo}/{id}, ver mapa/index.web.tsx). Handler separado del de
+  // simulación de arriba — ese es exclusivo de `sim.activo && !sim.modoVista`, este
+  // solo corre cuando la simulación está inactiva, nunca compiten por el mismo click.
+  useEffect(() => {
+    const map = mapRef.current;
+    if (!map || !onElementClickRef) return;
+
+    const handleClick = (event: maplibregl.MapMouseEvent) => {
+      if (useSimulacionStore.getState().activo) return;
+      if (!onElementClickRef.current) return;
+
+      const capas = useCapasStore.getState().capasVisibles;
+      const layersPresentes = ELEMENTO_INFO_LAYERS.filter(({ id }) => {
+        if (!map.getLayer(id)) return false;
+        const capaKey = CAPA_KEY_POR_LAYER_ID[id];
+        return capaKey ? capas.has(capaKey) : true;
+      }).map((l) => l.id);
+      if (layersPresentes.length === 0) return;
+
+      const feature = map.queryRenderedFeatures(event.point, { layers: layersPresentes })[0];
+      if (!feature) return;
+
+      const config = ELEMENTO_INFO_LAYERS.find((l) => l.id === feature.layer.id);
+      const idValor = config ? feature.properties?.[config.idProperty] : undefined;
+      if (!config || typeof idValor !== 'number') return;
+
+      onElementClickRef.current(config.tipo, idValor);
+    };
+
+    map.on('click', handleClick);
+    return () => {
+      map.off('click', handleClick);
+    };
+  }, []);
+
+  // Cursor "esto va a fallar" (X roja, ver CURSOR_FALLA) mientras se elige el
+  // elemento a romper en modo simulación — se actualiza solo al cambiar de fase (no
+  // por mousemove), el hover de arriba respeta esta fase y no pisa el cursor.
+  const simActivo = useSimulacionStore((state) => state.activo);
+  const simModoVista = useSimulacionStore((state) => state.modoVista);
+
+  useEffect(() => {
+    const map = mapRef.current;
+    if (!map) return;
+    map.getCanvas().style.cursor = simActivo && !simModoVista ? CURSOR_FALLA : '';
+  }, [simActivo, simModoVista]);
+
   // Modo vista: aísla y pinta de rojo TODA la red afectada devuelta por el backend
   // (redAfectada, agrupada por elementoTipo) más las cajas de los suministros
   // afectados (por inscripcion) — mismo idioma que applyCatastroSectorFilter/
@@ -541,6 +669,7 @@ export function EpselMapView({ clusters, onPressCluster }: Props) {
   return (
     <div style={{ position: 'absolute', inset: 0 }}>
       <div ref={containerRef} style={{ position: 'absolute', inset: 0 }} />
+      <SimulacionBorderOverlay />
       <SimulacionControl />
     </div>
   );

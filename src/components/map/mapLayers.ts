@@ -11,7 +11,7 @@ export type MapExpression = unknown[];
 export const CAPA_LAYER_IDS: Record<CapaKey, string[]> = {
   manzanas: ['manzanas-fill', 'manzanas-outline'],
   lotes: ['lotes-fill', 'lotes-outline'],
-  red_potable: ['agua-red'],
+  red_potable: ['agua-red', 'agua-red-diametro-label'],
   conexion_agua: ['cajaaguaconexion-line'],
   caja_agua: ['cajaagua-circle'],
   accesorios: ['accesorios-circle'],
@@ -54,6 +54,42 @@ export const CATASTRO_SECTOR_FILTER_LAYERS: { id: string; baseFilter?: MapExpres
   { id: 'cajadesagueconexion-line' },
   { id: 'cajadesague-circle' },
   { id: 'buzones-circle' },
+];
+
+// Capas con paint sensible a feature-state 'hover' en map-style.json (case sobre
+// ["feature-state","hover"]) y `promoteId` configurado en su source — subconjunto de
+// CATASTRO_SECTOR_FILTER_LAYERS que excluye alcantarillado-flujo-flecha (flecha
+// decorativa, sin promoteId ni paint de hover, no es "un elemento" clickeable).
+export const HOVER_INTERACTIVE_LAYERS: string[] = CATASTRO_SECTOR_FILTER_LAYERS.map((l) => l.id).filter(
+  (id) => id !== 'alcantarillado-flujo-flecha'
+);
+
+// Mismo vocabulario que `ELEMENTO_TIPOS_VALIDOS` en gota-backend
+// (app/modules/red/service.py) — identifica de qué tabla de `sig` viene el elemento.
+export type ElementoRedTipo =
+  | 'tuberia'
+  | 'tramo'
+  | 'buzon'
+  | 'accesorio'
+  | 'cajaagua'
+  | 'cajadesague'
+  | 'manzana'
+  | 'lote';
+
+// Capas clickeables (fuera de modo simulación) para abrir el panel de info de
+// GET /red/elemento/{tipo}/{id} — la property de la que se lee el id es la misma que
+// usa `promoteId` en map-style.json para cada source, así que feature-state y el id
+// enviado al backend siempre coinciden.
+export const ELEMENTO_INFO_LAYERS: { id: string; tipo: ElementoRedTipo; idProperty: string }[] = [
+  { id: 'agua-red', tipo: 'tuberia', idProperty: 'aguaid' },
+  { id: 'alcantarillado-primaria', tipo: 'tramo', idProperty: 'alcantarilladoid' },
+  { id: 'alcantarillado-secundaria', tipo: 'tramo', idProperty: 'alcantarilladoid' },
+  { id: 'buzones-circle', tipo: 'buzon', idProperty: 'buzonid' },
+  { id: 'accesorios-circle', tipo: 'accesorio', idProperty: 'accesorioid' },
+  { id: 'cajaagua-circle', tipo: 'cajaagua', idProperty: 'cajaaguaid' },
+  { id: 'cajadesague-circle', tipo: 'cajadesague', idProperty: 'cajadesagueid' },
+  { id: 'manzanas-fill', tipo: 'manzana', idProperty: 'manzanaid' },
+  { id: 'lotes-fill', tipo: 'lote', idProperty: 'loteid' },
 ];
 
 // Tres capas por el mismo source "sectores" (ver map-style.json): relleno traslúcido,

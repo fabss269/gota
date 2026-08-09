@@ -109,6 +109,9 @@ function buildEffectiveStyle(
 type Props = {
   clusters: IncidentCluster[];
   onPressCluster: (cluster: IncidentCluster) => void;
+  // No implementado en nativo (como el resto de modo simulación, ver MapView.web.tsx)
+  // — solo para que el tipo de Props coincida con la variante web, que sí lo usa.
+  onElementClick?: (tipo: import('@/components/map/mapLayers').ElementoRedTipo, id: number) => void;
 };
 
 export function EpselMapView({ clusters, onPressCluster }: Props) {

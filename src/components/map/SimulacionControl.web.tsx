@@ -1,3 +1,4 @@
+import { Ionicons } from '@expo/vector-icons';
 import { useMemo } from 'react';
 import { Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
 
@@ -6,11 +7,15 @@ import { AfectadoRow } from '@/components/shared/AfectadoRow';
 import { useSimulacionStore } from '@/state/simulacionStore';
 import { useThemeColors } from '@/state/themeStore';
 
-/** Control flotante del modo simulación (web) — toggle + selector de falla para
- * buzones (colapso vs. tapa faltante; tramos/tuberías/accesorios/caja desagüe infieren
- * su falla del tipo de elemento clickeado, no necesitan selector) + resumen del
- * resultado. Tras un click exitoso entra a modo vista: bloquea el resto de la pantalla
- * (ver mapa/index.web.tsx) y solo queda el botón ← + la lista de afectados. */
+/** Control flotante del modo simulación (web) — botón redondo con ícono de ojo
+ * (cerrado = normal, abierto = activa, Ionicons de @expo/vector-icons, no un emoji)
+ * + selector de falla para buzones (colapso vs. tapa faltante; tramos/tuberías/
+ * accesorios/caja desagüe infieren su falla del tipo de elemento clickeado, no
+ * necesitan selector) + resumen del resultado. Vive junto a CatastroFloatingPanel
+ * (abajo), no arriba a la derecha — incidencia real: el toggle de texto competía por
+ * atención arriba mientras el resto de controles del mapa vive abajo. Tras un click
+ * exitoso entra a modo vista: bloquea el resto de la pantalla (ver mapa/index.web.tsx)
+ * y solo queda el botón ← + la lista de afectados. */
 export function SimulacionControl() {
   const t = useThemeColors();
   const styles = useMemo(() => makeStyles(t), [t]);
@@ -27,10 +32,6 @@ export function SimulacionControl() {
   if (modoVista) {
     return (
       <View style={styles.container} pointerEvents="box-none">
-        <Pressable style={styles.backBtn} onPress={salirModoVista}>
-          <Text style={styles.backBtnLabel}>← Salir de modo vista</Text>
-        </Pressable>
-
         {resultado && (
           <View style={styles.panelVista}>
             <Text style={styles.panelTitle}>
@@ -44,18 +45,16 @@ export function SimulacionControl() {
             </ScrollView>
           </View>
         )}
+
+        <Pressable style={styles.backBtn} onPress={salirModoVista}>
+          <Text style={styles.backBtnLabel}>← Salir de modo vista</Text>
+        </Pressable>
       </View>
     );
   }
 
   return (
     <View style={styles.container} pointerEvents="box-none">
-      <Pressable style={[styles.toggle, activo && styles.toggleActive]} onPress={toggleActivo}>
-        <Text style={[styles.toggleLabel, activo && styles.toggleLabelActive]}>
-          {activo ? 'Simulación: activa' : 'Modo simulación'}
-        </Text>
-      </Pressable>
-
       {activo && (
         <View style={styles.panel}>
           <Text style={styles.panelTitle}>Click en un elemento de red activo en Filtros</Text>
@@ -92,20 +91,41 @@ export function SimulacionControl() {
           )}
         </View>
       )}
+
+      <Pressable
+        style={[styles.toggle, activo && styles.toggleActive]}
+        onPress={toggleActivo}
+        aria-label={activo ? 'Salir de modo simulación' : 'Entrar en modo simulación'}
+      >
+        <Ionicons
+          name={activo ? 'eye-outline' : 'eye-off-outline'}
+          size={20}
+          color={activo ? t.white : t.textBody}
+        />
+      </Pressable>
     </View>
   );
 }
 
 function makeStyles(t: ColorPalette) {
   return StyleSheet.create({
-    // top-right: top-left ya lo ocupa la barra de búsqueda de dirección/suministro
-    // (LocationSearchBar), bottom-right lo ocupa NavigationControl de MapLibre.
-    container: { position: 'absolute', top: Spacing.md, right: Spacing.md, gap: Spacing.xs, zIndex: 10 },
+    // bottom-right, junto a CatastroFloatingPanel (bottom-center) — bottom-right de
+    // NavigationControl de MapLibre ya ocupado, por eso queda un poco más arriba.
+    container: {
+      position: 'absolute',
+      bottom: 84,
+      right: Spacing.md,
+      alignItems: 'flex-end',
+      gap: Spacing.xs,
+      zIndex: 10,
+    },
     toggle: {
+      width: 44,
+      height: 44,
+      borderRadius: 22,
+      alignItems: 'center',
+      justifyContent: 'center',
       backgroundColor: t.surface,
-      borderRadius: Radius.pill,
-      paddingHorizontal: Spacing.md,
-      paddingVertical: Spacing.sm,
       shadowColor: '#000',
       shadowOpacity: 0.15,
       shadowRadius: 6,
@@ -113,8 +133,6 @@ function makeStyles(t: ColorPalette) {
       elevation: 4,
     },
     toggleActive: { backgroundColor: t.accent },
-    toggleLabel: { fontSize: 12.5, fontWeight: '700', color: t.textBody },
-    toggleLabelActive: { color: t.white },
     panel: {
       backgroundColor: t.surface,
       borderRadius: Radius.md,
@@ -142,7 +160,6 @@ function makeStyles(t: ColorPalette) {
       borderRadius: Radius.pill,
       paddingHorizontal: Spacing.md,
       paddingVertical: Spacing.sm,
-      alignSelf: 'flex-end',
       shadowColor: '#000',
       shadowOpacity: 0.15,
       shadowRadius: 6,

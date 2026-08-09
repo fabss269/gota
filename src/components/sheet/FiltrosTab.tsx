@@ -1,5 +1,5 @@
 import { useMemo, useState } from 'react';
-import { Modal, Pressable, StyleSheet, Text, View } from 'react-native';
+import { Modal, Pressable, StyleSheet, Switch, Text, View } from 'react-native';
 
 import { UbicacionPicker } from '@/components/map/UbicacionPicker';
 import { Radius, Spacing, type ColorPalette } from '@/constants/theme';
@@ -60,6 +60,8 @@ export function FiltrosTab() {
   const setEstado = useFiltersStore((s) => s.setEstado);
   const rangoFechas = useFiltersStore((s) => s.rangoFechas);
   const setRangoFechas = useFiltersStore((s) => s.setRangoFechas);
+  const soloNoResueltas = useFiltersStore((s) => s.soloNoResueltas);
+  const setSoloNoResueltas = useFiltersStore((s) => s.setSoloNoResueltas);
   const reset = useFiltersStore((s) => s.reset);
 
   const [selectorAbierto, setSelectorAbierto] = useState<'tipo' | 'estado' | 'rango' | null>(null);
@@ -88,6 +90,11 @@ export function FiltrosTab() {
           active={categorias.includes('desague')}
           onPress={() => toggleCategoria('desague')}
         />
+      </View>
+
+      <View style={styles.soloNoResueltasRow}>
+        <Text style={styles.sectionTitle}>Solo no resueltas</Text>
+        <Switch value={soloNoResueltas} onValueChange={setSoloNoResueltas} />
       </View>
 
       <Text style={styles.sectionTitle}>Ubicación</Text>
@@ -263,6 +270,7 @@ function makeStyles(t: ColorPalette) {
   return StyleSheet.create({
     container: { paddingHorizontal: Spacing.md, paddingBottom: Spacing.xl, gap: Spacing.sm },
     headerRow: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' },
+    soloNoResueltasRow: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' },
     sectionTitle: { fontSize: 13, fontWeight: '700', color: t.primaryDark, marginTop: Spacing.sm },
     limpiar: { color: t.accent, fontWeight: '600' },
     chipRow: { flexDirection: 'row', gap: Spacing.xs },
