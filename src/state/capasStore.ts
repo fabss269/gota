@@ -26,10 +26,11 @@ const DEFAULT_CAPAS: Set<CapaKey> = new Set([
   'red_potable',
   'red_primaria_desague',
   'red_secundaria_desague',
-  'buzones',
   'resaltar_sector',
-  // conexion_agua, conexion_desague y flujo_desague: OFF por defecto (muy densas /
-  // capa especializada que no todos necesitan ver siempre)
+  // Resto OFF por defecto (buzones, cajas, accesorios, conexiones, flujo, reservorios,
+  // manzanas) — el usuario los activa desde el panel "Capas" según necesite. Las
+  // conexiones además NO tienen tabla de detalles todavía (ver NO_HOVEREABLES en
+  // mapLayers.ts).
 ]);
 
 export const useCapasStore = create<CapasState>((set) => ({

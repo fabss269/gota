@@ -389,7 +389,7 @@
         "visibility": "none"
       },
       "paint": {
-        "circle-radius": 3,
+        "circle-radius": 5,
         "circle-color": "#06B6D4",
         "circle-stroke-color": "#FFEB3B",
         "circle-stroke-width": [
@@ -536,7 +536,7 @@
         "visibility": "none"
       },
       "paint": {
-        "circle-radius": 3,
+        "circle-radius": 5,
         "circle-color": "#795548",
         "circle-stroke-color": "#FFEB3B",
         "circle-stroke-width": [

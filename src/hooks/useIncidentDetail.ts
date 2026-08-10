@@ -62,6 +62,7 @@ export function useIncidentDetail(id: string | undefined) {
         tipo: detalle.tipo,
         categoria: detalle.categoria,
         direccion: detalle.direccion ?? 'Dirección no disponible',
+        codigoSuministro: detalle.codigoSuministro ?? null,
         sector: detalle.catastro?.sector ?? 'Sin sector',
         prioridad: detalle.prioridad ?? 'a_tiempo',
         estado: detalle.estado,
@@ -80,6 +81,8 @@ export function useIncidentDetail(id: string | undefined) {
           medioRecepcion: detalle.reclamo?.medioRecepcion ?? 'No especificado',
           canal: '—',
           descripcion: detalle.reclamo?.descripcion ?? 'Sin descripción registrada.',
+          detalleTicket: detalle.reclamo?.detalleTicket ?? null,
+          esRobo: detalle.reclamo?.esRobo ?? false,
         },
         catastro: {
           redAsociada: detalle.catastro?.redAsociada ?? 'Sin red asociada',

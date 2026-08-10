@@ -58,11 +58,21 @@ export const CATASTRO_SECTOR_FILTER_LAYERS: { id: string; baseFilter?: MapExpres
 ];
 
 // Capas con paint sensible a feature-state 'hover' en map-style.json (case sobre
-// ["feature-state","hover"]) y `promoteId` configurado en su source — subconjunto de
-// CATASTRO_SECTOR_FILTER_LAYERS que excluye alcantarillado-flujo-flecha (flecha
-// decorativa, sin promoteId ni paint de hover, no es "un elemento" clickeable).
+// ["feature-state","hover"]) y `promoteId` configurado en su source — subconjunto
+// de CATASTRO_SECTOR_FILTER_LAYERS que excluye:
+//   - alcantarillado-flujo-flecha: flecha decorativa, sin promoteId, no es "un
+//     elemento" clickeable.
+//   - cajaaguaconexion-line / cajadesagueconexion-line: las conexiones no tienen
+//     tabla de detalles (sig.cajaaguaconexion/cajadesagueconexion no exponen data
+//     visible al usuario todavía), así que no son clickeables ni deberían dar
+//     feedback visual de "puedo interactuar".
+const NO_HOVEREABLES = new Set([
+  'alcantarillado-flujo-flecha',
+  'cajaaguaconexion-line',
+  'cajadesagueconexion-line',
+]);
 export const HOVER_INTERACTIVE_LAYERS: string[] = CATASTRO_SECTOR_FILTER_LAYERS.map((l) => l.id).filter(
-  (id) => id !== 'alcantarillado-flujo-flecha'
+  (id) => !NO_HOVEREABLES.has(id)
 );
 
 // Mismo vocabulario que `ELEMENTO_TIPOS_VALIDOS` en gota-backend

@@ -24,7 +24,13 @@ export type ApiIncidenciaListResponse = {
 };
 
 export type ApiTecnicoAsignado = { id: string; nombre: string };
-export type ApiReclamoResumen = { fechaRegistro: string; medioRecepcion: string; descripcion: string | null };
+export type ApiReclamoResumen = {
+  fechaRegistro: string;
+  medioRecepcion: string;
+  descripcion: string | null;
+  detalleTicket: string | null;
+  esRobo: boolean;
+};
 export type ApiCatastro = {
   redAsociada: string | null;
   diametroMm: number | null;
@@ -40,6 +46,7 @@ export type ApiIncidenciaDetalle = {
   tipo: string;
   categoria: Categoria;
   direccion: string | null;
+  codigoSuministro: string | null;
   prioridad: Prioridad | null;
   estado: EstadoIncidencia;
   antiguedadDias: number;
@@ -73,30 +80,46 @@ export type ApiSuministro = { lat: number; lon: number; sectorId: number | null;
 
 // GET /red/elemento/{tipo}/{id} — panel de info al hacer click en un elemento de
 // catastro (ver API.md § 7). Campos no aplicables al `tipo` consultado vienen `null`.
+// Los `*Id` conviven con los nombres para poblar combos editables sin un round-trip
+// adicional (materialId + material, accesorioTipoId + tipoNombre, etc.).
 export type ApiElementoRedDetalle = {
   tipo: string;
   id: number;
   codigo: string | null;
   inscripcion: string | null;
+  nombre: string | null;
+  referencia: string | null;
+  // Tipo/subtipo
   tipoNombre: string | null;
+  accesorioTipoId: number | null;
+  // Material
   material: string | null;
+  materialId: number | null;
+  // Clasificación de accesorio
+  accesorioClasificacion: string | null;
+  accesorioClasificacionId: number | null;
+  // Numéricos
   diametroPulgadas: number | null;
-  primaria: boolean | null;
+  pendiente: number | null;
+  distancia: number | null;
   profundidad: number | null;
   cota: number | null;
   cotaFondo: number | null;
-  referencia: string | null;
-  nombre: string | null;
   area: number | null;
   perimetro: number | null;
+  // Booleano
+  primaria: boolean | null;
+  // Ubicación (solo lectura desde el panel — derivadas de la geom)
   sectorId: number | null;
   sectorNombre: string | null;
   distritoId: number | null;
   distritoNombre: string | null;
 };
 
-// GET /red/materiales/{tipo} — catálogo para el selector de edición inline.
+// Catálogos para el selector de edición inline (combos con buscador).
 export type ApiMaterial = { id: number; nombre: string };
+export type ApiAccesorioTipo = { id: number; nombre: string };
+export type ApiAccesorioClasificacion = { id: number; nombre: string };
 
 // Grafo hidráulico (impacto/foco por causa raíz/simulación) — ver API.md § 11.
 export type TipoFalla =

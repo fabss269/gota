@@ -1,45 +1,40 @@
+import { Ionicons } from '@expo/vector-icons';
 import type { CSSProperties, ReactNode } from 'react';
 import { useState } from 'react';
-import { Alert, View } from 'react-native';
+import { View } from 'react-native';
 
-import { CambiarEstadoSheet } from '@/components/incident-actions/CambiarEstadoSheet';
 import { RegistrarAvanceSheet } from '@/components/incident-actions/RegistrarAvanceSheet';
 import { SeleccionarResponsableSheet } from '@/components/incident-actions/SeleccionarResponsableSheet';
 import { FocoTab } from '@/components/incident-detail/FocoTab';
-import { PredioTab } from '@/components/incident-detail/PredioTab';
 import { TrazabilidadTab } from '@/components/incident-detail/TrazabilidadTab';
 import { Colors } from '@/constants/theme';
 import { useIncidentDetail } from '@/hooks/useIncidentDetail';
-import type { TransicionEstado } from '@/mocks/estadoWorkflowMock';
+import type { IncidenciaDetalle } from '@/mocks/incidentDetailMock';
 import { useMapSearchStore } from '@/state/mapSearchStore';
 
-const PRIORIDAD_COLOR: Record<string, string> = {
-  a_tiempo: Colors.statusATiempo,
-  alerta: Colors.statusAlerta,
-  critica: Colors.statusCritica,
-};
-const PRIORIDAD_LABEL: Record<string, string> = {
-  a_tiempo: 'A tiempo',
-  alerta: 'Alerta',
-  critica: 'Crítica',
+const ESTADO_LABEL: Record<string, string> = {
+  CREADO: 'Creado',
+  PENDIENTE: 'Pendiente',
+  EN_PROGRESO: 'En progreso',
+  ATENDIDO: 'Atendido',
 };
 
-type ActiveSheet = 'estado' | 'avance' | 'responsable' | null;
+// Zoom al que hacemos flyTo desde "Ver en el mapa" — nivel media manzana.
+const ZOOM_VER_EN_MAPA = 19;
 
+type ActiveSheet = 'avance' | 'responsable' | null;
 type Props = { incidenciaId: string; onClose: () => void };
 
 /** Panel lateral derecho de detalle de incidencia — layout web desktop. */
 export function DetailPanel({ incidenciaId, onClose }: Props) {
   const [activeSheet, setActiveSheet] = useState<ActiveSheet>(null);
-  const [pendingTransicion, setPendingTransicion] = useState<TransicionEstado | null>(null);
-
   const { data: incidencia, isLoading, isError } = useIncidentDetail(incidenciaId);
 
   if (isLoading) {
     return (
       <div style={panel}>
         <div style={statusBox}>
-          <span style={{ color: 'var(--map-text-muted)', fontSize: 13 }}>Cargando…</span>
+          <span style={{ color: Colors.textMuted, fontSize: 13 }}>Cargando…</span>
         </div>
       </div>
     );
@@ -49,91 +44,93 @@ export function DetailPanel({ incidenciaId, onClose }: Props) {
     return (
       <div style={panel}>
         <div style={statusBox}>
-          <span style={{ color: 'var(--map-text-muted)', fontSize: 13 }}>No se encontró la incidencia.</span>
+          <span style={{ color: Colors.textMuted, fontSize: 13 }}>No se encontró la incidencia.</span>
           <button style={linkBtn} onClick={onClose}>Cerrar panel</button>
         </div>
       </div>
     );
   }
 
-  const prioColor = PRIORIDAD_COLOR[incidencia.prioridad] ?? 'var(--map-text-muted)';
+  const fechaHora = separarFechaHora(incidencia.reclamo.fechaRegistro);
+  const esRobo = incidencia.reclamo.esRobo;
+  const detalleTicket = incidencia.reclamo.detalleTicket;
+
+  const verEnMapa = () => {
+    useMapSearchStore.getState().flyTo({
+      lat: incidencia.lat, lon: incidencia.lon, zoom: ZOOM_VER_EN_MAPA,
+    });
+  };
 
   return (
     <div style={panel}>
       {/* ── Header fijo ──────────────────────────── */}
       <div style={header}>
-        <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
-          <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
-            <span style={{ width: 7, height: 7, borderRadius: 4, backgroundColor: prioColor, display: 'inline-block', flexShrink: 0 }} />
-            <span style={{ fontSize: 11, fontWeight: '700', color: prioColor }}>
-              {PRIORIDAD_LABEL[incidencia.prioridad]}
-            </span>
-            <span style={{ fontSize: 11, color: 'var(--map-text-muted)' }}>DANA #{incidencia.id}</span>
+        {/* Fila 1: SUMINISTRO (label + código) a la izquierda, estado + cerrar a la derecha */}
+        <div style={topRow}>
+          <div style={{ display: 'flex', flexDirection: 'column', minWidth: 0 }}>
+            <span style={suministroLabel}>Suministro</span>
+            <span style={suministroValor}>{incidencia.codigoSuministro ?? 'Sin registro'}</span>
           </div>
-          <button style={closeBtn} onClick={onClose} aria-label="Cerrar panel">×</button>
+          <div style={{ display: 'flex', alignItems: 'center', gap: 6, flexShrink: 0 }}>
+            <span style={estadoBadge}>{ESTADO_LABEL[incidencia.estado] ?? incidencia.estado}</span>
+            <button type="button" style={closeBtn} onClick={onClose} aria-label="Cerrar panel">
+              <Ionicons name="close" size={18} color={Colors.textBody} />
+            </button>
+          </div>
         </div>
 
-        <div style={{ fontSize: 17, fontWeight: '700', color: 'var(--map-text)', marginTop: 6, lineHeight: 1.25 }}>
-          {incidencia.tipo}
+        {/* Fila 2: tipo del reclamo + (si aplica) badge de robo de medidor */}
+        <div style={tipoLine}>
+          <span>{incidencia.tipo}</span>
+          {esRobo && (
+            <span style={roboBadge} title="Robo de medidor">
+              <Ionicons name="warning-outline" size={12} color={Colors.statusCritica} />
+              <span>Robo de medidor</span>
+            </span>
+          )}
         </div>
-        <div style={{ display: 'flex', alignItems: 'center', gap: 6, marginTop: 3 }}>
-          <span style={{ fontSize: 12, color: 'var(--map-text-muted)' }}>
-            {incidencia.direccion} · {incidencia.sector.split('·')[0].trim()}
-          </span>
+
+        {/* Fila 3: dirección con ícono + botón ver-en-mapa */}
+        <div style={direccionRow}>
+          <Ionicons name="location-outline" size={16} color={Colors.textMuted} style={{ flexShrink: 0, marginTop: 1 }} />
+          <span style={direccionText}>{incidencia.direccion}</span>
           <button
-            style={centrarBtn}
-            onClick={() => useMapSearchStore.getState().flyTo({ lat: incidencia.lat, lon: incidencia.lon })}
+            type="button"
+            style={verMapaBtn}
+            onClick={verEnMapa}
+            title="Ver en el mapa"
+            aria-label="Ver en el mapa"
           >
-            Ver en el mapa
+            <Ionicons name="locate" size={16} color={Colors.accent} />
           </button>
         </div>
 
-        {/* Estado + técnico asignado */}
-        <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginTop: 10, flexWrap: 'wrap' }}>
-          <button
-            style={estadoChip}
-            onClick={() => setActiveSheet('estado')}
-          >
-            {incidencia.estado.replace('_', ' ')} ▾
-          </button>
-          <button
-            style={reassignBtn}
-            onClick={() => setActiveSheet('responsable')}
-          >
-            {incidencia.tecnicoAsignado?.nombre ?? 'Sin asignar'} →
+        {/* Fila 4: chip del sector (izq) + técnico asignado con ícono usuario (der) */}
+        <div style={sectorTecnicoRow}>
+          <div style={sectorChip}>
+            <Ionicons name="grid-outline" size={11} color={Colors.accent} />
+            <span>{incidencia.sector}</span>
+          </div>
+          <button type="button" style={reassignBtn} onClick={() => setActiveSheet('responsable')}>
+            <Ionicons name="person-circle-outline" size={16} color={Colors.textBody} />
+            <span>{incidencia.tecnicoAsignado?.nombre ?? 'Sin asignar'}</span>
+            <Ionicons name="chevron-forward" size={12} color={Colors.textMuted} />
           </button>
         </div>
       </div>
 
       {/* ── Contenido scrolleable ─────────────────── */}
       <div style={scrollable}>
-
         {/* DATOS DEL RECLAMO */}
         <Section title="DATOS DEL RECLAMO (DANA)">
-          <DataRow label="Tipo" value={incidencia.tipo} />
-          <DataRow label="Registrado" value={incidencia.reclamo.fechaRegistro} />
+          <DataRow label="Fecha de registro" value={fechaHora.fecha} />
+          <DataRow label="Hora de registro" value={fechaHora.hora} />
           <DataRow
-            label="Estado"
-            value={incidencia.estado.replace('_', ' ')}
-            accent={incidencia.estado === 'PENDIENTE' || incidencia.estado === 'CREADO'}
-          />
-          <DataRow
-            label="Antigüedad"
+            label="En espera"
             value={`${incidencia.antiguedadDias} día${incidencia.antiguedadDias !== 1 ? 's' : ''}`}
             accent={incidencia.antiguedadDias > 1}
           />
-          <DataRow label="Medio" value={incidencia.reclamo.medioRecepcion} />
-        </Section>
-
-        <Divider />
-
-        {/* CATASTRO TÉCNICO */}
-        <Section title="CATASTRO TÉCNICO (GIS)">
-          <DataRow label="Sector" value={incidencia.sector} />
-          <DataRow label="Red" value={incidencia.catastro.redAsociada} />
-          <DataRow label="Diámetro" value={`${incidencia.catastro.diametroMm} mm`} />
-          <DataRow label="Material" value={incidencia.catastro.material} />
-          <DataRow label="Buzón cercano" value={incidencia.catastro.buzonCercano} />
+          {detalleTicket && <DetalleBloque texto={detalleTicket} />}
         </Section>
 
         <Divider />
@@ -152,46 +149,23 @@ export function DetailPanel({ incidenciaId, onClose }: Props) {
 
         <Divider />
 
-        {/* PREDIO */}
-        <Section title="HISTORIAL DEL PREDIO">
-          <View><PredioTab incidencia={incidencia} /></View>
-        </Section>
+        {/* PREDIO — mensaje simple, sin sección titulada */}
+        <PredioMensaje incidencia={incidencia} />
       </div>
 
-      {/* ── Acciones fijas al fondo ────────────────── */}
+      {/* ── Acción única al fondo ─────────────────── */}
       <div style={footer}>
-        <button
-          style={btnPrimary}
-          onClick={() => Alert.alert('Asignar cuadrilla', 'Funcionalidad en desarrollo.')}
-        >
-          ★ Asignar cuadrilla
+        <button type="button" style={btnPrimary} onClick={() => setActiveSheet('avance')}>
+          Registrar avance
         </button>
-        <div style={{ display: 'flex', gap: 8 }}>
-          <button style={btnSecondary} onClick={() => setActiveSheet('estado')}>
-            Cambiar estado
-          </button>
-          <button style={btnSecondary} onClick={() => setActiveSheet('avance')}>
-            Registrar avance
-          </button>
-        </div>
       </div>
 
-      {/* Action sheets (RN Modal, funcional en web) */}
-      <CambiarEstadoSheet
-        visible={activeSheet === 'estado'}
-        incidenciaId={incidencia.id}
-        estado={incidencia.estado}
-        onClose={() => setActiveSheet(null)}
-        onAbrirAvance={(transicion) => {
-          setPendingTransicion(transicion);
-          setActiveSheet('avance');
-        }}
-      />
       <RegistrarAvanceSheet
         visible={activeSheet === 'avance'}
         incidenciaId={incidencia.id}
         incidenciaLabel={`${incidencia.tipo}  ·  ${incidencia.direccion}`}
-        transicion={pendingTransicion}
+        transicion={null}
+        estadoActual={incidencia.estado}
         tecnicoActualId={incidencia.tecnicoAsignado?.id}
         onClose={() => setActiveSheet(null)}
         onRegistrado={() => setActiveSheet(null)}
@@ -209,6 +183,28 @@ export function DetailPanel({ incidenciaId, onClose }: Props) {
 
 // ── Sub-componentes ───────────────────────────────────────
 
+function PredioMensaje({ incidencia }: { incidencia: IncidenciaDetalle }) {
+  const noReincidente = incidencia.predio.noReincidente;
+  const cantidad = incidencia.predio.historico.length;
+  return (
+    <div style={{ padding: '14px 16px' }}>
+      {noReincidente ? (
+        <div style={predioNoReinc}>
+          <Ionicons name="checkmark-circle-outline" size={16} color={Colors.statusATiempo} />
+          <span>No es predio reincidente</span>
+        </div>
+      ) : (
+        <div style={predioReinc}>
+          <Ionicons name="alert-circle-outline" size={16} color={Colors.statusAlerta} style={{ flexShrink: 0, marginTop: 2 }} />
+          <span>
+            <strong>Predio reincidente:</strong> {cantidad} reclamo{cantidad !== 1 ? 's' : ''} anterior{cantidad !== 1 ? 'es' : ''} registrado{cantidad !== 1 ? 's' : ''}
+          </span>
+        </div>
+      )}
+    </div>
+  );
+}
+
 function Section({ title, children }: { title: string; children: ReactNode }) {
   return (
     <div style={{ padding: '14px 16px' }}>
@@ -219,152 +215,190 @@ function Section({ title, children }: { title: string; children: ReactNode }) {
 }
 
 function Divider() {
-  return <div style={{ height: 1, backgroundColor: 'var(--map-border)' }} />;
+  return <div style={{ height: 1, backgroundColor: Colors.border }} />;
+}
+
+function DetalleBloque({ texto }: { texto: string }) {
+  return (
+    <div style={{ marginTop: 10 }}>
+      <div style={{ fontSize: 11, color: Colors.textMuted, fontWeight: 600, marginBottom: 4 }}>
+        Detalle del ticket
+      </div>
+      <div style={detalleTextoStyle}>{texto}</div>
+    </div>
+  );
 }
 
 function DataRow({ label, value, accent }: { label: string; value: string; accent?: boolean }) {
   return (
     <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', padding: '5px 0', gap: 8 }}>
-      <span style={{ fontSize: 11, color: 'var(--map-text-muted)', fontWeight: '600', flexShrink: 0, width: 90 }}>
+      <span style={{ fontSize: 11, color: Colors.textMuted, fontWeight: '600', flexShrink: 0, width: 110 }}>
         {label}
       </span>
-      <span style={{ fontSize: 12.5, color: accent ? '#D32F2F' : 'var(--map-text)', fontWeight: accent ? '600' : '400', textAlign: 'right' }}>
+      <span style={{ fontSize: 12.5, color: accent ? Colors.statusCritica : Colors.textBody, fontWeight: accent ? '600' : '400', textAlign: 'right' }}>
         {value}
       </span>
     </div>
   );
 }
 
+// ── Utilidades ───────────────────────────────────────
+
+function separarFechaHora(iso: string): { fecha: string; hora: string } {
+  // ISO tipo "2026-08-03T10:10:16" — evitamos toLocaleString para no depender del
+  // locale del navegador; queremos formato estable "YYYY-MM-DD" y "hh:mm:ss AM/PM".
+  const [f, h] = iso.split('T');
+  const hms = (h ?? '').slice(0, 8);
+  if (!hms) return { fecha: f ?? '—', hora: '—' };
+  const [hh, mm, ss] = hms.split(':');
+  const h24 = Number(hh);
+  const sufijo = h24 >= 12 ? 'p. m.' : 'a. m.';
+  const h12 = h24 % 12 === 0 ? 12 : h24 % 12;
+  return { fecha: f ?? '—', hora: `${String(h12).padStart(2, '0')}:${mm}:${ss} ${sufijo}` };
+}
+
 // ── Estilos ───────────────────────────────────────────────
 
 const panel: CSSProperties = {
-  width: 320,
-  minWidth: 320,
+  width: 340,
+  minWidth: 340,
   height: '100%',
   display: 'flex',
   flexDirection: 'column',
-  backgroundColor: 'var(--map-surface)',
-  borderLeft: '1px solid var(--map-border)',
+  backgroundColor: '#FFFFFF',
+  borderLeft: `1px solid ${Colors.border}`,
   overflow: 'hidden',
 };
 
 const statusBox: CSSProperties = {
-  flex: 1,
-  display: 'flex',
-  flexDirection: 'column',
-  alignItems: 'center',
-  justifyContent: 'center',
-  gap: 8,
-  padding: 24,
+  flex: 1, display: 'flex', flexDirection: 'column',
+  alignItems: 'center', justifyContent: 'center', gap: 8, padding: 24,
 };
 
 const header: CSSProperties = {
   padding: '14px 16px 12px',
-  borderBottom: '1px solid var(--map-border)',
+  borderBottom: `1px solid ${Colors.border}`,
   flexShrink: 0,
 };
 
-const scrollable: CSSProperties = {
-  flex: 1,
-  overflowY: 'auto',
+const topRow: CSSProperties = {
+  display: 'flex', alignItems: 'flex-start', justifyContent: 'space-between', gap: 8,
 };
+
+const suministroLabel: CSSProperties = {
+  fontSize: 10, fontWeight: 700, color: Colors.textMuted,
+  letterSpacing: 0.6, textTransform: 'uppercase',
+};
+
+const suministroValor: CSSProperties = {
+  fontSize: 24, fontWeight: 800, color: Colors.textBody,
+  letterSpacing: -0.3, marginTop: 2, lineHeight: 1.1,
+};
+
+const tipoLine: CSSProperties = {
+  fontSize: 13, color: Colors.textBody, fontWeight: 600,
+  marginTop: 8, lineHeight: 1.3,
+  display: 'flex', alignItems: 'center', gap: 8, flexWrap: 'wrap',
+};
+
+const roboBadge: CSSProperties = {
+  display: 'inline-flex', alignItems: 'center', gap: 4,
+  fontSize: 11, fontWeight: 700, color: Colors.statusCritica,
+  backgroundColor: '#FDECEA', border: `1px solid ${Colors.statusCritica}`,
+  padding: '2px 8px', borderRadius: 999,
+};
+
+const direccionRow: CSSProperties = {
+  display: 'flex', alignItems: 'flex-start', gap: 6, marginTop: 10,
+};
+
+const direccionText: CSSProperties = {
+  flex: 1, fontSize: 12, color: Colors.textMuted, lineHeight: 1.35,
+};
+
+const verMapaBtn: CSSProperties = {
+  background: 'none', border: 'none', cursor: 'pointer',
+  padding: 4, borderRadius: 4, flexShrink: 0,
+  display: 'flex', alignItems: 'center', justifyContent: 'center',
+};
+
+const sectorTecnicoRow: CSSProperties = {
+  display: 'flex', alignItems: 'center', justifyContent: 'space-between',
+  gap: 8, marginTop: 10, flexWrap: 'wrap',
+};
+
+const sectorChip: CSSProperties = {
+  display: 'inline-flex', alignItems: 'center', gap: 4,
+  backgroundColor: Colors.accentBg,
+  color: Colors.accent,
+  fontSize: 11, fontWeight: 600,
+  padding: '3px 8px', borderRadius: 999,
+};
+
+const estadoBadge: CSSProperties = {
+  backgroundColor: Colors.accentBg,
+  color: Colors.accent,
+  border: 'none', borderRadius: 20,
+  padding: '4px 10px', fontSize: 11, fontWeight: 700,
+};
+
+const reassignBtn: CSSProperties = {
+  display: 'inline-flex', alignItems: 'center', gap: 6,
+  background: 'none',
+  border: `1px solid ${Colors.border}`,
+  borderRadius: 20,
+  padding: '4px 10px 4px 6px', fontSize: 12, color: Colors.textBody,
+  cursor: 'pointer',
+};
+
+const detalleTextoStyle: CSSProperties = {
+  fontSize: 12.5, color: Colors.textBody, lineHeight: 1.45,
+  backgroundColor: '#F8F9FA',
+  padding: '10px 12px', borderRadius: 6,
+  wordBreak: 'break-word',
+};
+
+const closeBtn: CSSProperties = {
+  width: 24, height: 24, borderRadius: 12,
+  backgroundColor: '#F1F3F5', border: 'none',
+  cursor: 'pointer',
+  display: 'flex', alignItems: 'center', justifyContent: 'center',
+  padding: 0,
+};
+
+const scrollable: CSSProperties = { flex: 1, overflowY: 'auto' };
 
 const footer: CSSProperties = {
   padding: '12px 16px',
-  borderTop: '1px solid var(--map-border)',
-  display: 'flex',
-  flexDirection: 'column',
-  gap: 8,
+  borderTop: `1px solid ${Colors.border}`,
   flexShrink: 0,
 };
 
 const sectionTitle: CSSProperties = {
-  fontSize: 10,
-  fontWeight: '700',
-  color: 'var(--map-text-muted)',
-  letterSpacing: 0.6,
-  marginBottom: 10,
-};
-
-const closeBtn: CSSProperties = {
-  width: 24,
-  height: 24,
-  borderRadius: 12,
-  backgroundColor: 'var(--map-surface-alt)',
-  border: 'none',
-  fontSize: 18,
-  lineHeight: '24px',
-  cursor: 'pointer',
-  color: 'var(--map-text)',
-  display: 'flex',
-  alignItems: 'center',
-  justifyContent: 'center',
-  fontWeight: '700',
-  padding: 0,
-};
-
-const estadoChip: CSSProperties = {
-  backgroundColor: 'var(--map-accent-bg)',
-  color: 'var(--map-accent)',
-  border: 'none',
-  borderRadius: 20,
-  padding: '4px 10px',
-  fontSize: 11,
-  fontWeight: '700',
-  cursor: 'pointer',
-};
-
-const reassignBtn: CSSProperties = {
-  background: 'none',
-  border: '1px solid var(--map-border)',
-  borderRadius: 20,
-  padding: '4px 10px',
-  fontSize: 11,
-  color: 'var(--map-text)',
-  cursor: 'pointer',
-};
-
-const centrarBtn: CSSProperties = {
-  background: 'none',
-  border: 'none',
-  color: 'var(--map-accent)',
-  fontSize: 11,
-  fontWeight: '700',
-  cursor: 'pointer',
-  padding: 0,
-  whiteSpace: 'nowrap',
-  flexShrink: 0,
+  fontSize: 10, fontWeight: 700, color: Colors.textMuted,
+  letterSpacing: 0.6, marginBottom: 10,
 };
 
 const linkBtn: CSSProperties = {
-  background: 'none',
-  border: 'none',
-  color: 'var(--map-accent)',
-  fontSize: 13,
-  fontWeight: '700',
-  cursor: 'pointer',
+  background: 'none', border: 'none',
+  color: Colors.accent, fontSize: 13, fontWeight: 700, cursor: 'pointer',
 };
 
 const btnPrimary: CSSProperties = {
-  backgroundColor: 'var(--map-accent)',
-  color: 'white',
-  border: 'none',
-  borderRadius: 8,
-  padding: '12px',
-  fontSize: 14,
-  fontWeight: '700',
-  cursor: 'pointer',
-  width: '100%',
+  backgroundColor: Colors.accent,
+  color: 'white', border: 'none', borderRadius: 8,
+  padding: '12px', fontSize: 14, fontWeight: 700,
+  cursor: 'pointer', width: '100%',
 };
 
-const btnSecondary: CSSProperties = {
-  flex: 1,
-  backgroundColor: 'var(--map-surface-alt)',
-  color: 'var(--map-text)',
-  border: 'none',
-  borderRadius: 8,
-  padding: '10px',
-  fontSize: 13,
-  fontWeight: '600',
-  cursor: 'pointer',
+const predioNoReinc: CSSProperties = {
+  display: 'flex', alignItems: 'center', gap: 8,
+  fontSize: 13, color: Colors.textBody,
+  padding: '10px 12px', backgroundColor: '#F0F9F4', borderRadius: 6,
+};
+
+const predioReinc: CSSProperties = {
+  display: 'flex', alignItems: 'flex-start', gap: 8,
+  fontSize: 13, color: Colors.textBody, lineHeight: 1.4,
+  padding: '10px 12px', backgroundColor: '#FFF8E1', borderRadius: 6,
 };
