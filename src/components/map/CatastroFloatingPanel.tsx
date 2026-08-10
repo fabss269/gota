@@ -1,6 +1,11 @@
 import { useEffect, useRef, useState, type CSSProperties, type ReactNode } from 'react';
+import { Image as RNImage } from 'react-native';
 
 import { useCapasStore, type CapaKey } from '@/state/capasStore';
+
+const RESERVORIO_ELEVADO_URI = RNImage.resolveAssetSource(
+  require('@/assets/images/icons/reservorio_elevado.png'),
+).uri;
 
 type CapaItem = { key: CapaKey; label: string; icon: ReactNode };
 
@@ -25,7 +30,21 @@ const AGUA: CapaItem[] = [
   { key: 'accesorios', label: 'Accesorios', icon: <ColorCircle color="#9C27B0" /> },
 ];
 
-const TODAS_LAS_CAPAS = [...PREDIO, ...ALCANTARILLADO, ...AGUA];
+const INFRAESTRUCTURA: CapaItem[] = [
+  {
+    key: 'reservorios',
+    label: 'Reservorios',
+    icon: (
+      <img
+        src={RESERVORIO_ELEVADO_URI}
+        alt=""
+        style={{ width: 18, height: 18, objectFit: 'contain' }}
+      />
+    ),
+  },
+];
+
+const TODAS_LAS_CAPAS = [...PREDIO, ...ALCANTARILLADO, ...AGUA, ...INFRAESTRUCTURA];
 
 /**
  * Panel flotante inferior del mapa desktop con las capas de Catastro (Predio,
@@ -77,6 +96,8 @@ export function CatastroFloatingPanel() {
           <CapaGroup title="Alcantarillado" items={ALCANTARILLADO} isCapa={isCapa} onToggle={toggleCapa} />
           <div style={colDivider} />
           <CapaGroup title="Agua" items={AGUA} isCapa={isCapa} onToggle={toggleCapa} />
+          <div style={colDivider} />
+          <CapaGroup title="Infraestructura no lineal" items={INFRAESTRUCTURA} isCapa={isCapa} onToggle={toggleCapa} />
         </div>
       )}
 

@@ -1,7 +1,15 @@
 import maplibregl from 'maplibre-gl';
 import 'maplibre-gl/dist/maplibre-gl.css';
 import { useEffect, useRef } from 'react';
+import { Image as RNImage } from 'react-native';
 import { createRoot, type Root } from 'react-dom/client';
+
+const RESERVORIO_ELEVADO_URI = RNImage.resolveAssetSource(
+  require('@/assets/images/icons/reservorio_elevado.png'),
+).uri;
+const RESERVORIO_APOYADO_URI = RNImage.resolveAssetSource(
+  require('@/assets/images/icons/reservorio_apoyado.png'),
+).uri;
 
 import type { ApiBbox, TipoFalla } from '@/api/types';
 import { postSimulacion } from '@/api/grafo';
@@ -147,6 +155,27 @@ export function EpselMapView({ clusters, onPressCluster, onElementClick }: Props
     map.addControl(new maplibregl.NavigationControl({ showCompass: false }), 'bottom-right');
     mapRef.current = map;
     const markers = markersRef.current;
+
+    // Íconos usados por la capa `reservorios-icon` (map-style.json). Se registran
+    // una sola vez al cargar el mapa. PNG 192×192 con fondo transparente y
+    // `pixelRatio: 2` — MapLibre interpreta 2 pixels del PNG = 1 CSS px, así que
+    // en pantallas retina el ícono se rasteriza a resolución completa sin borrosidad.
+    // Base efectiva: 96 CSS px (192 / 2). El icon-size del style multiplica esa base.
+    map.on('load', () => {
+      const iconos: { id: string; url: string }[] = [
+        { id: 'reservorio_elevado', url: RESERVORIO_ELEVADO_URI },
+        { id: 'reservorio_apoyado', url: RESERVORIO_APOYADO_URI },
+      ];
+      for (const { id, url } of iconos) {
+        if (map.hasImage(id)) continue;
+        const img = new Image();
+        img.onload = () => {
+          if (!map.hasImage(id)) map.addImage(id, img, { pixelRatio: 2 });
+        };
+        img.onerror = () => console.warn(`[MapView] No se pudo cargar el ícono ${id} desde ${url}`);
+        img.src = url;
+      }
+    });
 
     return () => {
       markers.forEach(({ marker, root }) => {

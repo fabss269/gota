@@ -13,7 +13,8 @@ export type CapaKey =
   | 'caja_desague'
   | 'buzones'
   | 'resaltar_sector'
-  | 'flujo_desague';
+  | 'flujo_desague'
+  | 'reservorios';
 
 type CapasState = {
   capasVisibles: Set<CapaKey>;

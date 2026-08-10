@@ -21,6 +21,7 @@ export const CAPA_LAYER_IDS: Record<CapaKey, string[]> = {
   caja_desague: ['cajadesague-circle'],
   buzones: ['buzones-circle'],
   flujo_desague: ['alcantarillado-flujo-flecha'],
+  reservorios: ['reservorios-icon'],
   // resaltar_sector no tiene layers propios: lo maneja aparte el resaltado de sector
   // (necesita togglear el filtro, no solo la visibilidad).
   resaltar_sector: [],

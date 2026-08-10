@@ -22,6 +22,10 @@ const DESAGUE_CAPAS: { key: CapaKey; label: string }[] = [
   { key: 'buzones', label: 'Buzones' },
 ];
 
+const INFRAESTRUCTURA_CAPAS: { key: CapaKey; label: string }[] = [
+  { key: 'reservorios', label: 'Reservorios (tanques elevado/apoyado)' },
+];
+
 /** Tab "Capas" del Bottom Sheet — versión móvil. Ver FiltersSidebar.tsx para la versión web. */
 export function CapasTab() {
   const t = useThemeColors();
@@ -56,6 +60,14 @@ export function CapasTab() {
         title="Alcantarillado"
         dotColor={Colors.desague}
         items={DESAGUE_CAPAS}
+        seleccion={capasVisibles}
+        onToggle={toggle}
+      />
+      <CapaGroup
+        styles={styles}
+        title="Infraestructura no lineal"
+        dotColor={Colors.primary}
+        items={INFRAESTRUCTURA_CAPAS}
         seleccion={capasVisibles}
         onToggle={toggle}
       />
