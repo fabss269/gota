@@ -1,11 +1,19 @@
-import { useState, type CSSProperties, type ReactNode } from 'react';
+import { Ionicons } from '@expo/vector-icons';
+import type { CSSProperties, ReactNode } from 'react';
 
+import { EditableNumberField, EditableSelectField, EditableSwitchField } from '@/components/shared/EditableField';
+import { SkeletonBlock } from '@/components/shared/Skeleton';
 import type { ElementoRedTipo } from '@/components/map/mapLayers';
-import { useActualizarElementoRed, useElementoRed, useMaterialesRed } from '@/hooks/useElementoRed';
+import {
+  useAccesorioClasificaciones,
+  useAccesorioTipos,
+  useElementoRed,
+  useMaterialesRed,
+} from '@/hooks/useElementoRed';
 
 const TIPO_LABEL: Record<ElementoRedTipo, string> = {
   tuberia: 'Tubería de agua',
-  tramo: 'Tramo de alcantarillado',
+  tramo: 'Tubería de alcantarillado',
   buzon: 'Buzón',
   accesorio: 'Accesorio',
   cajaagua: 'Caja de agua',
@@ -14,25 +22,53 @@ const TIPO_LABEL: Record<ElementoRedTipo, string> = {
   lote: 'Lote',
 };
 
-// Edición inline (estilo Jira) de diámetro/material — pedido de Edgar 2026-08-07,
-// solo para tramos de red (tuberia = agua, tramo = alcantarillado). El resto de
-// tipos (buzon/accesorio/cajaagua/cajadesague/manzana/lote) queda de solo lectura.
-const TIENE_DIAMETRO_EDITABLE = (tipo: ElementoRedTipo) => tipo === 'tuberia';
-const TIENE_MATERIAL_EDITABLE = (tipo: ElementoRedTipo) => tipo === 'tuberia' || tipo === 'tramo';
+// Grupo de sig.materiales por tipo — mismo mapeo que GRUPO_MATERIAL_POR_TIPO en
+// app/modules/red/service.py (backend), no se puede editar material fuera de estos 2.
+const GRUPO_MATERIAL: Partial<Record<ElementoRedTipo, string>> = {
+  tuberia: 'AGUA POTABLE',
+  tramo: 'ALCANTARILLADO',
+};
 
 type Props = { tipo: ElementoRedTipo; id: number; onClose: () => void };
 
 /** Panel lateral derecho con la info de un elemento de catastro (click en el mapa
- * fuera de modo simulación) — misma estructura visual que DetailPanel.tsx
- * (incidencias). Diámetro/material de tramos son editables inline. */
+ * fuera de modo simulación). Todo campo es editable salvo el identificador (código/
+ * id, mostrado en el título) y ubicación (sector/distrito, derivados de la geometría
+ * — el backend no los expone en la whitelist de PATCH). Cada control (switch/combo/
+ * input) está siempre visible; cambiarlo abre un modal de confirmación antes de
+ * guardar (ver EditableField.web.tsx y la decisión de Edgar 2026-08-10). */
 export function ElementoInfoPanel({ tipo, id, onClose }: Props) {
   const { data, isLoading, isError } = useElementoRed({ tipo, id });
 
   if (isLoading) {
     return (
       <div style={panel}>
-        <div style={statusBox}>
-          <span style={{ color: 'var(--map-text-muted)', fontSize: 13 }}>Cargando…</span>
+        <div style={header}>
+          <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
+            <SkeletonBlock width={120} height={10} />
+            <div style={closeBtn} />
+          </div>
+          <div style={{ marginTop: 8 }}>
+            <SkeletonBlock width={160} height={20} />
+          </div>
+        </div>
+        <div style={scrollable}>
+          <div style={{ padding: '14px 16px' }}>
+            <SkeletonBlock width={110} height={20} radius={999} />
+            <div style={{ marginTop: 16, display: 'flex', flexDirection: 'column', gap: 16 }}>
+              <SkeletonFieldRow />
+              <SkeletonFieldRow />
+              <SkeletonFieldRow />
+            </div>
+          </div>
+          <Divider />
+          <div style={{ padding: '14px 16px' }}>
+            <SkeletonBlock width={90} height={20} radius={999} />
+            <div style={{ marginTop: 14, display: 'flex', flexDirection: 'column', gap: 4 }}>
+              <SkeletonUbicacionRow />
+              <SkeletonUbicacionRow />
+            </div>
+          </div>
         </div>
       </div>
     );
@@ -49,66 +85,174 @@ export function ElementoInfoPanel({ tipo, id, onClose }: Props) {
     );
   }
 
-  const materialEditable = TIENE_MATERIAL_EDITABLE(tipo);
-  const diametroEditable = TIENE_DIAMETRO_EDITABLE(tipo);
+  const identificador = data.codigo ?? (data.id !== undefined ? String(data.id) : null);
+  const tieneDatosTecnicos = ['tuberia', 'tramo', 'cajaagua', 'cajadesague', 'accesorio', 'buzon'].includes(tipo);
 
   return (
     <div style={panel}>
       <div style={header}>
         <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
-          <span style={{ fontSize: 11, fontWeight: '700', color: 'var(--map-accent)' }}>
-            {TIPO_LABEL[tipo]}
-          </span>
+          <span style={badge}>{TIPO_LABEL[tipo].toUpperCase()}</span>
           <button style={closeBtn} onClick={onClose} aria-label="Cerrar panel">×</button>
         </div>
-        <div style={{ fontSize: 17, fontWeight: '700', color: 'var(--map-text)', marginTop: 6 }}>
-          {data.codigo ?? data.inscripcion ?? data.nombre ?? `#${data.id}`}
-        </div>
+        <div style={titleStyle}>{identificador ? `#${identificador}` : data.nombre ?? '—'}</div>
       </div>
 
       <div style={scrollable}>
-        <Section title="DATOS">
-          {filaTexto('Código', data.codigo)}
-          {filaTexto('Inscripción', data.inscripcion)}
-          {filaTexto('Nombre', data.nombre)}
-          {filaTexto('Tipo', data.tipoNombre)}
-          {materialEditable ? (
-            <MaterialRowEditable tipo={tipo} id={id} value={data.material} />
-          ) : (
-            filaTexto('Material', data.material)
-          )}
-          {data.primaria !== null && <DataRow label="Red" value={data.primaria ? 'Primaria' : 'Secundaria'} />}
-          {diametroEditable ? (
-            <DiametroRowEditable tipo={tipo} id={id} value={data.diametroPulgadas} />
-          ) : (
-            filaNumero('Diámetro', data.diametroPulgadas, '"')
-          )}
-          {filaNumero('Profundidad', data.profundidad, ' m')}
-          {filaNumero('Cota tapa', data.cota, ' m')}
-          {filaNumero('Cota fondo', data.cotaFondo, ' m')}
-          {filaTexto('Referencia', data.referencia)}
-          {filaNumero('Área', data.area, ' m²')}
-          {filaNumero('Perímetro', data.perimetro, ' m')}
-        </Section>
+        {tieneDatosTecnicos && (
+          <Section title="Datos técnicos">
+            <DatosTecnicos tipo={tipo} id={id} data={data} />
+          </Section>
+        )}
+
+        {(tipo === 'manzana' || tipo === 'lote') && (
+          <Section title="Datos">
+            {filaTexto('Nombre', data.nombre)}
+            {filaTexto('Tipo', data.tipoNombre)}
+            {filaNumero('Área', data.area, ' m²')}
+            {filaNumero('Perímetro', data.perimetro, ' m')}
+          </Section>
+        )}
 
         <Divider />
 
-        <Section title="UBICACIÓN">
-          {filaTexto('Sector', data.sectorNombre)}
-          {filaTexto('Distrito', data.distritoNombre)}
+        <Section title="Ubicación">
+          <UbicacionRow icon="location-outline" label="Sector" value={data.sectorNombre} />
+          <UbicacionRow icon="business-outline" label="Distrito" value={data.distritoNombre} />
         </Section>
       </div>
     </div>
   );
 }
 
-function filaTexto(label: string, value: string | null): ReactNode {
+type ElementoData = ReturnType<typeof useElementoRed>['data'];
+
+function DatosTecnicos({ tipo, id, data }: { tipo: ElementoRedTipo; id: number; data: NonNullable<ElementoData> }) {
+  const grupoMaterial = GRUPO_MATERIAL[tipo] ?? null;
+  const materialesQuery = useMaterialesRed(grupoMaterial, grupoMaterial !== null);
+  const accesorioTiposQuery = useAccesorioTipos(null, tipo === 'accesorio');
+  const accesorioClasifQuery = useAccesorioClasificaciones(tipo === 'accesorio');
+
+  if (tipo === 'tramo') {
+    return (
+      <>
+        <EditableSwitchField
+          tipo={tipo}
+          id={id}
+          label="Clasificación"
+          campo="primaria"
+          value={data.primaria ?? false}
+          offLabel="Secundaria"
+          onLabel="Primaria"
+        />
+        <EditableSelectField
+          tipo={tipo}
+          id={id}
+          label="Material"
+          campo="materialId"
+          valueId={data.materialId}
+          valueLabel={data.material}
+          options={materialesQuery.data}
+          loading={materialesQuery.isLoading}
+        />
+        <EditableNumberField tipo={tipo} id={id} label="Pendiente" campo="pendiente" value={data.pendiente} suffix="%" />
+        <EditableNumberField tipo={tipo} id={id} label="Distancia" campo="distancia" value={data.distancia} suffix=" m" />
+      </>
+    );
+  }
+
+  if (tipo === 'tuberia') {
+    return (
+      <>
+        <EditableSelectField
+          tipo={tipo}
+          id={id}
+          label="Material"
+          campo="materialId"
+          valueId={data.materialId}
+          valueLabel={data.material}
+          options={materialesQuery.data}
+          loading={materialesQuery.isLoading}
+        />
+        <EditableNumberField
+          tipo={tipo}
+          id={id}
+          label="Diámetro"
+          campo="diametroPulgadas"
+          value={data.diametroPulgadas}
+          suffix='"'
+        />
+        <EditableNumberField tipo={tipo} id={id} label="Distancia" campo="distancia" value={data.distancia} suffix=" m" />
+      </>
+    );
+  }
+
+  if (tipo === 'accesorio') {
+    return (
+      <>
+        <EditableSelectField
+          tipo={tipo}
+          id={id}
+          label="Tipo"
+          campo="accesorioTipoId"
+          valueId={data.accesorioTipoId}
+          valueLabel={data.tipoNombre}
+          options={accesorioTiposQuery.data}
+          loading={accesorioTiposQuery.isLoading}
+        />
+        <EditableNumberField
+          tipo={tipo}
+          id={id}
+          label="Diámetro"
+          campo="diametroPulgadas"
+          value={data.diametroPulgadas}
+          suffix='"'
+        />
+        <EditableNumberField
+          tipo={tipo}
+          id={id}
+          label="Profundidad"
+          campo="profundidad"
+          value={data.profundidad}
+          suffix=" m"
+        />
+        <EditableSelectField
+          tipo={tipo}
+          id={id}
+          label="Clasificación"
+          campo="accesorioClasificacionId"
+          valueId={data.accesorioClasificacionId}
+          valueLabel={data.accesorioClasificacion}
+          options={accesorioClasifQuery.data}
+          loading={accesorioClasifQuery.isLoading}
+        />
+      </>
+    );
+  }
+
+  if (tipo === 'cajaagua' || tipo === 'cajadesague') {
+    return <EditableNumberField tipo={tipo} id={id} label="Cota" campo="cota" value={data.cota} suffix=" m" />;
+  }
+
+  if (tipo === 'buzon') {
+    return (
+      <>
+        <EditableNumberField tipo={tipo} id={id} label="Tapa" campo="tapa" value={data.cota} suffix=" m" />
+        <EditableNumberField tipo={tipo} id={id} label="Fondo" campo="fondo" value={data.cotaFondo} suffix=" m" />
+      </>
+    );
+  }
+
+  return null;
+}
+
+function filaTexto(label: string, value: string | null | undefined): ReactNode {
   if (!value) return null;
   return <DataRow label={label} value={value} />;
 }
 
-function filaNumero(label: string, value: number | null, sufijo: string): ReactNode {
-  if (value === null) return null;
+function filaNumero(label: string, value: number | null | undefined, sufijo: string): ReactNode {
+  if (value === null || value === undefined) return null;
   return <DataRow label={label} value={`${value}${sufijo}`} />;
 }
 
@@ -117,8 +261,8 @@ function Section({ title, children }: { title: string; children: ReactNode }) {
   if (Array.isArray(hijos) && hijos.length === 0) return null;
   return (
     <div style={{ padding: '14px 16px' }}>
-      <div style={sectionTitle}>{title}</div>
-      {children}
+      <span style={sectionBadge}>{title.toUpperCase()}</span>
+      <div style={{ marginTop: 14 }}>{children}</div>
     </div>
   );
 }
@@ -138,123 +282,50 @@ function DataRow({ label, value }: { label: string; value: string }) {
   );
 }
 
-// ── Edición inline (estilo Jira): click en el valor → input/select en el lugar,
-// guarda solo al confirmar (blur/Enter para el número, onChange para el select) —
-// no hay botón "Guardar" separado. Escape cancela sin guardar. ──────────────
-
-function DiametroRowEditable({ tipo, id, value }: { tipo: ElementoRedTipo; id: number; value: number | null }) {
-  const [editando, setEditando] = useState(false);
-  const [draft, setDraft] = useState('');
-  const mutation = useActualizarElementoRed();
-
-  if (!editando) {
-    return (
-      <button
-        type="button"
-        style={rowEditableBtn}
-        onClick={() => {
-          setDraft(value !== null ? String(value) : '');
-          setEditando(true);
-        }}
-      >
-        <span style={dataRowLabelEditable}>Diámetro</span>
-        <span style={dataRowValueEditable}>
-          {value !== null ? `${value}"` : 'Sin dato'} <EditPencil />
-        </span>
-      </button>
-    );
-  }
-
-  const confirmar = () => {
-    const numero = Number(draft);
-    if (draft.trim() === '' || Number.isNaN(numero) || numero === value) {
-      setEditando(false);
-      return;
-    }
-    mutation.mutate(
-      { tipo, id, patch: { diametroPulgadas: numero } },
-      { onSettled: () => setEditando(false) }
-    );
-  };
-
+function UbicacionRow({
+  icon,
+  label,
+  value,
+}: {
+  icon: keyof typeof Ionicons.glyphMap;
+  label: string;
+  value: string | null | undefined;
+}) {
   return (
-    <div style={rowEditing}>
-      <span style={dataRowLabelEditable}>Diámetro</span>
-      <div style={{ display: 'flex', alignItems: 'center', gap: 4 }}>
-        <input
-          type="number"
-          step="0.5"
-          min="0"
-          autoFocus
-          disabled={mutation.isPending}
-          value={draft}
-          onChange={(e) => setDraft(e.target.value)}
-          onBlur={confirmar}
-          onKeyDown={(e) => {
-            if (e.key === 'Enter') (e.target as HTMLInputElement).blur();
-            if (e.key === 'Escape') setEditando(false);
-          }}
-          style={inlineInput}
-        />
-        <span style={{ fontSize: 12.5, color: 'var(--map-text)' }}>{'"'}</span>
+    <div style={ubicacionRow}>
+      <div style={ubicacionIconWrap}>
+        <Ionicons name={icon} size={16} color="var(--map-accent)" />
+      </div>
+      <div>
+        <div style={{ fontSize: 11, color: 'var(--map-text-muted)', fontWeight: '600' }}>{label}</div>
+        <div style={{ fontSize: 13, color: 'var(--map-text)', fontWeight: '600' }}>{value ?? 'Sin dato'}</div>
       </div>
     </div>
   );
 }
 
-function MaterialRowEditable({ tipo, id, value }: { tipo: ElementoRedTipo; id: number; value: string | null }) {
-  const [editando, setEditando] = useState(false);
-  const { data: materiales, isLoading } = useMaterialesRed(editando ? tipo : null);
-  const mutation = useActualizarElementoRed();
-
-  if (!editando) {
-    return (
-      <button type="button" style={rowEditableBtn} onClick={() => setEditando(true)}>
-        <span style={dataRowLabelEditable}>Material</span>
-        <span style={dataRowValueEditable}>
-          {value ?? 'Sin dato'} <EditPencil />
-        </span>
-      </button>
-    );
-  }
-
+function SkeletonFieldRow() {
   return (
-    <div style={rowEditing}>
-      <span style={dataRowLabelEditable}>Material</span>
-      <select
-        autoFocus
-        disabled={isLoading || mutation.isPending}
-        defaultValue=""
-        onChange={(e) => {
-          const materialId = Number(e.target.value);
-          if (!materialId) {
-            setEditando(false);
-            return;
-          }
-          mutation.mutate({ tipo, id, patch: { materialId } }, { onSettled: () => setEditando(false) });
-        }}
-        onBlur={() => setEditando(false)}
-        style={inlineSelect}
-      >
-        <option value="" disabled>
-          {isLoading ? 'Cargando…' : 'Elegir material…'}
-        </option>
-        {materiales?.map((m) => (
-          <option key={m.id} value={m.id}>
-            {m.nombre}
-          </option>
-        ))}
-      </select>
+    <div>
+      <SkeletonBlock width={70} height={9} style={{ marginBottom: 6 }} />
+      <SkeletonBlock height={34} radius={8} />
     </div>
   );
 }
 
-function EditPencil() {
-  return <span style={editPencil}>✎</span>;
+function SkeletonUbicacionRow() {
+  return (
+    <div style={ubicacionRow}>
+      <SkeletonBlock width={32} height={32} radius={16} />
+      <div style={{ flex: 1 }}>
+        <SkeletonBlock width={50} height={9} style={{ marginBottom: 6 }} />
+        <SkeletonBlock width={100} height={12} />
+      </div>
+    </div>
+  );
 }
 
-// ── Estilos (idénticos a DetailPanel.tsx para que el panel derecho se sienta igual
-// sea cual sea el tipo de selección) ───────────────────────────────────────
+// ── Estilos ──────────────────────────────────────────────────────────────────
 
 const panel: CSSProperties = {
   width: 320,
@@ -283,17 +354,34 @@ const header: CSSProperties = {
   flexShrink: 0,
 };
 
+const badge: CSSProperties = {
+  fontSize: 10,
+  fontWeight: '700',
+  color: 'var(--map-accent)',
+  letterSpacing: 0.5,
+};
+
+const titleStyle: CSSProperties = {
+  fontSize: 18,
+  fontWeight: '700',
+  color: 'var(--map-text)',
+  marginTop: 6,
+};
+
 const scrollable: CSSProperties = {
   flex: 1,
   overflowY: 'auto',
 };
 
-const sectionTitle: CSSProperties = {
+const sectionBadge: CSSProperties = {
+  display: 'inline-block',
   fontSize: 10,
   fontWeight: '700',
   color: 'var(--map-text-muted)',
-  letterSpacing: 0.6,
-  marginBottom: 10,
+  letterSpacing: 0.5,
+  backgroundColor: 'var(--map-surface-alt)',
+  padding: '4px 10px',
+  borderRadius: 999,
 };
 
 const closeBtn: CSSProperties = {
@@ -322,69 +410,20 @@ const linkBtn: CSSProperties = {
   cursor: 'pointer',
 };
 
-const rowEditableBtn: CSSProperties = {
+const ubicacionRow: CSSProperties = {
   display: 'flex',
-  width: '100%',
-  justifyContent: 'space-between',
   alignItems: 'center',
-  padding: '5px 0',
-  gap: 8,
-  background: 'none',
-  border: 'none',
-  cursor: 'pointer',
-  borderRadius: 4,
+  gap: 10,
+  padding: '8px 0',
 };
 
-const rowEditing: CSSProperties = {
+const ubicacionIconWrap: CSSProperties = {
+  width: 32,
+  height: 32,
+  borderRadius: 16,
+  backgroundColor: 'var(--map-accent-bg)',
   display: 'flex',
-  justifyContent: 'space-between',
   alignItems: 'center',
-  padding: '5px 0',
-  gap: 8,
-};
-
-const dataRowLabelEditable: CSSProperties = {
-  fontSize: 11,
-  color: 'var(--map-text-muted)',
-  fontWeight: '600',
+  justifyContent: 'center',
   flexShrink: 0,
-  width: 90,
-  textAlign: 'left',
-};
-
-const dataRowValueEditable: CSSProperties = {
-  fontSize: 12.5,
-  color: 'var(--map-accent)',
-  textAlign: 'right',
-  fontWeight: '600',
-  display: 'flex',
-  alignItems: 'center',
-  justifyContent: 'flex-end',
-  gap: 4,
-};
-
-const editPencil: CSSProperties = {
-  fontSize: 11,
-  opacity: 0.6,
-};
-
-const inlineInput: CSSProperties = {
-  width: 70,
-  fontSize: 12.5,
-  padding: '3px 6px',
-  border: '1px solid var(--map-accent)',
-  borderRadius: 4,
-  color: 'var(--map-text)',
-  backgroundColor: 'var(--map-surface)',
-  textAlign: 'right',
-};
-
-const inlineSelect: CSSProperties = {
-  fontSize: 12.5,
-  padding: '3px 6px',
-  border: '1px solid var(--map-accent)',
-  borderRadius: 4,
-  color: 'var(--map-text)',
-  backgroundColor: 'var(--map-surface)',
-  maxWidth: 190,
 };

@@ -129,6 +129,15 @@
             "boolean",
             [
               "feature-state",
+              "selected"
+            ],
+            false
+          ],
+          "#FFC107",
+          [
+            "boolean",
+            [
+              "feature-state",
               "hover"
             ],
             false
@@ -138,6 +147,30 @@
         ],
         "line-width": [
           "case",
+          [
+            "boolean",
+            [
+              "feature-state",
+              "selected"
+            ],
+            false
+          ],
+          [
+            "+",
+            3,
+            [
+              "*",
+              2.5,
+              [
+                "coalesce",
+                [
+                  "feature-state",
+                  "pulse"
+                ],
+                0
+              ]
+            ]
+          ],
           [
             "boolean",
             [
@@ -180,6 +213,15 @@
             "boolean",
             [
               "feature-state",
+              "selected"
+            ],
+            false
+          ],
+          "#FFC107",
+          [
+            "boolean",
+            [
+              "feature-state",
               "hover"
             ],
             false
@@ -189,6 +231,30 @@
         ],
         "line-width": [
           "case",
+          [
+            "boolean",
+            [
+              "feature-state",
+              "selected"
+            ],
+            false
+          ],
+          [
+            "+",
+            2.4,
+            [
+              "*",
+              2.0,
+              [
+                "coalesce",
+                [
+                  "feature-state",
+                  "pulse"
+                ],
+                0
+              ]
+            ]
+          ],
           [
             "boolean",
             [
@@ -212,9 +278,73 @@
         "visibility": "none"
       },
       "paint": {
-        "line-color": "#29B6F6",
+        "line-color": [
+          "case",
+          [
+            "boolean",
+            [
+              "feature-state",
+              "selected"
+            ],
+            false
+          ],
+          "#FFC107",
+          "#29B6F6"
+        ],
         "line-width": [
           "case",
+          [
+            "boolean",
+            [
+              "feature-state",
+              "selected"
+            ],
+            false
+          ],
+          [
+            "+",
+            [
+              "interpolate",
+              [
+                "linear"
+              ],
+              [
+                "to-number",
+                [
+                  "coalesce",
+                  [
+                    "get",
+                    "diametro"
+                  ],
+                  4
+                ]
+              ],
+              2,
+              1.5,
+              4,
+              2.1,
+              8,
+              3.0,
+              16,
+              4.2,
+              30,
+              5.7,
+              40,
+              6.6
+            ],
+            [
+              "*",
+              3.5,
+              [
+                "coalesce",
+                [
+                  "feature-state",
+                  "pulse"
+                ],
+                0
+              ]
+            ]
+          ],
           [
             "boolean",
             [
@@ -347,6 +477,15 @@
             "boolean",
             [
               "feature-state",
+              "selected"
+            ],
+            false
+          ],
+          "#FFC107",
+          [
+            "boolean",
+            [
+              "feature-state",
               "hover"
             ],
             false
@@ -356,6 +495,30 @@
         ],
         "line-width": [
           "case",
+          [
+            "boolean",
+            [
+              "feature-state",
+              "selected"
+            ],
+            false
+          ],
+          [
+            "+",
+            3.3,
+            [
+              "*",
+              2.5,
+              [
+                "coalesce",
+                [
+                  "feature-state",
+                  "pulse"
+                ],
+                0
+              ]
+            ]
+          ],
           [
             "boolean",
             [
@@ -382,11 +545,74 @@
         "visibility": "none"
       },
       "paint": {
-        "circle-radius": 3,
+        "circle-radius": [
+          "case",
+          [
+            "boolean",
+            [
+              "feature-state",
+              "selected"
+            ],
+            false
+          ],
+          [
+            "+",
+            6,
+            [
+              "*",
+              3,
+              [
+                "coalesce",
+                [
+                  "feature-state",
+                  "pulse"
+                ],
+                0
+              ]
+            ]
+          ],
+          3
+        ],
         "circle-color": "#06B6D4",
-        "circle-stroke-color": "#FFEB3B",
+        "circle-stroke-color": [
+          "case",
+          [
+            "boolean",
+            [
+              "feature-state",
+              "selected"
+            ],
+            false
+          ],
+          "#FFC107",
+          "#FFEB3B"
+        ],
         "circle-stroke-width": [
           "case",
+          [
+            "boolean",
+            [
+              "feature-state",
+              "selected"
+            ],
+            false
+          ],
+          [
+            "+",
+            3,
+            [
+              "*",
+              3,
+              [
+                "coalesce",
+                [
+                  "feature-state",
+                  "pulse"
+                ],
+                0
+              ]
+            ]
+          ],
           [
             "boolean",
             [
@@ -417,9 +643,45 @@
         true
       ],
       "paint": {
-        "line-color": "#5D4037",
+        "line-color": [
+          "case",
+          [
+            "boolean",
+            [
+              "feature-state",
+              "selected"
+            ],
+            false
+          ],
+          "#FFC107",
+          "#5D4037"
+        ],
         "line-width": [
           "case",
+          [
+            "boolean",
+            [
+              "feature-state",
+              "selected"
+            ],
+            false
+          ],
+          [
+            "+",
+            7.65,
+            [
+              "*",
+              3.5,
+              [
+                "coalesce",
+                [
+                  "feature-state",
+                  "pulse"
+                ],
+                0
+              ]
+            ]
+          ],
           [
             "boolean",
             [
@@ -450,9 +712,45 @@
         false
       ],
       "paint": {
-        "line-color": "#A1887F",
+        "line-color": [
+          "case",
+          [
+            "boolean",
+            [
+              "feature-state",
+              "selected"
+            ],
+            false
+          ],
+          "#FFC107",
+          "#A1887F"
+        ],
         "line-width": [
           "case",
+          [
+            "boolean",
+            [
+              "feature-state",
+              "selected"
+            ],
+            false
+          ],
+          [
+            "+",
+            2.7,
+            [
+              "*",
+              2.0,
+              [
+                "coalesce",
+                [
+                  "feature-state",
+                  "pulse"
+                ],
+                0
+              ]
+            ]
+          ],
           [
             "boolean",
             [
@@ -494,6 +792,15 @@
             "boolean",
             [
               "feature-state",
+              "selected"
+            ],
+            false
+          ],
+          "#FFC107",
+          [
+            "boolean",
+            [
+              "feature-state",
               "hover"
             ],
             false
@@ -503,6 +810,30 @@
         ],
         "line-width": [
           "case",
+          [
+            "boolean",
+            [
+              "feature-state",
+              "selected"
+            ],
+            false
+          ],
+          [
+            "+",
+            3.3,
+            [
+              "*",
+              2.5,
+              [
+                "coalesce",
+                [
+                  "feature-state",
+                  "pulse"
+                ],
+                0
+              ]
+            ]
+          ],
           [
             "boolean",
             [
@@ -529,11 +860,74 @@
         "visibility": "none"
       },
       "paint": {
-        "circle-radius": 3,
+        "circle-radius": [
+          "case",
+          [
+            "boolean",
+            [
+              "feature-state",
+              "selected"
+            ],
+            false
+          ],
+          [
+            "+",
+            6,
+            [
+              "*",
+              3,
+              [
+                "coalesce",
+                [
+                  "feature-state",
+                  "pulse"
+                ],
+                0
+              ]
+            ]
+          ],
+          3
+        ],
         "circle-color": "#795548",
-        "circle-stroke-color": "#FFEB3B",
+        "circle-stroke-color": [
+          "case",
+          [
+            "boolean",
+            [
+              "feature-state",
+              "selected"
+            ],
+            false
+          ],
+          "#FFC107",
+          "#FFEB3B"
+        ],
         "circle-stroke-width": [
           "case",
+          [
+            "boolean",
+            [
+              "feature-state",
+              "selected"
+            ],
+            false
+          ],
+          [
+            "+",
+            3,
+            [
+              "*",
+              3,
+              [
+                "coalesce",
+                [
+                  "feature-state",
+                  "pulse"
+                ],
+                0
+              ]
+            ]
+          ],
           [
             "boolean",
             [
@@ -556,11 +950,74 @@
         "visibility": "none"
       },
       "paint": {
-        "circle-radius": 4,
+        "circle-radius": [
+          "case",
+          [
+            "boolean",
+            [
+              "feature-state",
+              "selected"
+            ],
+            false
+          ],
+          [
+            "+",
+            7,
+            [
+              "*",
+              3,
+              [
+                "coalesce",
+                [
+                  "feature-state",
+                  "pulse"
+                ],
+                0
+              ]
+            ]
+          ],
+          4
+        ],
         "circle-color": "#757575",
-        "circle-stroke-color": "#FFEB3B",
+        "circle-stroke-color": [
+          "case",
+          [
+            "boolean",
+            [
+              "feature-state",
+              "selected"
+            ],
+            false
+          ],
+          "#FFC107",
+          "#FFEB3B"
+        ],
         "circle-stroke-width": [
           "case",
+          [
+            "boolean",
+            [
+              "feature-state",
+              "selected"
+            ],
+            false
+          ],
+          [
+            "+",
+            3,
+            [
+              "*",
+              3,
+              [
+                "coalesce",
+                [
+                  "feature-state",
+                  "pulse"
+                ],
+                0
+              ]
+            ]
+          ],
           [
             "boolean",
             [
@@ -583,11 +1040,74 @@
         "visibility": "none"
       },
       "paint": {
-        "circle-radius": 3,
+        "circle-radius": [
+          "case",
+          [
+            "boolean",
+            [
+              "feature-state",
+              "selected"
+            ],
+            false
+          ],
+          [
+            "+",
+            6,
+            [
+              "*",
+              3,
+              [
+                "coalesce",
+                [
+                  "feature-state",
+                  "pulse"
+                ],
+                0
+              ]
+            ]
+          ],
+          3
+        ],
         "circle-color": "#9C27B0",
-        "circle-stroke-color": "#FFEB3B",
+        "circle-stroke-color": [
+          "case",
+          [
+            "boolean",
+            [
+              "feature-state",
+              "selected"
+            ],
+            false
+          ],
+          "#FFC107",
+          "#FFEB3B"
+        ],
         "circle-stroke-width": [
           "case",
+          [
+            "boolean",
+            [
+              "feature-state",
+              "selected"
+            ],
+            false
+          ],
+          [
+            "+",
+            3,
+            [
+              "*",
+              3,
+              [
+                "coalesce",
+                [
+                  "feature-state",
+                  "pulse"
+                ],
+                0
+              ]
+            ]
+          ],
           [
             "boolean",
             [

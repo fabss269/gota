@@ -73,30 +73,41 @@ export type ApiSuministro = { lat: number; lon: number; sectorId: number | null;
 
 // GET /red/elemento/{tipo}/{id} — panel de info al hacer click en un elemento de
 // catastro (ver API.md § 7). Campos no aplicables al `tipo` consultado vienen `null`.
+// Los `*Id` conviven con los nombres legibles para poblar combos editables sin un
+// segundo request (mismo criterio que ElementoRedOut en el backend).
 export type ApiElementoRedDetalle = {
   tipo: string;
   id: number;
   codigo: string | null;
   inscripcion: string | null;
+  nombre: string | null;
+  referencia: string | null;
   tipoNombre: string | null;
+  accesorioTipoId: number | null;
   material: string | null;
+  materialId: number | null;
+  accesorioClasificacion: string | null;
+  accesorioClasificacionId: number | null;
   diametroPulgadas: number | null;
-  primaria: boolean | null;
+  pendiente: number | null;
+  distancia: number | null;
   profundidad: number | null;
   cota: number | null;
   cotaFondo: number | null;
-  referencia: string | null;
-  nombre: string | null;
   area: number | null;
   perimetro: number | null;
+  primaria: boolean | null;
   sectorId: number | null;
   sectorNombre: string | null;
   distritoId: number | null;
   distritoNombre: string | null;
 };
 
-// GET /red/materiales/{tipo} — catálogo para el selector de edición inline.
+// GET /red/materiales, /red/accesorio-tipos, /red/accesorio-clasificaciones —
+// catálogos para los combos editables del panel de elemento.
 export type ApiMaterial = { id: number; nombre: string };
+export type ApiAccesorioTipo = { id: number; nombre: string };
+export type ApiAccesorioClasificacion = { id: number; nombre: string };
 
 // Grafo hidráulico (impacto/foco por causa raíz/simulación) — ver API.md § 11.
 export type TipoFalla =
