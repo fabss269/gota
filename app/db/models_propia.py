@@ -134,6 +134,7 @@ class Reclamo(Base):
     persona: Mapped[str]
     direccion_detalle: Mapped[str | None]
     detalle_del_ticket: Mapped[str | None]
+    es_robo: Mapped[bool | None]
     problema: Mapped[str | None]
     fecha_registro: Mapped[datetime]
     medio_recepcion_id: Mapped[int] = mapped_column(
