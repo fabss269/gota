@@ -1,7 +1,7 @@
 import uuid
 from datetime import date, datetime
 
-from sqlalchemy import Select, and_, func, or_, select
+from sqlalchemy import Select, and_, any_, func, or_, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.db.models_propia import (
@@ -20,6 +20,23 @@ class PropiaIncidenciaRepository:
     def __init__(self, session: AsyncSession) -> None:
         self._session = session
 
+    def _ultimo_estado_subquery(self):
+        """Subquery `incidente_id` cuyo evento MÁS RECIENTE tiene un estado dado —
+        mismo patrón de window function que `mapa_prioridad_real`. Reemplaza el
+        índice invertido `idx:estado:*` que vivía en Redis (decisión de Edgar
+        2026-08-10: ese índice solo se llenaba leyendo incidentes uno por uno, así
+        que Redis vacío = filtro por estado devolvía 0 resultados)."""
+        ultimo_evento = (
+            select(
+                EstadoIncidenteEvento.incidente_id,
+                EstadoIncidenteEvento.estado_resultante_id,
+                func.row_number()
+                .over(partition_by=EstadoIncidenteEvento.incidente_id, order_by=EstadoIncidenteEvento.fecha.desc())
+                .label("orden_reciente"),
+            ).subquery()
+        )
+        return ultimo_evento
+
     def _query_base(
         self,
         *,
@@ -31,6 +48,8 @@ class PropiaIncidenciaRepository:
         q: str | None,
         bbox: tuple[float, float, float, float] | None,
         resuelto: bool | None,
+        estado_ids: list[int] | None,
+        suministro_codigos: list[str] | None,
     ) -> Select:
         stmt = select(Incidente).join(Incidente.tipo_atencion)
         condiciones = []
@@ -58,6 +77,20 @@ class PropiaIncidenciaRepository:
             min_lon, min_lat, max_lon, max_lat = bbox
             condiciones.append(Incidente.latitud.between(min_lat, max_lat))
             condiciones.append(Incidente.longitud.between(min_lon, max_lon))
+        if estado_ids is not None:
+            ultimo_evento = self._ultimo_estado_subquery()
+            con_ese_estado = select(ultimo_evento.c.incidente_id).where(
+                ultimo_evento.c.orden_reciente == 1, ultimo_evento.c.estado_resultante_id.in_(estado_ids)
+            )
+            condiciones.append(Incidente.incidente_id.in_(con_ese_estado))
+        if suministro_codigos is not None:
+            # `= ANY(:array)` en vez de `.in_()`: un `distritoId` puede traer
+            # decenas de miles de suministros (todos los cajaagua/cajadesague del
+            # distrito) — `.in_()` expande cada valor como un parámetro bindeado
+            # aparte y asyncpg tiene un límite duro de 32767 parámetros por query
+            # (error real en vivo 2026-08-10: "the number of query arguments
+            # cannot exceed 32767"). `ANY(array)` manda un solo parámetro array.
+            condiciones.append(Incidente.suministro_codigo == any_(suministro_codigos))
         if condiciones:
             stmt = stmt.where(and_(*condiciones))
         return stmt
@@ -73,7 +106,8 @@ class PropiaIncidenciaRepository:
         q: str | None = None,
         bbox: tuple[float, float, float, float] | None = None,
         resuelto: bool | None = None,
-        candidatos: set[str] | None = None,
+        estado_ids: list[int] | None = None,
+        suministro_codigos: list[str] | None = None,
         page: int = 1,
         page_size: int = 10,
     ) -> tuple[list[Incidente], int]:
@@ -86,10 +120,9 @@ class PropiaIncidenciaRepository:
             q=q,
             bbox=bbox,
             resuelto=resuelto,
+            estado_ids=estado_ids,
+            suministro_codigos=suministro_codigos,
         )
-        if candidatos is not None:
-            ids = [uuid.UUID(c) for c in candidatos]
-            stmt = stmt.where(Incidente.incidente_id.in_(ids))
 
         total = (
             await self._session.scalar(
@@ -259,6 +292,15 @@ class PropiaIncidenciaRepository:
             )
         )
         return float(promedio) if promedio is not None else None
+
+    async def listar_suministro_y_fecha(self) -> list[tuple[str, datetime]]:
+        """`(suministro_codigo, creado_en)` de todos los incidentes — usado por el
+        dashboard (`prioridadPorSector`) para agrupar por sector en Python contra el
+        mapa de `CatastroEnrichmentService.mapa_suministro_a_sector()`, en vez de un
+        query a Redis por sector (ver decisión de Edgar 2026-08-10 en
+        cache_repository.py)."""
+        filas = await self._session.execute(select(Incidente.suministro_codigo, Incidente.creado_en))
+        return list(filas.all())
 
     async def get_prioridad_real(self, incidente_id: uuid.UUID) -> int | None:
         """Prioridad real del incidente, calculada por el módulo de alertas

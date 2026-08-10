@@ -141,3 +141,21 @@ postgres:
         codigo: varchar
         sectorid: int4
         distritoid: int4
+    incidencias:
+      # Mapa del Dashboard (DashboardMap.web.tsx) — nunca tuvo esta fuente
+      # configurada en Martin (404 confirmado en vivo 2026-08-09). `geom` ya viene
+      # en SRID 4326 directo desde latitud/longitud, no hace falta ST_Transform.
+      # Whitelist: lo que lee DashboardMap.web.tsx (codigo, grupo, n_reclamos,
+      # es_resolucion_lenta, sectorid) más columnas obvias por si hacen falta.
+      schema: gota
+      table: mv_incidente_enriquecido
+      srid: 4326
+      geometry_column: geom
+      properties:
+        codigo: varchar
+        grupo: varchar
+        n_reclamos: int8
+        es_resolucion_lenta: bool
+        sin_solucion: bool
+        sectorid: int4
+        sig_distritoid: int4

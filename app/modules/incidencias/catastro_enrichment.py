@@ -80,6 +80,46 @@ class CatastroEnrichmentService:
             lon=float(row.lon),
         )
 
+    async def listar_suministros_por_sector(self, sector_ids: list[int]) -> list[str]:
+        """Códigos de suministro (== `inscripcion` en sig.cajaagua/cajadesague) de
+        los sectores dados — usado para filtrar `GET /incidencias?sectorId=`/
+        `distritoId=` directo contra la BD, sin depender de Redis (decisión de
+        Edgar 2026-08-10: antes esto se resolvía con un índice invertido en Redis
+        que solo se llenaba leyendo incidentes uno por uno, así que un Redis recién
+        reiniciado o vaciado dejaba el filtro de sector devolviendo 0 resultados
+        aunque la BD tuviera todo bien). Sin JOIN cross-schema (specs/00 §1): el
+        resultado se usa como `WHERE suministro_codigo = ANY(...)` en la BD propia,
+        en `service.py`."""
+        if not sector_ids:
+            return []
+        stmt = text(
+            """
+            SELECT inscripcion FROM sig.cajaagua WHERE sectorid = ANY(:sector_ids) AND inscripcion <> :sentinel
+            UNION
+            SELECT inscripcion FROM sig.cajadesague WHERE sectorid = ANY(:sector_ids) AND inscripcion <> :sentinel
+            """
+        )
+        result = await self._session.execute(stmt, {"sector_ids": sector_ids, "sentinel": _SENTINEL_INSCRIPCION})
+        return [row[0] for row in result if row[0]]
+
+    async def mapa_suministro_a_sector(self) -> dict[str, int]:
+        """Igual idea que `listar_suministros_por_sector` pero en la dirección
+        contraria y para TODOS los sectores de una — usado por el dashboard
+        (`prioridadPorSector`) para agrupar incidentes por sector sin hacer un
+        query a `sig` por sector (antes N queries a Redis, uno por sector, con el
+        mismo problema de índice-vacío-si-no-se-usó-antes)."""
+        stmt = text(
+            """
+            SELECT inscripcion, sectorid FROM sig.cajaagua
+            WHERE inscripcion <> :sentinel AND sectorid IS NOT NULL
+            UNION
+            SELECT inscripcion, sectorid FROM sig.cajadesague
+            WHERE inscripcion <> :sentinel AND sectorid IS NOT NULL
+            """
+        )
+        result = await self._session.execute(stmt, {"sentinel": _SENTINEL_INSCRIPCION})
+        return {row.inscripcion: row.sectorid for row in result}
+
     async def resolver_catastro_cercano(self, lat: float, lon: float, categoria: str) -> CatastroCercano:
         """Vecino más cercano en `sig.agua`/`sig.alcantarillado` (según `categoria`) +
         `sig.buzones`, usando los índices GiST existentes (`<->` KNN). El punto de

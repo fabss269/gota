@@ -153,31 +153,29 @@ class IncidenciaService:
         return date.fromisoformat(valor)
 
     async def listar(self, filtros: IncidenciaFilterParams) -> IncidenciaListResponse:
-        estado_ids: list[str] | None = None
-        prioridad_ids: list[str] | None = None
-        sector_ids: list[str] | None = None
-
+        # `estado`/`sector`/`distrito` se filtran directo contra Postgres/`sig`, no
+        # contra Redis — decisión de Edgar 2026-08-10. Antes dependían de índices
+        # invertidos (`idx:estado:*`/`idx:sector:*`) que solo se llenaban leyendo
+        # incidentes uno por uno (o con un rebuild manual); con Redis vacío (recién
+        # reiniciado, o después de un restore de BD) el filtro devolvía 0 resultados
+        # aunque la BD tuviera todo bien — bug real encontrado en vivo (el mapa
+        # quedó sin ninguna incidencia). `prioridad` directamente no se aplica como
+        # filtro: sin módulo de alertas implementado no hay prioridad real que
+        # filtrar (ver gota.incidente_alerta_regla, siempre vacía hoy).
+        estado_ids: list[int] | None = None
         if filtros.estado:
-            estado_ids = [str(i) for i in await self._propia.resolver_estado_ids(filtros.csv(filtros.estado) or [])]
-        if filtros.prioridad:
-            prioridad_ids = [
-                str(i) for i in await self._propia.resolver_prioridad_ids(filtros.csv(filtros.prioridad) or [])
-            ]
+            estado_ids = await self._propia.resolver_estado_ids(filtros.csv(filtros.estado) or [])
+
+        suministro_codigos: list[str] | None = None
         if filtros.sectorId or filtros.distritoId:
-            ids: set[str] = set()
+            sector_ids: set[str] = set()
             if filtros.sectorId:
-                ids.update(filtros.csv(filtros.sectorId) or [])
+                sector_ids.update(filtros.csv(filtros.sectorId) or [])
             if filtros.distritoId:
                 sectores = await self._sig_catalogo.listar_sectores(filtros.distritoId)
-                ids.update(s["id"] for s in sectores)
-            sector_ids = list(ids)
-
-        candidatos = None
-        if estado_ids is not None or prioridad_ids is not None or sector_ids is not None:
-            candidatos = await self._cache.resolver_candidatos(
-                estado_ids=estado_ids, prioridad_ids=prioridad_ids, sector_ids=sector_ids
-            )
-            if candidatos is not None and not candidatos:
+                sector_ids.update(s["id"] for s in sectores)
+            suministro_codigos = await self._catastro.listar_suministros_por_sector([int(s) for s in sector_ids])
+            if not suministro_codigos:
                 return IncidenciaListResponse(items=[], page=filtros.page, pageSize=filtros.pageSize, total=0)
 
         filas, total = await self._propia.listar(
@@ -189,7 +187,8 @@ class IncidenciaService:
             q=filtros.q,
             bbox=filtros.bbox_tuple(),
             resuelto=filtros.resuelto,
-            candidatos=candidatos,
+            estado_ids=estado_ids,
+            suministro_codigos=suministro_codigos,
             page=filtros.page,
             page_size=filtros.pageSize,
         )

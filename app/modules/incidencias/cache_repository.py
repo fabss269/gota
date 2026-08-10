@@ -1,17 +1,21 @@
-"""Caché externa (Redis) de `estado`/`prioridad`/`sector` de `incidente`.
+"""Caché externa (Redis) de `estado`/`prioridad`/`sector` de `incidente` — solo
+para armar rápido los campos derivados de `GET /incidencias`, nunca para filtrar.
 
 `incidente` no tiene estas columnas (specs/00-arquitectura.md §7) — viven solo aquí,
-desechable y reconstruible desde Postgres+`sig` (ver `scripts/rebuild_incidencia_cache.py`).
-Nunca es la fuente de verdad: en un *cache miss*, el caller debe recalcular contra las
-fuentes reales y repoblar vía `set_resumen`.
-"""
+desechable y reconstruible desde Postgres+`sig`. Es una caché de lectura individual
+pura (get/set por id): decisión de Edgar 2026-08-10 de sacar los índices invertidos
+(`idx:estado:*`/`idx:sector:*`/`idx:prioridad:*`) que existían antes — esos requerían
+que cada incidente hubiera sido leído al menos una vez (o un rebuild manual) para que
+el filtrado funcionara; si Redis estaba vacío (recién reiniciado, o después de un
+restore de BD), filtrar por estado/sector devolvía 0 resultados aunque la BD tuviera
+todo bien. Ahora `estado`/`sector` se filtran directo contra Postgres/`sig`
+(`propia_repository.py`/`catastro_enrichment.py`), sin pasar por Redis — esta caché
+solo evita recalcular por incidente en cada respuesta, nunca decide qué incidente
+entra o no en un listado."""
 
 from redis.asyncio import Redis
 
 _RESUMEN_KEY = "cache:incidente:{id}:resumen"
-_IDX_ESTADO_KEY = "idx:estado:{id}"
-_IDX_PRIORIDAD_KEY = "idx:prioridad:{id}"
-_IDX_SECTOR_KEY = "idx:sector:{id}"
 
 
 class Resumen:
@@ -61,14 +65,10 @@ class IncidenciaCacheRepository:
         sector_nombre: str | None = None,
         distrito_id: str | None = None,
     ) -> None:
-        """Actualiza el hash de resumen y mantiene los índices invertidos al día.
-
-        Solo toca los campos que vienen distintos de `None` — permite actualizar
-        estado sin tener que recalcular sector, y viceversa (ej. spec 05 solo
-        actualiza `estado_actual_id` al insertar un evento).
-        """
-        anterior = await self.get_resumen(incidente_id)
-
+        """Actualiza el hash de resumen — solo toca los campos que vienen distintos
+        de `None`, permite actualizar estado sin tener que recalcular sector, y
+        viceversa (ej. spec 05 solo actualiza `estado_actual_id` al insertar un
+        evento). Sin índices invertidos que mantener (ver docstring del módulo)."""
         campos: dict[str, str] = {}
         if estado_actual_id is not None:
             campos["estado_actual_id"] = estado_actual_id
@@ -83,56 +83,3 @@ class IncidenciaCacheRepository:
 
         if campos:
             await self._redis.hset(_RESUMEN_KEY.format(id=incidente_id), mapping=campos)
-
-        if estado_actual_id is not None:
-            await self._mover_indice(
-                _IDX_ESTADO_KEY, incidente_id, anterior.estado_actual_id if anterior else None, estado_actual_id
-            )
-        if prioridad_id is not None:
-            await self._mover_indice(
-                _IDX_PRIORIDAD_KEY, incidente_id, anterior.prioridad_id if anterior else None, prioridad_id
-            )
-        if sector_id is not None:
-            await self._mover_indice(
-                _IDX_SECTOR_KEY, incidente_id, anterior.sector_id if anterior else None, sector_id
-            )
-
-    async def _mover_indice(
-        self, key_pattern: str, incidente_id: str, id_anterior: str | None, id_nuevo: str
-    ) -> None:
-        if id_anterior == id_nuevo:
-            return
-        if id_anterior is not None:
-            await self._redis.srem(key_pattern.format(id=id_anterior), incidente_id)
-        await self._redis.sadd(key_pattern.format(id=id_nuevo), incidente_id)
-
-    async def resolver_candidatos(
-        self,
-        *,
-        estado_ids: list[str] | None = None,
-        prioridad_ids: list[str] | None = None,
-        sector_ids: list[str] | None = None,
-    ) -> set[str] | None:
-        """`None` significa "sin restricción" (no se pidió ningún filtro resuelto por
-        Redis). Si se pidió al menos un filtro, intersecta (AND) los resultados de cada
-        dimensión — dentro de cada dimensión los ids son OR (`SUNION`)."""
-        grupos: list[set[str]] = []
-        for key_pattern, ids in (
-            (_IDX_ESTADO_KEY, estado_ids),
-            (_IDX_PRIORIDAD_KEY, prioridad_ids),
-            (_IDX_SECTOR_KEY, sector_ids),
-        ):
-            if not ids:
-                continue
-            keys = [key_pattern.format(id=i) for i in ids]
-            grupos.append(await self._redis.sunion(keys) if len(keys) > 1 else await self._redis.smembers(keys[0]))
-
-        if not grupos:
-            return None
-        candidatos = grupos[0]
-        for grupo in grupos[1:]:
-            candidatos &= grupo
-        return candidatos
-
-    async def sector_incidente_ids(self, sector_id: str) -> set[str]:
-        return await self._redis.smembers(_IDX_SECTOR_KEY.format(id=sector_id))
