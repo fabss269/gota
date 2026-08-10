@@ -4,6 +4,7 @@ import { useState, type CSSProperties, type ReactNode } from 'react';
 import type { ApiElementoRedDetalle } from '@/api/types';
 import { EditableField } from '@/components/shared/EditableField';
 import type { ComboOption } from '@/components/shared/SearchableCombo';
+import { SkeletonBlock } from '@/components/shared/Skeleton';
 import { useToast } from '@/components/shared/Toast';
 import type { ElementoRedTipo } from '@/components/map/mapLayers';
 import { Colors } from '@/constants/theme';
@@ -39,8 +40,31 @@ export function ElementoInfoPanel({ tipo, id, onClose }: Props) {
   if (isLoading) {
     return (
       <aside style={panel}>
-        <div style={statusBox}>
-          <span style={{ color: Colors.textMuted, fontSize: 13 }}>Cargando…</span>
+        <div style={headerStyle}>
+          <div style={headerRow}>
+            <SkeletonBlock width={120} height={10} style={skeletonColor} />
+            <div style={closeBtn} />
+          </div>
+          <div style={{ marginTop: 8 }}>
+            <SkeletonBlock width={160} height={20} style={skeletonColor} />
+          </div>
+        </div>
+        <div style={scrollable}>
+          <div style={section}>
+            <SkeletonBlock width={90} height={12} style={skeletonColor} />
+            <div style={{ ...sectionBody, display: 'flex', flexDirection: 'column', gap: 16 }}>
+              <SkeletonFieldRow />
+              <SkeletonFieldRow />
+              <SkeletonFieldRow />
+            </div>
+          </div>
+          <div style={section}>
+            <SkeletonBlock width={70} height={12} style={skeletonColor} />
+            <div style={sectionBody}>
+              <SkeletonUbicacionRow />
+              <SkeletonUbicacionRow />
+            </div>
+          </div>
         </div>
       </aside>
     );
@@ -284,6 +308,26 @@ function ReadOnlyRow({ label, value }: { label: string; value: string }) {
   );
 }
 
+// ── Placeholders del estado de carga (isLoading) ─────────────────────────────
+
+function SkeletonFieldRow() {
+  return (
+    <div>
+      <SkeletonBlock width={70} height={9} style={{ ...skeletonColor, marginBottom: 6 }} />
+      <SkeletonBlock height={34} radius={8} style={skeletonColor} />
+    </div>
+  );
+}
+
+function SkeletonUbicacionRow() {
+  return (
+    <div style={readOnlyRow}>
+      <SkeletonBlock width={80} height={11} style={skeletonColor} />
+      <SkeletonBlock width={110} height={13} style={skeletonColor} />
+    </div>
+  );
+}
+
 // ── Sección con título + fondo tenue ─────────────────────────────────────────
 
 function Section({ title, children }: { title: string; children: ReactNode }) {
@@ -326,6 +370,8 @@ function toComboOptions(items: { id: number; nombre: string }[] | undefined): Co
 }
 
 // ── Estilos ──────────────────────────────────────────────────────────────────
+
+const skeletonColor: CSSProperties = { backgroundColor: '#F1F3F5' };
 
 const panel: CSSProperties = {
   width: 340,

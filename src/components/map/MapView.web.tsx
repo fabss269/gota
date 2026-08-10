@@ -106,6 +106,7 @@ type Props = {
   clusters: IncidentCluster[];
   onPressCluster: (cluster: IncidentCluster) => void;
   onElementClick?: (tipo: ElementoRedTipo, id: number) => void;
+  elementoSeleccionado?: { tipo: ElementoRedTipo; id: number } | null;
 };
 
 type MarkerEntry = {
@@ -122,7 +123,7 @@ function unmountRootSafely(root: Root) {
   queueMicrotask(() => root.unmount());
 }
 
-export function EpselMapView({ clusters, onPressCluster, onElementClick }: Props) {
+export function EpselMapView({ clusters, onPressCluster, onElementClick, elementoSeleccionado }: Props) {
   const containerRef = useRef<HTMLDivElement | null>(null);
   const mapRef = useRef<maplibregl.Map | null>(null);
   const markersRef = useRef<Map<string, MarkerEntry>>(new Map());
@@ -583,6 +584,15 @@ export function EpselMapView({ clusters, onPressCluster, onElementClick }: Props
   // (GET /red/elemento/{tipo}/{id}, ver mapa/index.web.tsx). Handler separado del de
   // simulación de arriba — ese es exclusivo de `sim.activo && !sim.modoVista`, este
   // solo corre cuando la simulación está inactiva, nunca compiten por el mismo click.
+  //
+  // El feature clickeado queda marcado con feature-state 'selected' (mismo mecanismo
+  // que 'hover' arriba) para que se note cuál es — pedido de Edgar 2026-08-10, antes
+  // no había ninguna marca visual de qué se había clickeado. Se guarda en
+  // selectedFeatureRef para poder limpiarlo cuando el panel se cierra (el efecto de
+  // más abajo, que mira la prop `elementoSeleccionado`) o cuando se clickea otro
+  // elemento (se limpia el anterior antes de marcar el nuevo).
+  const selectedFeatureRef = useRef<{ source: string; sourceLayer: string; id: string | number } | null>(null);
+
   useEffect(() => {
     const map = mapRef.current;
     if (!map || !onElementClickRef) return;
@@ -605,6 +615,14 @@ export function EpselMapView({ clusters, onPressCluster, onElementClick }: Props
       const config = ELEMENTO_INFO_LAYERS.find((l) => l.id === feature.layer.id);
       const idValor = config ? feature.properties?.[config.idProperty] : undefined;
       if (!config || typeof idValor !== 'number') return;
+      if (feature.id === undefined || feature.sourceLayer === undefined) return;
+
+      const prev = selectedFeatureRef.current;
+      if (prev) {
+        map.setFeatureState({ source: prev.source, sourceLayer: prev.sourceLayer, id: prev.id }, { selected: false, pulse: 0 });
+      }
+      map.setFeatureState({ source: feature.source, sourceLayer: feature.sourceLayer, id: feature.id }, { selected: true });
+      selectedFeatureRef.current = { source: feature.source, sourceLayer: feature.sourceLayer, id: feature.id };
 
       onElementClickRef.current(config.tipo, idValor);
     };
@@ -614,6 +632,43 @@ export function EpselMapView({ clusters, onPressCluster, onElementClick }: Props
       map.off('click', handleClick);
     };
   }, []);
+
+  // Limpia la marca de selección cuando el panel se cierra (elementoSeleccionado
+  // pasa a null vía onClose en mapa/index.web.tsx). No hace falta manejar el caso
+  // "se seleccionó un elemento distinto" acá: el propio handleClick de arriba ya
+  // limpia el anterior antes de marcar el nuevo, este efecto solo cubre el cierre.
+  useEffect(() => {
+    if (elementoSeleccionado) return;
+    const map = mapRef.current;
+    const prev = selectedFeatureRef.current;
+    if (map && prev) {
+      map.setFeatureState({ source: prev.source, sourceLayer: prev.sourceLayer, id: prev.id }, { selected: false, pulse: 0 });
+    }
+    selectedFeatureRef.current = null;
+  }, [elementoSeleccionado]);
+
+  // Animación de "palpitar" del elemento seleccionado: un valor 0..1 en el canal
+  // numérico de feature-state 'pulse', oscilando con una onda seno — los paint
+  // expressions de map-style.json lo usan para variar ancho/radio/opacidad. Un solo
+  // requestAnimationFrame mientras haya algo seleccionado (se detiene solo, no un
+  // setInterval corriendo siempre de fondo).
+  useEffect(() => {
+    if (!elementoSeleccionado) return;
+    const map = mapRef.current;
+    if (!map) return;
+
+    let frameId: number;
+    const tick = (time: number) => {
+      const sel = selectedFeatureRef.current;
+      if (sel) {
+        const pulse = (Math.sin(time / 320) + 1) / 2; // 0..1
+        map.setFeatureState({ source: sel.source, sourceLayer: sel.sourceLayer, id: sel.id }, { pulse });
+      }
+      frameId = requestAnimationFrame(tick);
+    };
+    frameId = requestAnimationFrame(tick);
+    return () => cancelAnimationFrame(frameId);
+  }, [elementoSeleccionado]);
 
   // Cursor "esto va a fallar" (X roja, ver CURSOR_FALLA) mientras se elige el
   // elemento a romper en modo simulación — se actualiza solo al cambiar de fase (no

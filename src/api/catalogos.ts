@@ -9,8 +9,9 @@ export function getDistritos(): Promise<ApiDistrito[]> {
   return apiFetch<ApiDistrito[]>('/catalogos/distritos');
 }
 
-export function getSectores(): Promise<ApiSector[]> {
-  return apiFetch<ApiSector[]>('/catalogos/sectores');
+export function getSectores(distritoId?: string): Promise<ApiSector[]> {
+  const query = distritoId ? `?${new URLSearchParams({ distritoId })}` : '';
+  return apiFetch<ApiSector[]>(`/catalogos/sectores${query}`);
 }
 
 export function buscarSuministro(codigo: string): Promise<ApiSuministro> {

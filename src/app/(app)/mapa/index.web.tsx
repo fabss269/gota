@@ -111,6 +111,7 @@ export default function MapaScreen() {
           clusters={clusters}
           onPressCluster={handleClusterPress}
           onElementClick={handleElementClick}
+          elementoSeleccionado={elementoSeleccionado}
         />
 
         {/* Buscador de dirección / suministro */}
