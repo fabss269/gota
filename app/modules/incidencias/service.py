@@ -53,7 +53,6 @@ class IncidenciaService:
         self._mapa_estados_inv: dict[str, int] = {}
         self._mapa_prioridades: dict[int, str] = {}
         self._mapa_prioridades_inv: dict[str, int] = {}
-        self._prioridad_default: str | None = None
 
     async def _precargar_mapas(self) -> None:
         if self._mapas_cargados:
@@ -62,7 +61,6 @@ class IncidenciaService:
         self._mapa_estados_inv = {v: k for k, v in self._mapa_estados.items()}
         self._mapa_prioridades = await self._propia.mapa_prioridades()
         self._mapa_prioridades_inv = {v: k for k, v in self._mapa_prioridades.items()}
-        self._prioridad_default = await self._propia.prioridad_default_codigo()
         self._mapas_cargados = True
 
     async def _resolver_resumen(self, incidente: Incidente, categoria: str) -> tuple[str, str | None, str | None]:
@@ -100,10 +98,10 @@ class IncidenciaService:
                 set_kwargs["sector_nombre"] = predio.sector_nombre
                 set_kwargs["distrito_id"] = str(predio.distrito_id)
 
-        if prioridad_codigo is None and self._prioridad_default is not None:
-            prioridad_codigo = self._prioridad_default
-            prioridad_id = self._mapa_prioridades_inv.get(prioridad_codigo)
+        if prioridad_codigo is None:
+            prioridad_id = await self._propia.get_prioridad_real(incidente.incidente_id)
             if prioridad_id is not None:
+                prioridad_codigo = self._mapa_prioridades.get(prioridad_id)
                 set_kwargs["prioridad_id"] = str(prioridad_id)
 
         if set_kwargs:

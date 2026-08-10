@@ -60,9 +60,6 @@ async def poblar_cache_incidentes(
     catastro_svc = CatastroEnrichmentService(sig_session)
 
     mapa_estados_inv = {v: k for k, v in (await propia_repo.mapa_estados()).items()}
-    mapa_prioridades_inv = {v: k for k, v in (await propia_repo.mapa_prioridades()).items()}
-    prioridad_default = await propia_repo.prioridad_default_codigo()
-    prioridad_default_id = mapa_prioridades_inv.get(prioridad_default) if prioridad_default else None
 
     query = select(Incidente).join(Incidente.tipo_atencion)
     if incidente_ids is not None:
@@ -70,6 +67,8 @@ async def poblar_cache_incidentes(
             return 0
         query = query.where(Incidente.incidente_id.in_(incidente_ids))
     incidentes = list(await propia_session.scalars(query))
+
+    mapa_prioridad_real = await propia_repo.mapa_prioridad_real([i.incidente_id for i in incidentes])
 
     poblados = 0
     for incidente in incidentes:
@@ -86,8 +85,9 @@ async def poblar_cache_incidentes(
             kwargs["sector_id"] = str(predio.sector_id)
             kwargs["sector_nombre"] = predio.sector_nombre
             kwargs["distrito_id"] = str(predio.distrito_id)
-        if prioridad_default_id is not None:
-            kwargs["prioridad_id"] = str(prioridad_default_id)
+        prioridad_id = mapa_prioridad_real.get(incidente.incidente_id)
+        if prioridad_id is not None:
+            kwargs["prioridad_id"] = str(prioridad_id)
 
         if kwargs:
             await cache_repo.set_resumen(str(incidente.incidente_id), **kwargs)

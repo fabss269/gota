@@ -11,6 +11,7 @@ from app.db.models_propia import (
     CatalogoTipoGrupo,
     EstadoIncidenteEvento,
     Incidente,
+    IncidenteAlertaRegla,
     Reclamo,
 )
 
@@ -259,10 +260,39 @@ class PropiaIncidenciaRepository:
         )
         return float(promedio) if promedio is not None else None
 
-    async def prioridad_default_codigo(self) -> str | None:
-        """Sin módulo de alertas implementado (fuera de alcance, specs/00 §7) no hay
-        forma de calcular la prioridad real de un incidente — se usa la de menor
-        `orden` como default explícito hasta que ese módulo exista."""
+    async def get_prioridad_real(self, incidente_id: uuid.UUID) -> int | None:
+        """Prioridad real del incidente, calculada por el módulo de alertas
+        (`incidente_alerta_regla`, hoy vacía — sin módulo de alertas implementado no
+        hay filas). `None` si no hay ninguna fila: no se inventa un default, para no
+        cachear/mostrar un dato que la BD no tiene."""
         return await self._session.scalar(
-            select(CatalogoPrioridad.codigo).order_by(CatalogoPrioridad.orden).limit(1)
+            select(IncidenteAlertaRegla.prioridad_id)
+            .where(IncidenteAlertaRegla.incidente_id == incidente_id)
+            .order_by(IncidenteAlertaRegla.fecha.desc())
+            .limit(1)
         )
+
+    async def mapa_prioridad_real(self, incidente_ids: list[uuid.UUID]) -> dict[uuid.UUID, int]:
+        """Igual que `get_prioridad_real` pero en bloque, para no hacer N round-trips
+        al reconstruir la caché completa. La fila más reciente por incidente gana."""
+        if not incidente_ids:
+            return {}
+        fila_mas_reciente = (
+            select(
+                IncidenteAlertaRegla.incidente_id,
+                IncidenteAlertaRegla.prioridad_id,
+                func.row_number()
+                .over(
+                    partition_by=IncidenteAlertaRegla.incidente_id,
+                    order_by=IncidenteAlertaRegla.fecha.desc(),
+                )
+                .label("orden_reciente"),
+            )
+            .where(IncidenteAlertaRegla.incidente_id.in_(incidente_ids))
+            .subquery()
+        )
+        stmt = select(fila_mas_reciente.c.incidente_id, fila_mas_reciente.c.prioridad_id).where(
+            fila_mas_reciente.c.orden_reciente == 1
+        )
+        filas = await self._session.execute(stmt)
+        return {incidente_id: prioridad_id for incidente_id, prioridad_id in filas if prioridad_id is not None}
