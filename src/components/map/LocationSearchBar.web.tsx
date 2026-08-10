@@ -47,6 +47,8 @@ function getSpeechRecognitionCtor(): (new () => SpeechRecognitionLike) | null {
 /** Buscador de ubicación (dirección vía Nominatim/OSM, o suministro vía backend) — overlay sobre el mapa web. */
 export function LocationSearchBar() {
   const flyTo = useMapSearchStore((state) => state.flyTo);
+  const isFlying = useMapSearchStore((state) => state.isFlying);
+  const clearPin = useMapSearchStore((state) => state.clearPin);
 
   const [query, setQuery] = useState('');
   const [resultados, setResultados] = useState<DireccionResultado[]>([]);
@@ -122,6 +124,9 @@ export function LocationSearchBar() {
   const handleQueryChange = (value: string) => {
     setQuery(value);
     const texto = value.trim();
+    // Al empezar a escribir de nuevo, retiramos el pin de la búsqueda anterior — no
+    // tiene sentido dejarlo colgado en un destino que ya no está en pantalla.
+    if (texto.length === 0) clearPin();
     // Limpiar dropdown/error cuando el texto es muy corto para buscar dirección
     // (y no aplica el modo suministro).
     if (detectarModo(texto) === 'direccion' && texto.length < MIN_QUERY_LEN) {
@@ -224,6 +229,14 @@ export function LocationSearchBar() {
 
   return (
     <div style={wrapper}>
+      <style>{`
+        @keyframes gota-spin { to { transform: rotate(360deg); } }
+        @keyframes gota-mic-pulse {
+          0%   { box-shadow: 0 0 0 0 rgba(220, 53, 69, 0.55); }
+          70%  { box-shadow: 0 0 0 12px rgba(220, 53, 69, 0); }
+          100% { box-shadow: 0 0 0 0 rgba(220, 53, 69, 0); }
+        }
+      `}</style>
       <form onSubmit={handleSubmit} style={formRow}>
         <span style={searchIcon}>
           <Ionicons name="search-outline" size={16} color="var(--map-text-muted)" />
@@ -258,18 +271,21 @@ export function LocationSearchBar() {
         )}
       </form>
 
-      {hayTexto && !buscando && !error && (
-        <div style={modeChip}>
-          <Ionicons
-            name={modo === 'suministro' ? 'barcode-outline' : 'location-outline'}
-            size={12}
-            color="var(--map-text-muted)"
-          />
-          <span>{modo === 'suministro' ? 'Buscando por suministro' : 'Buscando por dirección'}</span>
+      {!buscando && !isFlying && error && <div style={errorMsg}>{error}</div>}
+
+      {(buscando || isFlying) && (
+        <div style={loaderOverlay} role="status" aria-live="polite">
+          <div style={loaderCard}>
+            <span style={spinnerWrap} aria-hidden>
+              <span style={spinnerRing} />
+              <span style={spinnerDot} />
+            </span>
+            <span style={loaderText}>
+              {modo === 'suministro' ? 'Buscando por suministro' : 'Buscando por dirección'}
+            </span>
+          </div>
         </div>
       )}
-      {buscando && <div style={statusMsg}>Buscando…</div>}
-      {!buscando && error && <div style={{ ...statusMsg, color: 'var(--map-danger-text)' }}>{error}</div>}
 
       {modo === 'direccion' && mostrarResultados && resultados.length > 0 && (
         <div style={dropdown}>
@@ -300,18 +316,71 @@ const wrapper: CSSProperties = {
   maxWidth: 'calc(100% - 24px)',
 };
 
-const modeChip: CSSProperties = {
+// Overlay centrado sobre toda la pantalla — se muestra mientras la búsqueda está en
+// curso o el mapa está animando el flyTo. `pointerEvents: 'none'` permite que el
+// usuario siga interactuando con el mapa mientras aparece.
+const loaderOverlay: CSSProperties = {
+  position: 'fixed',
+  inset: 0,
+  display: 'flex',
+  alignItems: 'center',
+  justifyContent: 'center',
+  pointerEvents: 'none',
+  zIndex: 1000,
+};
+
+const loaderCard: CSSProperties = {
+  display: 'inline-flex',
+  flexDirection: 'column',
+  alignItems: 'center',
+  gap: 12,
+  padding: '18px 28px',
+  minWidth: 180,
+  backgroundColor: 'var(--map-surface)',
+  borderRadius: 10,
+  boxShadow: '0 4px 16px rgba(0,0,0,0.20)',
+};
+
+const spinnerWrap: CSSProperties = {
+  position: 'relative',
+  width: 36,
+  height: 36,
   display: 'inline-flex',
   alignItems: 'center',
-  gap: 4,
-  marginTop: 4,
-  padding: '3px 8px',
-  fontSize: 10,
+  justifyContent: 'center',
+};
+
+const spinnerRing: CSSProperties = {
+  position: 'absolute',
+  inset: 0,
+  border: '3px solid var(--map-surface-alt)',
+  borderTopColor: 'var(--map-accent)',
+  borderRadius: '50%',
+  animation: 'gota-spin 0.85s linear infinite',
+};
+
+const spinnerDot: CSSProperties = {
+  width: 10,
+  height: 10,
+  borderRadius: '50%',
+  backgroundColor: 'var(--map-accent)',
+};
+
+const loaderText: CSSProperties = {
+  fontSize: 13,
   fontWeight: 600,
-  color: 'var(--map-text-muted)',
-  backgroundColor: 'rgba(255,255,255,0.92)',
+  color: 'var(--map-text)',
+  textAlign: 'center',
+};
+
+const errorMsg: CSSProperties = {
+  marginTop: 4,
+  fontSize: 11,
+  color: 'var(--map-danger-text)',
+  backgroundColor: 'var(--map-surface)',
+  padding: '4px 10px',
   borderRadius: 6,
-  boxShadow: '0 1px 3px rgba(0,0,0,0.12)',
+  boxShadow: '0 1px 4px rgba(0,0,0,0.12)',
   width: 'fit-content',
 };
 
@@ -342,29 +411,21 @@ const input: CSSProperties = {
 
 const iconBtn: CSSProperties = {
   border: 'none',
-  background: 'none',
+  backgroundColor: 'transparent',
   cursor: 'pointer',
   display: 'inline-flex',
   alignItems: 'center',
   justifyContent: 'center',
   padding: 4,
-  borderRadius: 4,
+  borderRadius: '50%',
   flexShrink: 0,
 };
 
+// Estado del botón de mic mientras el reconocimiento de voz está capturando —
+// combina fondo tenue + animación pulso tipo sonar para señal visual clara.
 const iconBtnActive: CSSProperties = {
   backgroundColor: 'var(--map-danger-bg)',
-};
-
-const statusMsg: CSSProperties = {
-  marginTop: 4,
-  fontSize: 11,
-  color: 'var(--map-text-muted)',
-  backgroundColor: 'var(--map-surface)',
-  padding: '4px 10px',
-  borderRadius: 6,
-  boxShadow: '0 1px 4px rgba(0,0,0,0.12)',
-  width: 'fit-content',
+  animation: 'gota-mic-pulse 1.4s ease-out infinite',
 };
 
 const dropdown: CSSProperties = {
