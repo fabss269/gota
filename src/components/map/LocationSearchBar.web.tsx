@@ -46,7 +46,7 @@ function getSpeechRecognitionCtor(): (new () => SpeechRecognitionLike) | null {
 
 /** Buscador de ubicación (dirección vía Nominatim/OSM, o suministro vía backend) — overlay sobre el mapa web. */
 export function LocationSearchBar() {
-  const flyTo = useMapSearchStore((state) => state.flyTo);
+  const searchAndFly = useMapSearchStore((state) => state.searchAndFly);
   const isFlying = useMapSearchStore((state) => state.isFlying);
   const clearPin = useMapSearchStore((state) => state.clearPin);
 
@@ -141,7 +141,7 @@ export function LocationSearchBar() {
     setQuery(item.label);
     setResultados([]);
     setMostrarResultados(false);
-    flyTo({ lat: item.lat, lon: item.lon, zoom: 18 });
+    searchAndFly({ lat: item.lat, lon: item.lon, zoom: 18 });
   };
 
   const buscarPorSuministro = async () => {
@@ -151,7 +151,7 @@ export function LocationSearchBar() {
     setError(null);
     try {
       const resultado = await buscarSuministro(codigo);
-      flyTo({ lat: resultado.lat, lon: resultado.lon, zoom: 19 });
+      searchAndFly({ lat: resultado.lat, lon: resultado.lon, zoom: 19 });
     } catch (e) {
       if (e instanceof ApiError && e.status === 404) {
         setError('No se encontró una caja de agua con ese suministro.');
@@ -210,7 +210,7 @@ export function LocationSearchBar() {
     setMostrarResultados(false);
     navigator.geolocation.getCurrentPosition(
       (pos) => {
-        flyTo({ lat: pos.coords.latitude, lon: pos.coords.longitude, zoom: 17 });
+        searchAndFly({ lat: pos.coords.latitude, lon: pos.coords.longitude, zoom: 17 });
         setBuscando(false);
       },
       (err) => {

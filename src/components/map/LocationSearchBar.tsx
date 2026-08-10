@@ -31,7 +31,7 @@ const detectarModo = (texto: string): Modo =>
 export function LocationSearchBar() {
   const t = useThemeColors();
   const styles = useMemo(() => makeStyles(t), [t]);
-  const flyTo = useMapSearchStore((state) => state.flyTo);
+  const searchAndFly = useMapSearchStore((state) => state.searchAndFly);
 
   const [query, setQuery] = useState('');
   const [resultados, setResultados] = useState<DireccionResultado[]>([]);
@@ -107,7 +107,7 @@ export function LocationSearchBar() {
     setQuery(item.label);
     setResultados([]);
     setMostrarResultados(false);
-    flyTo({ lat: item.lat, lon: item.lon, zoom: 18 });
+    searchAndFly({ lat: item.lat, lon: item.lon, zoom: 18 });
   };
 
   const buscarPorSuministro = async () => {
@@ -117,7 +117,7 @@ export function LocationSearchBar() {
     setError(null);
     try {
       const resultado = await buscarSuministro(codigo);
-      flyTo({ lat: resultado.lat, lon: resultado.lon, zoom: 19 });
+      searchAndFly({ lat: resultado.lat, lon: resultado.lon, zoom: 19 });
     } catch (e) {
       if (e instanceof ApiError && e.status === 404) {
         setError('No se encontró una caja de agua con ese suministro.');
