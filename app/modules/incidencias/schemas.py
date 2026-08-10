@@ -44,6 +44,8 @@ class ReclamoResumenOut(BaseModel):
     fechaRegistro: datetime
     medioRecepcion: str
     descripcion: str | None
+    detalleTicket: str | None
+    esRobo: bool
 
 
 class CatastroOut(BaseModel):
@@ -69,6 +71,7 @@ class IncidenciaDetalleOut(BaseModel):
     tipo: str
     categoria: str
     direccion: str | None
+    codigoSuministro: str | None
     prioridad: str | None
     estado: str
     antiguedadDias: int

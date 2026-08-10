@@ -265,6 +265,7 @@ class IncidenciaService:
             tipo=incidente.tipo_atencion.nombre,
             categoria=categoria,
             direccion=incidente.direccion,
+            codigoSuministro=incidente.suministro_codigo,
             prioridad=prioridad,
             estado=estado,
             antiguedadDias=(_now() - incidente.creado_en).days,
@@ -283,6 +284,8 @@ class IncidenciaService:
                     fechaRegistro=ultimo_reclamo.fecha_registro,
                     medioRecepcion=ultimo_reclamo.medio_recepcion.nombre,
                     descripcion=ultimo_reclamo.problema,
+                    detalleTicket=ultimo_reclamo.detalle_del_ticket,
+                    esRobo=bool(ultimo_reclamo.es_robo),
                 )
                 if ultimo_reclamo
                 else None
