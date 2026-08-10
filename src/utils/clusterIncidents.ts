@@ -6,48 +6,36 @@ export type IncidentCluster = {
   lon: number;
   count: number;
   prioridadMaxima: Prioridad;
-  categoriaDominante: 'agua' | 'desague' | 'mixta';
+  categoriaDominante: 'agua' | 'desague';
   incidencias: Incidencia[];
 };
 
-const PRIORIDAD_RANK: Record<Prioridad, number> = { a_tiempo: 0, alerta: 1, critica: 2 };
-
-// Radio de agrupación aproximado (grados). Suficiente para agrupar incidencias de una
-// misma cuadra/zona sin necesitar un endpoint de clustering en el backend todavía
-// (ver docs/API.md § 3, nota de implementación).
-const CLUSTER_RADIUS_DEG = 0.003;
-
+/**
+ * Mapea 1:1 cada Incidencia consolidada del backend a un marker del mapa.
+ *
+ * El backend YA agrupa por (suministro + tipo_atencion + ventana de 72h), por lo
+ * que cada `Incidencia` que llega acá es una entidad de negocio única — el
+ * frontend NO hace un segundo agrupamiento geográfico (eso mezclaba incidencias
+ * de suministros/tipos distintos que solo estaban cerca en el mapa, y forzaba
+ * una pseudo-categoría "mixta" que no existe en el dominio).
+ *
+ * `count` refleja cuántos reclamos originales el backend consolidó en esa
+ * incidencia (campo `quejasAgrupadas`). Hoy el endpoint del listado
+ * (`ApiIncidencia`) no lo expone, así que arranca en 1; cuando el backend lo
+ * agregue, este mapper lo consume sin cambios adicionales.
+ *
+ * TODO (foco por calle): cuando varias incidencias distintas caen sobre la
+ * misma vía, mostrar una mancha/heat sobre esa calle en vez de N markers
+ * separados. Requiere geometría de la calle y agregación server-side.
+ */
 export function clusterIncidents(incidencias: Incidencia[]): IncidentCluster[] {
-  const clusters: IncidentCluster[] = [];
-
-  for (const incidencia of incidencias) {
-    const existing = clusters.find(
-      (c) =>
-        Math.abs(c.lat - incidencia.lat) < CLUSTER_RADIUS_DEG &&
-        Math.abs(c.lon - incidencia.lon) < CLUSTER_RADIUS_DEG,
-    );
-
-    if (existing) {
-      existing.incidencias.push(incidencia);
-      existing.count += 1;
-      if (PRIORIDAD_RANK[incidencia.prioridad] > PRIORIDAD_RANK[existing.prioridadMaxima]) {
-        existing.prioridadMaxima = incidencia.prioridad;
-      }
-      if (existing.categoriaDominante !== 'mixta' && existing.categoriaDominante !== incidencia.categoria) {
-        existing.categoriaDominante = 'mixta';
-      }
-    } else {
-      clusters.push({
-        id: `cluster-${incidencia.id}`,
-        lat: incidencia.lat,
-        lon: incidencia.lon,
-        count: 1,
-        prioridadMaxima: incidencia.prioridad,
-        categoriaDominante: incidencia.categoria,
-        incidencias: [incidencia],
-      });
-    }
-  }
-
-  return clusters;
+  return incidencias.map((incidencia) => ({
+    id: `cluster-${incidencia.id}`,
+    lat: incidencia.lat,
+    lon: incidencia.lon,
+    count: (incidencia as Incidencia & { quejasAgrupadas?: number }).quejasAgrupadas ?? 1,
+    prioridadMaxima: incidencia.prioridad,
+    categoriaDominante: incidencia.categoria,
+    incidencias: [incidencia],
+  }));
 }

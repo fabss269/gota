@@ -1,0 +1,292 @@
+{
+  "version": 8,
+  "name": "GOTA - Red EPSEL (dev local, Martin en localhost:3000)",
+  "glyphs": "https://fonts.openmaptiles.org/{fontstack}/{range}.pbf",
+  "sources": {
+    "osm": {
+      "type": "raster",
+      "tiles": ["https://tile.openstreetmap.org/{z}/{x}/{y}.png"],
+      "tileSize": 256,
+      "maxzoom": 19,
+      "attribution": "© OpenStreetMap contributors"
+    },
+    "manzanas": {
+      "type": "vector",
+      "tiles": ["http://localhost:3000/manzanas/{z}/{x}/{y}"],
+      "promoteId": "manzanaid"
+    },
+    "lotes": {
+      "type": "vector",
+      "tiles": ["http://localhost:3000/lotes/{z}/{x}/{y}"],
+      "promoteId": "loteid"
+    },
+    "agua": {
+      "type": "vector",
+      "tiles": ["http://localhost:3000/agua/{z}/{x}/{y}"],
+      "promoteId": "aguaid"
+    },
+    "alcantarillado": {
+      "type": "vector",
+      "tiles": ["http://localhost:3000/alcantarillado/{z}/{x}/{y}"],
+      "promoteId": "alcantarilladoid"
+    },
+    "buzones": {
+      "type": "vector",
+      "tiles": ["http://localhost:3000/buzones/{z}/{x}/{y}"],
+      "promoteId": "buzonid"
+    },
+    "accesorios": {
+      "type": "vector",
+      "tiles": ["http://localhost:3000/accesorios/{z}/{x}/{y}"],
+      "promoteId": "accesorioid"
+    },
+    "cajaagua": {
+      "type": "vector",
+      "tiles": ["http://localhost:3000/cajaagua/{z}/{x}/{y}"],
+      "promoteId": "cajaaguaid"
+    },
+    "cajadesague": {
+      "type": "vector",
+      "tiles": ["http://localhost:3000/cajadesague/{z}/{x}/{y}"],
+      "promoteId": "cajadesagueid"
+    },
+    "cajaaguaconexion": {
+      "type": "vector",
+      "tiles": ["http://localhost:3000/cajaaguaconexion/{z}/{x}/{y}"],
+      "promoteId": "cajaaguaid"
+    },
+    "cajadesagueconexion": {
+      "type": "vector",
+      "tiles": ["http://localhost:3000/cajadesagueconexion/{z}/{x}/{y}"],
+      "promoteId": "cajadesagueid"
+    },
+    "sectores": {
+      "type": "vector",
+      "tiles": ["http://localhost:3000/sectores/{z}/{x}/{y}"]
+    },
+    "alcantarillado_flujo": {
+      "type": "vector",
+      "tiles": ["http://localhost:3000/alcantarillado_flujo/{z}/{x}/{y}"]
+    }
+  },
+  "layers": [
+    { "id": "osm", "type": "raster", "source": "osm" },
+
+    {
+      "id": "manzanas-fill",
+      "type": "fill",
+      "source": "manzanas",
+      "source-layer": "manzanas",
+      "layout": { "visibility": "none" },
+      "paint": { "fill-color": "#BDBDBD", "fill-opacity": 0.08 }
+    },
+    {
+      "id": "manzanas-outline",
+      "type": "line",
+      "source": "manzanas",
+      "source-layer": "manzanas",
+      "layout": { "visibility": "none" },
+      "paint": {
+        "line-color": ["case", ["boolean", ["feature-state", "hover"], false], "#FFEB3B", "#546472"],
+        "line-width": ["case", ["boolean", ["feature-state", "hover"], false], 3, 1.4],
+        "line-opacity": 0.85
+      }
+    },
+    {
+      "id": "lotes-fill",
+      "type": "fill",
+      "source": "lotes",
+      "source-layer": "lotes",
+      "layout": { "visibility": "none" },
+      "paint": { "fill-color": "#FFFFFF", "fill-opacity": 0.03 }
+    },
+    {
+      "id": "lotes-outline",
+      "type": "line",
+      "source": "lotes",
+      "source-layer": "lotes",
+      "layout": { "visibility": "none" },
+      "paint": {
+        "line-color": ["case", ["boolean", ["feature-state", "hover"], false], "#FFEB3B", "#8A97A3"],
+        "line-width": ["case", ["boolean", ["feature-state", "hover"], false], 2.4, 0.9],
+        "line-opacity": 0.8
+      }
+    },
+
+    {
+      "id": "agua-red",
+      "type": "line",
+      "source": "agua",
+      "source-layer": "agua",
+      "layout": { "visibility": "none" },
+      "paint": {
+        "line-color": "#29B6F6",
+        "line-width": [
+          "case", ["boolean", ["feature-state", "hover"], false],
+          ["*", ["interpolate", ["linear"], ["to-number", ["coalesce", ["get", "diametro"], 4]], 2, 1.5, 4, 2.1, 8, 3.0, 16, 4.2, 30, 5.7, 40, 6.6], 1.6],
+          ["interpolate", ["linear"], ["to-number", ["coalesce", ["get", "diametro"], 4]], 2, 1.5, 4, 2.1, 8, 3.0, 16, 4.2, 30, 5.7, 40, 6.6]
+        ]
+      }
+    },
+    {
+      "id": "agua-red-diametro-label",
+      "type": "symbol",
+      "source": "agua",
+      "source-layer": "agua",
+      "minzoom": 16,
+      "layout": {
+        "visibility": "none",
+        "symbol-placement": "line",
+        "symbol-spacing": 220,
+        "text-field": ["concat", ["to-string", ["round", ["to-number", ["get", "diametro"]]]], "\""],
+        "text-font": ["Noto Sans Bold"],
+        "text-size": 14,
+        "text-anchor": "bottom",
+        "text-offset": [0, -0.7],
+        "text-allow-overlap": false
+      },
+      "paint": {
+        "text-color": "#000000",
+        "text-halo-color": "#FFFFFF",
+        "text-halo-width": 1.8
+      }
+    },
+    {
+      "id": "cajaaguaconexion-line",
+      "type": "line",
+      "source": "cajaaguaconexion",
+      "source-layer": "cajaaguaconexion",
+      "layout": { "visibility": "none" },
+      "paint": {
+        "line-color": ["case", ["boolean", ["feature-state", "hover"], false], "#FFEB3B", "#60A5FA"],
+        "line-width": ["case", ["boolean", ["feature-state", "hover"], false], 3.3, 1.5],
+        "line-dasharray": [2, 2]
+      }
+    },
+    {
+      "id": "cajaagua-circle",
+      "type": "circle",
+      "source": "cajaagua",
+      "source-layer": "cajaagua",
+      "layout": { "visibility": "none" },
+      "paint": {
+        "circle-radius": 3,
+        "circle-color": "#06B6D4",
+        "circle-stroke-color": "#FFEB3B",
+        "circle-stroke-width": ["case", ["boolean", ["feature-state", "hover"], false], 3, 0]
+      }
+    },
+
+    {
+      "id": "alcantarillado-primaria",
+      "type": "line",
+      "source": "alcantarillado",
+      "source-layer": "alcantarillado",
+      "layout": { "visibility": "none" },
+      "filter": ["==", ["get", "primaria"], true],
+      "paint": {
+        "line-color": "#5D4037",
+        "line-width": ["case", ["boolean", ["feature-state", "hover"], false], 7.65, 4.8]
+      }
+    },
+    {
+      "id": "alcantarillado-secundaria",
+      "type": "line",
+      "source": "alcantarillado",
+      "source-layer": "alcantarillado",
+      "layout": { "visibility": "none" },
+      "filter": ["==", ["get", "primaria"], false],
+      "paint": {
+        "line-color": "#A1887F",
+        "line-width": ["case", ["boolean", ["feature-state", "hover"], false], 2.7, 1.5]
+      }
+    },
+    {
+      "id": "alcantarillado-flujo-flecha",
+      "type": "fill",
+      "source": "alcantarillado_flujo",
+      "source-layer": "alcantarillado_flujo",
+      "layout": { "visibility": "none" },
+      "paint": { "fill-color": "#B71C1C", "fill-opacity": 0.9 }
+    },
+    {
+      "id": "cajadesagueconexion-line",
+      "type": "line",
+      "source": "cajadesagueconexion",
+      "source-layer": "cajadesagueconexion",
+      "layout": { "visibility": "none" },
+      "paint": {
+        "line-color": ["case", ["boolean", ["feature-state", "hover"], false], "#FFEB3B", "#FB8C00"],
+        "line-width": ["case", ["boolean", ["feature-state", "hover"], false], 3.3, 1.5],
+        "line-dasharray": [2, 2]
+      }
+    },
+    {
+      "id": "cajadesague-circle",
+      "type": "circle",
+      "source": "cajadesague",
+      "source-layer": "cajadesague",
+      "layout": { "visibility": "none" },
+      "paint": {
+        "circle-radius": 3,
+        "circle-color": "#795548",
+        "circle-stroke-color": "#FFEB3B",
+        "circle-stroke-width": ["case", ["boolean", ["feature-state", "hover"], false], 3, 0]
+      }
+    },
+    {
+      "id": "buzones-circle",
+      "type": "circle",
+      "source": "buzones",
+      "source-layer": "buzones",
+      "layout": { "visibility": "none" },
+      "paint": {
+        "circle-radius": 4,
+        "circle-color": "#757575",
+        "circle-stroke-color": "#FFEB3B",
+        "circle-stroke-width": ["case", ["boolean", ["feature-state", "hover"], false], 3, 0]
+      }
+    },
+    {
+      "id": "accesorios-circle",
+      "type": "circle",
+      "source": "accesorios",
+      "source-layer": "accesorios",
+      "layout": { "visibility": "none" },
+      "paint": {
+        "circle-radius": 3,
+        "circle-color": "#9C27B0",
+        "circle-stroke-color": "#FFEB3B",
+        "circle-stroke-width": ["case", ["boolean", ["feature-state", "hover"], false], 3, 0]
+      }
+    },
+
+    {
+      "id": "sectores-resaltado-fill",
+      "type": "fill",
+      "source": "sectores",
+      "source-layer": "sectores",
+      "layout": { "visibility": "visible" },
+      "filter": ["in", ["get", "sectorid"], ["literal", []]],
+      "paint": { "fill-color": "#9E9E9E", "fill-opacity": 0.12 }
+    },
+    {
+      "id": "sectores-resaltado-halo",
+      "type": "line",
+      "source": "sectores",
+      "source-layer": "sectores",
+      "layout": { "visibility": "visible" },
+      "filter": ["in", ["get", "sectorid"], ["literal", []]],
+      "paint": { "line-color": "#FFFFFF", "line-width": 5.5 }
+    },
+    {
+      "id": "sectores-resaltado",
+      "type": "line",
+      "source": "sectores",
+      "source-layer": "sectores",
+      "layout": { "visibility": "visible" },
+      "filter": ["in", ["get", "sectorid"], ["literal", []]],
+      "paint": { "line-color": "#9E9E9E", "line-width": 2.5 }
+    }
+  ]
+}

@@ -32,11 +32,12 @@ export function IncidentMarker({ cluster }: Props) {
       <View style={styles.glyph} pointerEvents="none">
         {cluster.categoriaDominante === 'agua' && <GotaIcon size={16} color={Colors.white} />}
         {cluster.categoriaDominante === 'desague' && <AlcantarilladoIcon size={16} color={Colors.white} />}
-        {cluster.categoriaDominante === 'mixta' && <Text style={styles.mixedGlyph}>!</Text>}
       </View>
-      <View style={[styles.countBadge, { borderColor: color }]} pointerEvents="none">
-        <Text style={styles.countText}>{cluster.count}</Text>
-      </View>
+      {cluster.count > 1 && (
+        <View style={[styles.countBadge, { borderColor: color }]} pointerEvents="none">
+          <Text style={styles.countText}>{cluster.count}</Text>
+        </View>
+      )}
     </View>
   );
 }
@@ -53,11 +54,6 @@ const styles = StyleSheet.create({
     left: 0,
     right: 0,
     alignItems: 'center',
-  },
-  mixedGlyph: {
-    color: Colors.white,
-    fontWeight: '800',
-    fontSize: 14,
   },
   countBadge: {
     position: 'absolute',
