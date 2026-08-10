@@ -1,15 +1,12 @@
 import maplibregl from 'maplibre-gl';
 import 'maplibre-gl/dist/maplibre-gl.css';
 import { useEffect, useRef } from 'react';
-import { Image as RNImage } from 'react-native';
 import { createRoot, type Root } from 'react-dom/client';
 
-const RESERVORIO_ELEVADO_URI = RNImage.resolveAssetSource(
-  require('@/assets/images/icons/reservorio_elevado.png'),
-).uri;
-const RESERVORIO_APOYADO_URI = RNImage.resolveAssetSource(
-  require('@/assets/images/icons/reservorio_apoyado.png'),
-).uri;
+import { resolveAsset } from '@/utils/resolveAsset';
+
+const RESERVORIO_ELEVADO_URI = resolveAsset(require('@/assets/images/icons/reservorio_elevado.webp'));
+const RESERVORIO_APOYADO_URI = resolveAsset(require('@/assets/images/icons/reservorio_apoyado.webp'));
 
 import type { ApiBbox, TipoFalla } from '@/api/types';
 import { postSimulacion } from '@/api/grafo';
@@ -157,10 +154,11 @@ export function EpselMapView({ clusters, onPressCluster, onElementClick }: Props
     const markers = markersRef.current;
 
     // Íconos usados por la capa `reservorios-icon` (map-style.json). Se registran
-    // una sola vez al cargar el mapa. PNG 192×192 con fondo transparente y
-    // `pixelRatio: 2` — MapLibre interpreta 2 pixels del PNG = 1 CSS px, así que
-    // en pantallas retina el ícono se rasteriza a resolución completa sin borrosidad.
-    // Base efectiva: 96 CSS px (192 / 2). El icon-size del style multiplica esa base.
+    // una sola vez al cargar el mapa. PNG con aspect ratio natural (elevado 188×384,
+    // apoyado 384×228) y `pixelRatio: 4` — MapLibre interpreta 4 pixels del PNG = 1
+    // CSS px, dando ~3.6× de margen contra pixelamiento incluso en pantallas DPR 4.
+    // Base efectiva: lado más largo = 96 CSS px (384 / 4). El icon-size del style
+    // multiplica esa base preservando aspect ratio.
     map.on('load', () => {
       const iconos: { id: string; url: string }[] = [
         { id: 'reservorio_elevado', url: RESERVORIO_ELEVADO_URI },
@@ -170,7 +168,7 @@ export function EpselMapView({ clusters, onPressCluster, onElementClick }: Props
         if (map.hasImage(id)) continue;
         const img = new Image();
         img.onload = () => {
-          if (!map.hasImage(id)) map.addImage(id, img, { pixelRatio: 2 });
+          if (!map.hasImage(id)) map.addImage(id, img, { pixelRatio: 4 });
         };
         img.onerror = () => console.warn(`[MapView] No se pudo cargar el ícono ${id} desde ${url}`);
         img.src = url;

@@ -6,6 +6,7 @@ import { z } from 'zod';
 
 import { useAuth } from '@/auth/AuthContext';
 import { ComingSoonModal } from '@/components/shared/ComingSoonModal';
+import { resolveAsset } from '@/utils/resolveAsset';
 
 const schema = z.object({
   correo: z.string().min(1, 'Ingresa tu correo').email('Correo inválido'),
@@ -35,9 +36,6 @@ const T = {
 const FONT_HEAD = 'Manrope, "Helvetica Neue", Helvetica, Arial, sans-serif';
 const FONT_BODY = '"Hanken Grotesk", "Helvetica Neue", Helvetica, Arial, sans-serif';
 const FONT_DISPLAY = 'Montserrat, "Helvetica Neue", Helvetica, Arial, sans-serif';
-
-const resolveAsset = (m: { uri?: string } | string): string =>
-  typeof m === 'string' ? m : (m.uri ?? '');
 
 /** Login — variante web (Spec 02). Diseño Stitch "Creative Login Redesign". */
 export default function LoginScreen() {

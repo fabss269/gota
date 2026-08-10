@@ -22,7 +22,7 @@ type CapasState = {
 };
 
 const DEFAULT_CAPAS: Set<CapaKey> = new Set([
-  'manzanas',
+  'lotes',
   'red_potable',
   'red_primaria_desague',
   'red_secundaria_desague',

@@ -1,5 +1,7 @@
 import { useEffect } from 'react';
 
+import { resolveAsset } from '@/utils/resolveAsset';
+
 const MASCOT_SRC = require('@/assets/images/figura-agua/gotita-pulgar-arriba.png') as { uri?: string };
 
 const T = {
@@ -12,9 +14,6 @@ const T = {
 
 const FONT_HEAD = 'Manrope, "Helvetica Neue", Helvetica, Arial, sans-serif';
 const FONT_BODY = '"Hanken Grotesk", "Helvetica Neue", Helvetica, Arial, sans-serif';
-
-const resolveAsset = (m: { uri?: string } | string): string =>
-  typeof m === 'string' ? m : (m.uri ?? '');
 
 type Props = {
   open: boolean;

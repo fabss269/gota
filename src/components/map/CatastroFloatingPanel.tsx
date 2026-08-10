@@ -1,11 +1,9 @@
 import { useEffect, useRef, useState, type CSSProperties, type ReactNode } from 'react';
-import { Image as RNImage } from 'react-native';
 
 import { useCapasStore, type CapaKey } from '@/state/capasStore';
+import { resolveAsset } from '@/utils/resolveAsset';
 
-const RESERVORIO_ELEVADO_URI = RNImage.resolveAssetSource(
-  require('@/assets/images/icons/reservorio_elevado.png'),
-).uri;
+const RESERVORIO_ELEVADO_URI = resolveAsset(require('@/assets/images/icons/reservorio_elevado.webp'));
 
 type CapaItem = { key: CapaKey; label: string; icon: ReactNode };
 
