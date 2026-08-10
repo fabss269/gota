@@ -130,3 +130,14 @@ postgres:
       properties:
         primaria: bool
         sectorid: int4
+    reservorios:
+      schema: sig
+      table: reservorios
+      srid: 32719
+      geometry_column: geom
+      properties:
+        reservorioid: int4
+        reservoriotipoid: int4
+        codigo: varchar
+        sectorid: int4
+        distritoid: int4
