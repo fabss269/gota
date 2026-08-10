@@ -1,13 +1,14 @@
 import { Ionicons } from '@expo/vector-icons';
-import { useState, type CSSProperties, type ReactNode } from 'react';
+import BottomSheet, { BottomSheetScrollView } from '@gorhom/bottom-sheet';
+import { forwardRef, useMemo, useState } from 'react';
+import { Pressable, StyleSheet, Text, View } from 'react-native';
 
 import type { ApiElementoRedDetalle } from '@/api/types';
 import { EditableField } from '@/components/shared/EditableField';
 import type { ComboOption } from '@/components/shared/SearchableCombo';
-import { SkeletonBlock } from '@/components/shared/Skeleton';
 import { useToast } from '@/components/shared/Toast';
 import type { ElementoRedTipo } from '@/components/map/mapLayers';
-import { Colors } from '@/constants/theme';
+import { Colors, Radius, Spacing } from '@/constants/theme';
 import {
   useAccesorioClasificaciones,
   useAccesorioTipos,
@@ -15,8 +16,6 @@ import {
   useElementoRed,
   useMateriales,
 } from '@/hooks/useElementoRed';
-
-type Props = { tipo: ElementoRedTipo; id: number; onClose: () => void };
 
 const TIPO_LABEL: Record<ElementoRedTipo, string> = {
   tuberia: 'Tubería de agua',
@@ -29,81 +28,61 @@ const TIPO_LABEL: Record<ElementoRedTipo, string> = {
   lote: 'Lote',
 };
 
+type Props = { tipo: ElementoRedTipo; id: number; onClose: () => void };
+
 /**
- * Sidebar derecho con detalle de un elemento de catastro. Ver los 6 layouts en
- * el markup — un componente por tipo (renderXxx) porque cada tipo tiene su set
- * de campos + qué es editable (whitelist backend, ver `service.py`).
+ * Detalle de un elemento de catastro — variante nativa con BottomSheet
+ * (@gorhom/bottom-sheet). Contenido idéntico al panel web
+ * (ElementoInfoPanel.web.tsx) pero adaptado a la interacción mobile.
  */
-export function ElementoInfoPanel({ tipo, id, onClose }: Props) {
+export const ElementoInfoPanel = forwardRef<BottomSheet, Props>(function ElementoInfoPanel(
+  { tipo, id, onClose },
+) {
+  const snapPoints = useMemo(() => ['45%', '85%'], []);
   const { data, isLoading, isError } = useElementoRed({ tipo, id });
 
-  if (isLoading) {
-    return (
-      <aside style={panel}>
-        <div style={headerStyle}>
-          <div style={headerRow}>
-            <SkeletonBlock width={120} height={10} style={skeletonColor} />
-            <div style={closeBtn} />
-          </div>
-          <div style={{ marginTop: 8 }}>
-            <SkeletonBlock width={160} height={20} style={skeletonColor} />
-          </div>
-        </div>
-        <div style={scrollable}>
-          <div style={section}>
-            <SkeletonBlock width={90} height={12} style={skeletonColor} />
-            <div style={{ ...sectionBody, display: 'flex', flexDirection: 'column', gap: 16 }}>
-              <SkeletonFieldRow />
-              <SkeletonFieldRow />
-              <SkeletonFieldRow />
-            </div>
-          </div>
-          <div style={section}>
-            <SkeletonBlock width={70} height={12} style={skeletonColor} />
-            <div style={sectionBody}>
-              <SkeletonUbicacionRow />
-              <SkeletonUbicacionRow />
-            </div>
-          </div>
-        </div>
-      </aside>
-    );
-  }
-
-  if (isError || !data) {
-    return (
-      <aside style={panel}>
-        <div style={statusBox}>
-          <span style={{ color: Colors.textMuted, fontSize: 13 }}>No se encontró el elemento.</span>
-          <button type="button" style={linkBtn} onClick={onClose}>Cerrar panel</button>
-        </div>
-      </aside>
-    );
-  }
-
   return (
-    <aside style={panel}>
-      <Header tipo={tipo} data={data} onClose={onClose} />
-      <div style={scrollable}>
-        <TipoRenderer tipo={tipo} data={data} />
-      </div>
-    </aside>
+    <BottomSheet
+      snapPoints={snapPoints}
+      index={0}
+      enablePanDownToClose
+      onClose={onClose}
+      handleIndicatorStyle={styles.handle}
+      backgroundStyle={styles.sheetBg}
+    >
+      <BottomSheetScrollView contentContainerStyle={styles.scrollContent}>
+        {isLoading && <StatusText label="Cargando…" />}
+        {isError && <StatusText label="No se encontró el elemento." />}
+        {data && (
+          <>
+            <Header tipo={tipo} data={data} onClose={onClose} />
+            <TipoRenderer tipo={tipo} data={data} />
+          </>
+        )}
+      </BottomSheetScrollView>
+    </BottomSheet>
+  );
+});
+
+function StatusText({ label }: { label: string }) {
+  return (
+    <View style={styles.statusBox}>
+      <Text style={styles.statusText}>{label}</Text>
+    </View>
   );
 }
 
-// ── Header con badge de tipo + código/id ─────────────────────────────────────
-
 function Header({ tipo, data, onClose }: { tipo: ElementoRedTipo; data: ApiElementoRedDetalle; onClose: () => void }) {
   return (
-    <header style={headerStyle}>
-      <div style={headerRow}>
-        <span style={badgeTipo}>{TIPO_LABEL[tipo]}</span>
-        <button type="button" style={closeBtn} onClick={onClose} aria-label="Cerrar panel">
-          <Ionicons name="close" size={18} color={Colors.textBody} />
-        </button>
-      </div>
-      <div style={idLabel}>{codigoConPrefijo(tipo, data)}</div>
-    </header>
+    <View style={styles.header}>
+      <View style={styles.headerRow}>
+        <Text style={styles.badgeTipo}>{TIPO_LABEL[tipo].toUpperCase()}</Text>
+        <Pressable onPress={onClose} hitSlop={8} style={styles.closeBtn}>
+          <Ionicons name="close" size={20} color={Colors.textBody} />
+        </Pressable>
+      </View>
+      <Text style={styles.idLabel}>{codigoConPrefijo(tipo, data)}</Text>
+    </View>
   );
 }
 
@@ -112,10 +91,6 @@ const PREFIJO_POR_TIPO: Record<ElementoRedTipo, string> = {
   cajaagua: 'CA', cajadesague: 'CD', manzana: 'MZ', lote: 'LT',
 };
 
-// Único punto que decide el título del sidebar. Prioridad:
-// 1. Si el elemento tiene `codigo` en la BD -> "#PREFIJO-codigo" (ej "#TAG-1234").
-// 2. Si tiene inscripcion/nombre -> "#inscripcion" o "#nombre".
-// 3. Fallback al id numérico -> "#123".
 function codigoConPrefijo(tipo: ElementoRedTipo, data: ApiElementoRedDetalle): string {
   if (data.codigo) return `#${PREFIJO_POR_TIPO[tipo]}-${data.codigo}`;
   return `#${data.inscripcion ?? data.nombre ?? data.id}`;
@@ -134,8 +109,21 @@ function TipoRenderer({ tipo, data }: { tipo: ElementoRedTipo; data: ApiElemento
     case 'manzana':
     case 'lote':
       return <PoligonoCatastral data={data} />;
-    default: return <SoloUbicacion data={data} />;
+    default: return <UbicacionSection data={data} />;
   }
+}
+
+// Manzanas y lotes: solo lectura (área/perímetro derivados de la geometría).
+function PoligonoCatastral({ data }: { data: ApiElementoRedDetalle }) {
+  return (
+    <>
+      <Section title="Datos técnicos">
+        <ReadOnlyRow label="Área" value={fmtNumero(data.area, 'm²')} />
+        <ReadOnlyRow label="Perímetro" value={fmtNumero(data.perimetro, 'm')} />
+      </Section>
+      <UbicacionSection data={data} />
+    </>
+  );
 }
 
 type ElementoProps = { tipo: ElementoRedTipo; data: ApiElementoRedDetalle };
@@ -198,12 +186,12 @@ function Buzon({ tipo, data }: ElementoProps) {
   return (
     <>
       <Section title="Datos técnicos">
-        <EditableField label="Tapa" displayValue={fmtNumero(data.cota, 'm')}
-          suffix="m" kind="number" value={data.cota} step={0.01}
-          saving={saving} onSave={(v) => saveField({ tapa: v })} />
-        <EditableField label="Fondo" displayValue={fmtNumero(data.cotaFondo, 'm')}
-          suffix="m" kind="number" value={data.cotaFondo} step={0.01}
-          saving={saving} onSave={(v) => saveField({ fondo: v })} />
+        <EditableField label="Tapa" displayValue={fmtNumero(data.cota, 'm')} suffix="m"
+          kind="number" value={data.cota} step={0.01} saving={saving}
+          onSave={(v) => saveField({ tapa: v })} />
+        <EditableField label="Fondo" displayValue={fmtNumero(data.cotaFondo, 'm')} suffix="m"
+          kind="number" value={data.cotaFondo} step={0.01} saving={saving}
+          onSave={(v) => saveField({ fondo: v })} />
       </Section>
       <UbicacionSection data={data} />
     </>
@@ -270,25 +258,7 @@ function CajaDesague({ tipo, data }: ElementoProps) {
   );
 }
 
-function SoloUbicacion({ data }: { data: ApiElementoRedDetalle }) {
-  return <UbicacionSection data={data} />;
-}
-
-// Manzanas y lotes: solo lectura (área/perímetro se derivan de la geometría, no
-// tiene sentido editarlos a mano — cualquier corrección debe venir del catastro).
-function PoligonoCatastral({ data }: { data: ApiElementoRedDetalle }) {
-  return (
-    <>
-      <Section title="Datos técnicos">
-        <ReadOnlyRow label="Área" value={fmtNumero(data.area, 'm²')} />
-        <ReadOnlyRow label="Perímetro" value={fmtNumero(data.perimetro, 'm')} />
-      </Section>
-      <UbicacionSection data={data} />
-    </>
-  );
-}
-
-// ── Sección de ubicación (solo lectura, común a todos) ───────────────────────
+// ── Ubicación (solo lectura, común a todos) ──────────────────────────────────
 
 function UbicacionSection({ data }: { data: ApiElementoRedDetalle }) {
   return (
@@ -301,45 +271,23 @@ function UbicacionSection({ data }: { data: ApiElementoRedDetalle }) {
 
 function ReadOnlyRow({ label, value }: { label: string; value: string }) {
   return (
-    <div style={readOnlyRow}>
-      <span style={readOnlyLabel}>{label}</span>
-      <span style={readOnlyValue}>{value}</span>
-    </div>
+    <View style={styles.readOnlyRow}>
+      <Text style={styles.readOnlyLabel}>{label}</Text>
+      <Text style={styles.readOnlyValue} numberOfLines={2}>{value}</Text>
+    </View>
   );
 }
 
-// ── Placeholders del estado de carga (isLoading) ─────────────────────────────
-
-function SkeletonFieldRow() {
+function Section({ title, children }: { title: string; children: React.ReactNode }) {
   return (
-    <div>
-      <SkeletonBlock width={70} height={9} style={{ ...skeletonColor, marginBottom: 6 }} />
-      <SkeletonBlock height={34} radius={8} style={skeletonColor} />
-    </div>
+    <View style={styles.section}>
+      <Text style={styles.sectionTitle}>{title}</Text>
+      <View style={styles.sectionBody}>{children}</View>
+    </View>
   );
 }
 
-function SkeletonUbicacionRow() {
-  return (
-    <div style={readOnlyRow}>
-      <SkeletonBlock width={80} height={11} style={skeletonColor} />
-      <SkeletonBlock width={110} height={13} style={skeletonColor} />
-    </div>
-  );
-}
-
-// ── Sección con título + fondo tenue ─────────────────────────────────────────
-
-function Section({ title, children }: { title: string; children: ReactNode }) {
-  return (
-    <div style={section}>
-      <div style={sectionTitle}>{title}</div>
-      <div style={sectionBody}>{children}</div>
-    </div>
-  );
-}
-
-// ── Hook local: encapsula el mutate + toast ──────────────────────────────────
+// ── Hook local: mutate + toast (idéntico al web) ─────────────────────────────
 
 function useSaver(tipo: ElementoRedTipo, id: number) {
   const mutation = useActualizarElementoRed();
@@ -358,7 +306,7 @@ function useSaver(tipo: ElementoRedTipo, id: number) {
   return { saveField, saving: mutation.isPending };
 }
 
-// ── Utilidades ───────────────────────────────────────────────────────────────
+// ── Utils ────────────────────────────────────────────────────────────────────
 
 function fmtNumero(v: number | null, sufijo: string): string {
   if (v === null || v === undefined) return '—';
@@ -369,87 +317,48 @@ function toComboOptions(items: { id: number; nombre: string }[] | undefined): Co
   return items?.map((i) => ({ value: i.id, label: i.nombre })) ?? [];
 }
 
-// ── Estilos ──────────────────────────────────────────────────────────────────
-
-const skeletonColor: CSSProperties = { backgroundColor: '#F1F3F5' };
-
-const panel: CSSProperties = {
-  width: 340,
-  minWidth: 340,
-  height: '100%',
-  display: 'flex',
-  flexDirection: 'column',
-  backgroundColor: '#FFFFFF',
-  borderLeft: `1px solid ${Colors.border}`,
-  overflow: 'hidden',
-};
-
-const statusBox: CSSProperties = {
-  flex: 1, display: 'flex', flexDirection: 'column',
-  alignItems: 'center', justifyContent: 'center', gap: 8, padding: 24,
-};
-
-const headerStyle: CSSProperties = {
-  padding: '16px 20px 12px',
-  borderBottom: `1px solid ${Colors.border}`,
-  flexShrink: 0,
-};
-
-const headerRow: CSSProperties = {
-  display: 'flex', alignItems: 'center', justifyContent: 'space-between',
-};
-
-const badgeTipo: CSSProperties = {
-  fontSize: 11, fontWeight: 700, color: Colors.accent,
-  letterSpacing: 0.4, textTransform: 'uppercase',
-};
-
-const idLabel: CSSProperties = {
-  fontSize: 18, fontWeight: 700, color: Colors.textBody, marginTop: 6,
-  letterSpacing: -0.2,
-};
-
-const closeBtn: CSSProperties = {
-  width: 28, height: 28, borderRadius: 14,
-  backgroundColor: '#F1F3F5', border: 'none',
-  cursor: 'pointer',
-  display: 'flex', alignItems: 'center', justifyContent: 'center',
-  padding: 0,
-};
-
-const linkBtn: CSSProperties = {
-  background: 'none', border: 'none',
-  color: Colors.accent, fontSize: 13, fontWeight: 700, cursor: 'pointer',
-};
-
-const scrollable: CSSProperties = {
-  flex: 1, overflowY: 'auto', padding: '16px 20px', display: 'flex',
-  flexDirection: 'column', gap: 20,
-};
-
-const section: CSSProperties = { display: 'flex', flexDirection: 'column', gap: 8 };
-
-const sectionTitle: CSSProperties = {
-  fontSize: 10, fontWeight: 700, color: Colors.textMuted,
-  letterSpacing: 0.6, textTransform: 'uppercase',
-};
-
-const sectionBody: CSSProperties = {
-  border: `1px solid ${Colors.border}`,
-  borderRadius: 8, padding: '4px 12px',
-  backgroundColor: '#FAFBFC',
-};
-
-const readOnlyRow: CSSProperties = {
-  display: 'flex', alignItems: 'center', justifyContent: 'space-between',
-  padding: '8px 0', minHeight: 40, gap: 8,
-};
-
-const readOnlyLabel: CSSProperties = {
-  fontSize: 12, fontWeight: 600, color: Colors.textMuted,
-  flexShrink: 0, width: 100,
-};
-
-const readOnlyValue: CSSProperties = {
-  fontSize: 13, color: Colors.textBody, fontWeight: 500, textAlign: 'right',
-};
+const styles = StyleSheet.create({
+  sheetBg: { backgroundColor: '#FFFFFF' },
+  handle: { backgroundColor: Colors.border, width: 40 },
+  scrollContent: { paddingBottom: Spacing.xl },
+  statusBox: { padding: Spacing.xl, alignItems: 'center' },
+  statusText: { fontSize: 13, color: Colors.textMuted },
+  header: {
+    paddingHorizontal: Spacing.md,
+    paddingBottom: Spacing.md,
+    borderBottomWidth: 1,
+    borderBottomColor: Colors.border,
+    marginBottom: Spacing.md,
+  },
+  headerRow: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' },
+  badgeTipo: { fontSize: 11, fontWeight: '700', color: Colors.accent, letterSpacing: 0.4 },
+  idLabel: { fontSize: 18, fontWeight: '700', color: Colors.textBody, marginTop: 6 },
+  closeBtn: {
+    width: 28, height: 28, borderRadius: 14, backgroundColor: '#F1F3F5',
+    alignItems: 'center', justifyContent: 'center',
+  },
+  section: {
+    paddingHorizontal: Spacing.md,
+    marginBottom: Spacing.md,
+  },
+  sectionTitle: {
+    fontSize: 10, fontWeight: '700', color: Colors.textMuted,
+    letterSpacing: 0.6, marginBottom: 8,
+  },
+  sectionBody: {
+    borderWidth: 1, borderColor: Colors.border, borderRadius: Radius.md,
+    paddingHorizontal: 12, paddingVertical: 4,
+    backgroundColor: '#FAFBFC',
+  },
+  readOnlyRow: {
+    flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between',
+    paddingVertical: 8, gap: 8, minHeight: 40,
+  },
+  readOnlyLabel: {
+    fontSize: 12, fontWeight: '600', color: Colors.textMuted,
+    flexShrink: 0, width: 100,
+  },
+  readOnlyValue: {
+    fontSize: 13, color: Colors.textBody, fontWeight: '500', textAlign: 'right', flex: 1,
+  },
+});

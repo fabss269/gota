@@ -5,7 +5,7 @@ import { GestureHandlerRootView } from 'react-native-gesture-handler';
 
 import { AuthProvider } from '@/auth/AuthContext';
 import { PhoneFrame } from '@/components/PhoneFrame';
-import { ToastProvider } from '@/components/shared/ToastProvider';
+import { ToastProvider } from '@/components/shared/Toast';
 
 const queryClient = new QueryClient();
 

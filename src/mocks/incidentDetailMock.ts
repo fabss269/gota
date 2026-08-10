@@ -16,8 +16,16 @@ export type ReclamoPredio = { id: string; tipo: string; fecha: string };
 export type IncidenciaRelacionada = { id: string; tipo: string; direccion: string; sector: string; estado: EstadoIncidencia };
 
 export type IncidenciaDetalle = Incidencia & {
+  codigoSuministro: string | null;
   tecnicoAsignado: Usuario | null;
-  reclamo: { fechaRegistro: string; medioRecepcion: string; canal: string; descripcion: string };
+  reclamo: {
+    fechaRegistro: string;
+    medioRecepcion: string;
+    canal: string;
+    descripcion: string;
+    detalleTicket: string | null;
+    esRobo: boolean;
+  };
   catastro: {
     redAsociada: string;
     diametroMm: number;
@@ -94,11 +102,14 @@ export function getIncidentDetail(id: string): IncidenciaDetalle | undefined {
   const tecnicoAsignado =
     override?.tecnico ?? (estadoEfectivo === 'CREADO' ? null : pick(TECNICOS_POOL, seed));
 
+  const descripcion = pick(DESCRIPCIONES[base.categoria], seed + 3);
   const reclamo = {
     fechaRegistro: base.fechaCreacion,
     medioRecepcion: pick(MEDIOS_RECEPCION, seed),
     canal: pick(CANALES, seed + 7) + (base.sector.includes('Sector') ? ` ${sectorKey(base.sector)}` : ''),
-    descripcion: pick(DESCRIPCIONES[base.categoria], seed + 3),
+    descripcion,
+    detalleTicket: `${descripcion} Se solicita atención inmediata por parte de la cuadrilla de zona.`,
+    esRobo: base.tipo.toLowerCase().includes('medidor') && seed % 4 === 0,
   };
 
   const catastro = {
@@ -177,6 +188,7 @@ export function getIncidentDetail(id: string): IncidenciaDetalle | undefined {
   return {
     ...base,
     estado: estadoEfectivo,
+    codigoSuministro: `${1000000 + (seed % 800000)}`,
     tecnicoAsignado,
     reclamo,
     catastro,

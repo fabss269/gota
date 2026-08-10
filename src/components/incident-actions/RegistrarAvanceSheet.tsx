@@ -8,19 +8,34 @@ import {
   AREA_OPTIONS,
   EQUIPO_OPTIONS,
   MOTIVOS_AVANCE,
+  getTransicionesDisponibles,
   type MotivoAvance,
   type TransicionEstado,
 } from '@/mocks/estadoWorkflowMock';
+import type { EstadoIncidencia } from '@/mocks/incidentsMock';
 import type { Usuario } from '@/mocks/usuariosMock';
 import { useRegistrarAvance } from '@/hooks/useRegistrarAvance';
 import { useReasignarResponsable } from '@/hooks/useReasignarResponsable';
 import { useThemeColors } from '@/state/themeStore';
 
+const ESTADO_LABEL: Record<EstadoIncidencia, string> = {
+  CREADO: 'Creado',
+  PENDIENTE: 'Pendiente',
+  EN_PROGRESO: 'En progreso',
+  ATENDIDO: 'Atendido',
+};
+
 type Props = {
   visible: boolean;
   incidenciaId: string;
   incidenciaLabel: string;
+  /** Si viene `null`, el sheet muestra un selector de transición al inicio
+   * (usando `estadoActual`). Si viene con valor, se usa esa transición fija
+   * (flujo original desde CambiarEstadoSheet). */
   transicion: TransicionEstado | null;
+  /** Requerido cuando `transicion` es null — se usa para calcular qué
+   * transiciones ofrecer en el selector interno. */
+  estadoActual?: EstadoIncidencia;
   tecnicoActualId?: string;
   onClose: () => void;
   onRegistrado: () => void;
@@ -43,6 +58,7 @@ export function RegistrarAvanceSheet({
   incidenciaId,
   incidenciaLabel,
   transicion,
+  estadoActual,
   tecnicoActualId,
   onClose,
   onRegistrado,
@@ -54,6 +70,14 @@ export function RegistrarAvanceSheet({
   const [area, setArea] = useState<string | null>(null);
   const [tecnico, setTecnico] = useState<Usuario | null>(null);
   const [nota, setNota] = useState('');
+  // Transición elegida internamente cuando el prop `transicion` viene null (caso
+  // del DetailPanel actual, que ya no tiene botón "Cambiar estado" separado).
+  const [transicionInterna, setTransicionInterna] = useState<TransicionEstado | null>(null);
+  const transicionesDisponibles = useMemo(
+    () => (transicion == null && estadoActual ? getTransicionesDisponibles(estadoActual) : []),
+    [transicion, estadoActual],
+  );
+  const transicionEfectiva = transicion ?? transicionInterna;
   const registrarAvance = useRegistrarAvance();
   const reasignarResponsable = useReasignarResponsable();
 
@@ -79,6 +103,7 @@ export function RegistrarAvanceSheet({
     setArea(null);
     setTecnico(null);
     setNota('');
+    setTransicionInterna(null);
     onClose();
   };
 
@@ -88,7 +113,7 @@ export function RegistrarAvanceSheet({
     (motivo === 'REASIGNAR_TECNICO' && !tecnico);
 
   const handleConfirm = () => {
-    if (!motivo || !transicion || faltaCampoDependiente) return;
+    if (!motivo || !transicionEfectiva || faltaCampoDependiente) return;
 
     const notaFinal = [
       motivo === 'REQUIERE_EQUIPO' && equipo ? `Equipo requerido: ${equipo}.` : null,
@@ -99,7 +124,7 @@ export function RegistrarAvanceSheet({
       .join(' ');
 
     registrarAvance.mutate(
-      { id: incidenciaId, motivo, nota: notaFinal, siguienteEstado: transicion.hacia },
+      { id: incidenciaId, motivo, nota: notaFinal, siguienteEstado: transicionEfectiva.hacia },
       {
         onSuccess: () => {
           if (motivo === 'REASIGNAR_TECNICO' && tecnico) {
@@ -126,6 +151,25 @@ export function RegistrarAvanceSheet({
                 </Pressable>
               </View>
               <Text style={styles.subtitle}>{incidenciaLabel}</Text>
+
+              {/* Selector de estado destino — solo cuando el sheet se abre sin
+                  transición ya elegida (flujo directo desde DetailPanel). */}
+              {transicion == null && transicionesDisponibles.length > 0 && (
+                <>
+                  <Text style={styles.sectionLabel}>SIGUIENTE ESTADO</Text>
+                  <View style={styles.grid}>
+                    {transicionesDisponibles.map((tx) => (
+                      <Chip
+                        styles={styles}
+                        key={`${tx.desde}-${tx.hacia}`}
+                        label={ESTADO_LABEL[tx.hacia]}
+                        active={transicionInterna?.hacia === tx.hacia}
+                        onPress={() => setTransicionInterna(tx)}
+                      />
+                    ))}
+                  </View>
+                </>
+              )}
 
               <Text style={styles.sectionLabel}>¿QUÉ PASÓ?</Text>
               <View style={styles.grid}>
@@ -184,9 +228,9 @@ export function RegistrarAvanceSheet({
                   <Text style={styles.cancelLabel}>Cancelar</Text>
                 </Pressable>
                 <Pressable
-                  style={[styles.confirmBtn, (!motivo || faltaCampoDependiente) && styles.confirmBtnDisabled]}
+                  style={[styles.confirmBtn, (!motivo || !transicionEfectiva || faltaCampoDependiente) && styles.confirmBtnDisabled]}
                   onPress={handleConfirm}
-                  disabled={!motivo || faltaCampoDependiente || registrarAvance.isPending}
+                  disabled={!motivo || !transicionEfectiva || faltaCampoDependiente || registrarAvance.isPending}
                 >
                   <Text style={styles.confirmLabel}>Registrar avance</Text>
                 </Pressable>

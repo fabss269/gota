@@ -24,7 +24,13 @@ export type ApiIncidenciaListResponse = {
 };
 
 export type ApiTecnicoAsignado = { id: string; nombre: string };
-export type ApiReclamoResumen = { fechaRegistro: string; medioRecepcion: string; descripcion: string | null };
+export type ApiReclamoResumen = {
+  fechaRegistro: string;
+  medioRecepcion: string;
+  descripcion: string | null;
+  detalleTicket: string | null;
+  esRobo: boolean;
+};
 export type ApiCatastro = {
   redAsociada: string | null;
   diametroMm: number | null;
@@ -40,6 +46,7 @@ export type ApiIncidenciaDetalle = {
   tipo: string;
   categoria: Categoria;
   direccion: string | null;
+  codigoSuministro: string | null;
   prioridad: Prioridad | null;
   estado: EstadoIncidencia;
   antiguedadDias: number;
@@ -73,8 +80,8 @@ export type ApiSuministro = { lat: number; lon: number; sectorId: number | null;
 
 // GET /red/elemento/{tipo}/{id} — panel de info al hacer click en un elemento de
 // catastro (ver API.md § 7). Campos no aplicables al `tipo` consultado vienen `null`.
-// Los `*Id` conviven con los nombres legibles para poblar combos editables sin un
-// segundo request (mismo criterio que ElementoRedOut en el backend).
+// Los `*Id` conviven con los nombres para poblar combos editables sin un round-trip
+// adicional (materialId + material, accesorioTipoId + tipoNombre, etc.).
 export type ApiElementoRedDetalle = {
   tipo: string;
   id: number;
@@ -82,12 +89,16 @@ export type ApiElementoRedDetalle = {
   inscripcion: string | null;
   nombre: string | null;
   referencia: string | null;
+  // Tipo/subtipo
   tipoNombre: string | null;
   accesorioTipoId: number | null;
+  // Material
   material: string | null;
   materialId: number | null;
+  // Clasificación de accesorio
   accesorioClasificacion: string | null;
   accesorioClasificacionId: number | null;
+  // Numéricos
   diametroPulgadas: number | null;
   pendiente: number | null;
   distancia: number | null;
@@ -96,15 +107,16 @@ export type ApiElementoRedDetalle = {
   cotaFondo: number | null;
   area: number | null;
   perimetro: number | null;
+  // Booleano
   primaria: boolean | null;
+  // Ubicación (solo lectura desde el panel — derivadas de la geom)
   sectorId: number | null;
   sectorNombre: string | null;
   distritoId: number | null;
   distritoNombre: string | null;
 };
 
-// GET /red/materiales, /red/accesorio-tipos, /red/accesorio-clasificaciones —
-// catálogos para los combos editables del panel de elemento.
+// Catálogos para el selector de edición inline (combos con buscador).
 export type ApiMaterial = { id: number; nombre: string };
 export type ApiAccesorioTipo = { id: number; nombre: string };
 export type ApiAccesorioClasificacion = { id: number; nombre: string };

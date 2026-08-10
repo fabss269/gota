@@ -1,27 +1,31 @@
 import { useEffect, type CSSProperties } from 'react';
 
+import { Colors } from '@/constants/theme';
+
 type Props = {
   open: boolean;
   title?: string;
   message: string;
   confirmLabel?: string;
   cancelLabel?: string;
+  destructive?: boolean;
   loading?: boolean;
   onConfirm: () => void;
   onCancel: () => void;
 };
 
-/** Modal de confirmación reutilizable — "¿Estás seguro de cambiar X de Y a Z?".
- * Mismo patrón que ComingSoonModal.web.tsx (overlay `position: fixed`, sin portal:
- * verificado en docs/ESTADO_PROYECTO.md §4 que ningún modal necesita portar fuera
- * del PhoneFrame en esta combinación de versiones). Usa los tokens `--map-*` en vez
- * de colores propios porque vive dentro del panel de elemento del mapa. */
+/**
+ * Modal de confirmación reutilizable (Web).
+ * Cierra con Escape, click en el overlay, o botón Cancelar. Enter confirma.
+ * `destructive: true` pinta el botón de confirmar en rojo (para eliminar/borrar).
+ */
 export function ConfirmDialog({
   open,
   title = 'Confirmar cambio',
   message,
   confirmLabel = 'Confirmar',
   cancelLabel = 'Cancelar',
+  destructive = false,
   loading = false,
   onConfirm,
   onCancel,
@@ -29,13 +33,16 @@ export function ConfirmDialog({
   useEffect(() => {
     if (!open) return;
     const onKey = (e: KeyboardEvent) => {
-      if (e.key === 'Escape' && !loading) onCancel();
+      if (e.key === 'Escape') onCancel();
+      if (e.key === 'Enter' && !loading) onConfirm();
     };
     window.addEventListener('keydown', onKey);
     return () => window.removeEventListener('keydown', onKey);
-  }, [open, loading, onCancel]);
+  }, [open, loading, onConfirm, onCancel]);
 
   if (!open) return null;
+
+  const confirmBg = destructive ? Colors.statusCritica : Colors.accent;
 
   return (
     <div
@@ -46,15 +53,29 @@ export function ConfirmDialog({
       style={overlay}
     >
       <div onClick={(e) => e.stopPropagation()} style={card}>
-        <h2 id="confirm-dialog-title" style={titleStyle}>
-          {title}
-        </h2>
+        <h2 id="confirm-dialog-title" style={titleStyle}>{title}</h2>
         <p style={messageStyle}>{message}</p>
-        <div style={actions}>
-          <button type="button" style={cancelBtn} onClick={onCancel} disabled={loading}>
+        <div style={buttonsRow}>
+          <button
+            type="button"
+            onClick={onCancel}
+            disabled={loading}
+            style={{ ...btn, ...cancelBtn, opacity: loading ? 0.6 : 1 }}
+          >
             {cancelLabel}
           </button>
-          <button type="button" style={confirmBtn} onClick={onConfirm} disabled={loading}>
+          <button
+            type="button"
+            onClick={onConfirm}
+            disabled={loading}
+            style={{
+              ...btn,
+              ...confirmBtn,
+              backgroundColor: confirmBg,
+              opacity: loading ? 0.7 : 1,
+              cursor: loading ? 'default' : 'pointer',
+            }}
+          >
             {loading ? 'Guardando…' : confirmLabel}
           </button>
         </div>
@@ -62,8 +83,6 @@ export function ConfirmDialog({
     </div>
   );
 }
-
-const FONT: CSSProperties['fontFamily'] = '"Hanken Grotesk", "Helvetica Neue", Helvetica, Arial, sans-serif';
 
 const overlay: CSSProperties = {
   position: 'fixed',
@@ -73,59 +92,56 @@ const overlay: CSSProperties = {
   alignItems: 'center',
   justifyContent: 'center',
   padding: 16,
-  backgroundColor: 'rgba(10, 20, 40, 0.45)',
+  backgroundColor: 'rgba(15, 23, 42, 0.4)',
+  backdropFilter: 'blur(2px)',
+  WebkitBackdropFilter: 'blur(2px)',
 };
 
 const card: CSSProperties = {
   width: '100%',
-  maxWidth: 320,
-  backgroundColor: 'var(--map-surface)',
-  border: '1px solid var(--map-border)',
-  borderRadius: 12,
-  boxShadow: '0 8px 32px var(--map-shadow)',
-  padding: 20,
-  fontFamily: FONT,
+  maxWidth: 420,
+  backgroundColor: '#FFFFFF',
+  borderRadius: 8,
+  boxShadow: '0 10px 40px rgba(0,0,0,0.15)',
+  padding: '24px 24px 20px',
 };
 
 const titleStyle: CSSProperties = {
-  margin: '0 0 8px',
-  fontSize: 16,
+  fontSize: 17,
   fontWeight: 700,
-  color: 'var(--map-text)',
+  color: Colors.textBody,
+  margin: '0 0 10px',
 };
 
 const messageStyle: CSSProperties = {
-  margin: '0 0 20px',
-  fontSize: 13,
-  lineHeight: '19px',
-  color: 'var(--map-text-muted)',
+  fontSize: 14,
+  color: Colors.textMuted,
+  lineHeight: '20px',
+  margin: '0 0 24px',
 };
 
-const actions: CSSProperties = {
+const buttonsRow: CSSProperties = {
   display: 'flex',
-  gap: 10,
+  justifyContent: 'flex-end',
+  gap: 12,
 };
 
-const buttonBase: CSSProperties = {
-  flex: 1,
-  padding: '10px 14px',
-  borderRadius: 8,
-  fontSize: 13,
-  fontWeight: 700,
-  fontFamily: FONT,
+const btn: CSSProperties = {
+  padding: '10px 20px',
+  borderRadius: 6,
+  fontSize: 14,
+  fontWeight: 600,
+  border: 'none',
   cursor: 'pointer',
+  minWidth: 100,
 };
 
 const cancelBtn: CSSProperties = {
-  ...buttonBase,
-  backgroundColor: 'var(--map-surface)',
-  color: 'var(--map-text)',
-  border: '1px solid var(--map-border)',
+  backgroundColor: '#FFFFFF',
+  color: Colors.textBody,
+  border: `1px solid ${Colors.border}`,
 };
 
 const confirmBtn: CSSProperties = {
-  ...buttonBase,
-  backgroundColor: 'var(--map-accent)',
   color: '#FFFFFF',
-  border: '1px solid var(--map-accent)',
 };

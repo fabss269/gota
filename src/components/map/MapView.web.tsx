@@ -383,12 +383,39 @@ export function EpselMapView({ clusters, onPressCluster, onElementClick, element
   }, [provincias, distritos, sectores, provinciasActivas, distritosActivos, sectoresActivos]);
 
   const flyTarget = useMapSearchStore((state) => state.flyTarget);
+  const pin = useMapSearchStore((state) => state.pin);
+  const setFlying = useMapSearchStore((state) => state.setFlying);
+  const pinMarkerRef = useRef<maplibregl.Marker | null>(null);
 
   useEffect(() => {
     const map = mapRef.current;
     if (!map || !flyTarget) return;
     map.flyTo({ center: [flyTarget.lon, flyTarget.lat], zoom: flyTarget.zoom, duration: 1000 });
-  }, [flyTarget]);
+    // `once('moveend', ...)` se dispara al terminar la animación (o si el usuario la
+    // interrumpe con un gesto); en ambos casos apagamos el loader del buscador.
+    const onMoveEnd = () => setFlying(false);
+    map.once('moveend', onMoveEnd);
+    return () => {
+      map.off('moveend', onMoveEnd);
+    };
+  }, [flyTarget, setFlying]);
+
+  // Marker default de MapLibre (pin rojo SVG built-in). Se planta al buscar y se
+  // limpia si el store lo resetea (`clearPin`) o si se reemplaza por otra búsqueda.
+  useEffect(() => {
+    const map = mapRef.current;
+    if (!map) return;
+    pinMarkerRef.current?.remove();
+    pinMarkerRef.current = null;
+    if (!pin) return;
+    pinMarkerRef.current = new maplibregl.Marker({ color: '#E53935' })
+      .setLngLat([pin.lon, pin.lat])
+      .addTo(map);
+    return () => {
+      pinMarkerRef.current?.remove();
+      pinMarkerRef.current = null;
+    };
+  }, [pin]);
 
   useEffect(() => {
     const map = mapRef.current;

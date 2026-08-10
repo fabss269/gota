@@ -1,34 +1,42 @@
 import { apiFetch } from '@/api/client';
-import type { ApiAccesorioClasificacion, ApiAccesorioTipo, ApiElementoRedDetalle, ApiMaterial } from '@/api/types';
+import type {
+  ApiAccesorioClasificacion,
+  ApiAccesorioTipo,
+  ApiElementoRedDetalle,
+  ApiMaterial,
+} from '@/api/types';
 import type { ElementoRedTipo } from '@/components/map/mapLayers';
 
 export function getElementoRed(tipo: ElementoRedTipo, id: number): Promise<ApiElementoRedDetalle> {
   return apiFetch<ApiElementoRedDetalle>(`/red/elemento/${tipo}/${id}`);
 }
 
-/** Body de PATCH /red/elemento/{tipo}/{id} — el backend valida con whitelist por
- * tipo (ver CAMPOS_EDITABLES_POR_TIPO en app/modules/red/service.py), acá solo se
- * declaran todos los campos posibles; cada tipo usa el subconjunto que le aplica. */
+/** Todos los campos son opcionales — el backend valida qué aplican por tipo con una
+ * whitelist. Enviar solo el/los campos que efectivamente cambiaron. */
 export type ElementoRedPatch = {
+  // Alcantarillado
   primaria?: boolean;
   pendiente?: number;
+  // Alcantarillado + Agua
   distancia?: number;
   materialId?: number;
+  // Agua + Accesorios
   diametroPulgadas?: number;
+  // Accesorios
   profundidad?: number;
   accesorioTipoId?: number;
   accesorioClasificacionId?: number;
+  // Cajas
   cota?: number;
+  // Buzones
   tapa?: number;
   fondo?: number;
 };
 
-/** Edición inline del panel de elemento — el campo enviado depende del tipo
- * (ver ElementoInfoPanel.web.tsx), ver API.md § 7. */
 export function patchElementoRed(
   tipo: ElementoRedTipo,
   id: number,
-  patch: ElementoRedPatch
+  patch: ElementoRedPatch,
 ): Promise<void> {
   return apiFetch<void>(`/red/elemento/${tipo}/${id}`, {
     method: 'PATCH',
@@ -36,21 +44,26 @@ export function patchElementoRed(
   });
 }
 
-/** Catálogo de materiales (sig.materiales), opcionalmente filtrado por `grupo`
- * ('AGUA POTABLE' | 'ALCANTARILLADO'). Sin `grupo` trae todos. */
-export function getMaterialesRed(grupo?: string): Promise<ApiMaterial[]> {
-  const query = grupo ? `?${new URLSearchParams({ grupo })}` : '';
-  return apiFetch<ApiMaterial[]>(`/red/materiales${query}`);
+// ── Catálogos para poblar combos editables ────────────────────────────────────
+
+/** Materiales filtrados por grupo (`AGUA POTABLE` o `ALCANTARILLADO`). */
+export function getMateriales(grupo?: 'AGUA POTABLE' | 'ALCANTARILLADO'): Promise<ApiMaterial[]> {
+  const qs = grupo ? `?grupo=${encodeURIComponent(grupo)}` : '';
+  return apiFetch<ApiMaterial[]>(`/red/materiales${qs}`);
 }
 
-/** Catálogo de tipos de accesorio (sig.accesoriotipos), opcionalmente por `grupo`. */
+/** Compat con el endpoint viejo por tipo — el service ya resuelve el grupo. */
+export function getMaterialesRed(tipo: ElementoRedTipo): Promise<ApiMaterial[]> {
+  return apiFetch<ApiMaterial[]>(`/red/materiales/${tipo}`);
+}
+
+/** Catálogo de tipos de accesorio (codo, tapón, T, cruz, válvula, etc.). */
 export function getAccesorioTipos(grupo?: string): Promise<ApiAccesorioTipo[]> {
-  const query = grupo ? `?${new URLSearchParams({ grupo })}` : '';
-  return apiFetch<ApiAccesorioTipo[]>(`/red/accesorio-tipos${query}`);
+  const qs = grupo ? `?grupo=${encodeURIComponent(grupo)}` : '';
+  return apiFetch<ApiAccesorioTipo[]>(`/red/accesorio-tipos${qs}`);
 }
 
-/** Catálogo de clasificaciones de accesorio (sig.accesorioclasificacion) — sin filtro
- * por grupo, el backend no lo expone (una sola lista para todos los accesorios). */
+/** Catálogo de clasificaciones de accesorio. */
 export function getAccesorioClasificaciones(): Promise<ApiAccesorioClasificacion[]> {
-  return apiFetch<ApiAccesorioClasificacion[]>('/red/accesorio-clasificaciones');
+  return apiFetch<ApiAccesorioClasificacion[]>(`/red/accesorio-clasificaciones`);
 }
