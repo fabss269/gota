@@ -8,6 +8,14 @@ from sqlalchemy.ext.asyncio import AsyncSession
 _DISTRITO_JOIN = "JOIN sig.distritos d ON d.distritoid = t.distritoid AND d.ubigeo = :distrito_id"
 
 
+def _titulo(valor: str | None) -> str | None:
+    return (valor or "").title() or None
+
+
+def _num(valor) -> float | None:
+    return float(valor) if valor is not None else None
+
+
 class SigRedRepository:
     def __init__(self, session: AsyncSession) -> None:
         self._session = session
@@ -108,15 +116,13 @@ class SigRedRepository:
         """
         return await self._feature_collection(inner, params)
 
-    # ── Detalle de un elemento individual (click en el mapa fuera de modo simulación,
-    # ver mapLayers.ts/MapView.web.tsx) — un lookup por PK (índice, no table scan) +
-    # joins a catálogos chicos (materiales/tipos/sectores/distritos, todos <100 filas),
-    # mismo patrón de bajo costo que ya usa CatastroEnrichmentService. Cada método
-    # devuelve `None` si el id no existe; el service traduce eso a 404.
+    # ── Detalle de un elemento individual (click en el mapa fuera de modo simulación).
+    # Cada método devuelve `None` si el id no existe; el service traduce eso a 404.
 
     async def elemento_tuberia(self, aguaid: int) -> dict | None:
         stmt = text("""
-            SELECT t.aguaid AS id, t.codigo, t.diametro, m.material, at.aguatipo,
+            SELECT t.aguaid AS id, t.codigo, t.diametro, t.distancia, t.materialid,
+                   m.material, at.aguatipo,
                    t.sectorid, s.sector, t.distritoid, d.distrito
             FROM sig.agua t
             LEFT JOIN sig.materiales m ON m.materialid = t.materialid
@@ -131,18 +137,21 @@ class SigRedRepository:
         return {
             "id": row["id"],
             "codigo": row["codigo"],
-            "diametroPulgadas": float(row["diametro"]) if row["diametro"] is not None else None,
+            "diametroPulgadas": _num(row["diametro"]),
+            "distancia": _num(row["distancia"]),
+            "materialId": row["materialid"],
             "material": row["material"],
             "tipoNombre": row["aguatipo"],
             "sectorId": row["sectorid"],
-            "sectorNombre": (row["sector"] or "").title() or None,
+            "sectorNombre": _titulo(row["sector"]),
             "distritoId": row["distritoid"],
-            "distritoNombre": (row["distrito"] or "").title() or None,
+            "distritoNombre": _titulo(row["distrito"]),
         }
 
     async def elemento_tramo(self, alcantarilladoid: int) -> dict | None:
         stmt = text("""
-            SELECT t.alcantarilladoid AS id, t.codigo, t.primaria, m.material, at.alcantarilladotipo,
+            SELECT t.alcantarilladoid AS id, t.codigo, t.primaria, t.pendiente, t.distancia,
+                   t.materialid, m.material, at.alcantarilladotipo,
                    t.sectorid, s.sector, t.distritoid, d.distrito
             FROM sig.alcantarillado t
             LEFT JOIN sig.materiales m ON m.materialid = t.materialid
@@ -158,12 +167,15 @@ class SigRedRepository:
             "id": row["id"],
             "codigo": row["codigo"],
             "primaria": row["primaria"],
+            "pendiente": _num(row["pendiente"]),
+            "distancia": _num(row["distancia"]),
+            "materialId": row["materialid"],
             "material": row["material"],
             "tipoNombre": row["alcantarilladotipo"],
             "sectorId": row["sectorid"],
-            "sectorNombre": (row["sector"] or "").title() or None,
+            "sectorNombre": _titulo(row["sector"]),
             "distritoId": row["distritoid"],
-            "distritoNombre": (row["distrito"] or "").title() or None,
+            "distritoNombre": _titulo(row["distrito"]),
         }
 
     async def elemento_buzon(self, buzonid: int) -> dict | None:
@@ -182,20 +194,23 @@ class SigRedRepository:
             "id": row["id"],
             "codigo": row["codigo"],
             "referencia": row["referencia"],
-            "cota": float(row["tapa"]) if row["tapa"] is not None else None,
-            "cotaFondo": float(row["fondo"]) if row["fondo"] is not None else None,
+            "cota": _num(row["tapa"]),
+            "cotaFondo": _num(row["fondo"]),
             "sectorId": row["sectorid"],
-            "sectorNombre": (row["sector"] or "").title() or None,
+            "sectorNombre": _titulo(row["sector"]),
             "distritoId": row["distritoid"],
-            "distritoNombre": (row["distrito"] or "").title() or None,
+            "distritoNombre": _titulo(row["distrito"]),
         }
 
     async def elemento_accesorio(self, accesorioid: int) -> dict | None:
         stmt = text("""
-            SELECT t.accesorioid AS id, t.codigo, t.diametro, t.profundidad, at.accesoriotipo,
+            SELECT t.accesorioid AS id, t.codigo, t.diametro, t.profundidad,
+                   t.accesoriotipoid, at.accesoriotipo,
+                   t.accesorioclasificacionid, ac.accesorioclasificacion,
                    t.sectorid, s.sector, t.distritoid, d.distrito
             FROM sig.accesorios t
             LEFT JOIN sig.accesoriotipos at ON at.accesoriotipoid = t.accesoriotipoid
+            LEFT JOIN sig.accesorioclasificacion ac ON ac.accesorioclasificacionid = t.accesorioclasificacionid
             LEFT JOIN sig.sectores s ON s.sectorid = t.sectorid
             LEFT JOIN sig.distritos d ON d.distritoid = t.distritoid
             WHERE t.accesorioid = :id
@@ -206,13 +221,16 @@ class SigRedRepository:
         return {
             "id": row["id"],
             "codigo": row["codigo"],
-            "diametroPulgadas": float(row["diametro"]) if row["diametro"] is not None else None,
-            "profundidad": float(row["profundidad"]) if row["profundidad"] is not None else None,
+            "diametroPulgadas": _num(row["diametro"]),
+            "profundidad": _num(row["profundidad"]),
+            "accesorioTipoId": row["accesoriotipoid"],
             "tipoNombre": row["accesoriotipo"],
+            "accesorioClasificacionId": row["accesorioclasificacionid"],
+            "accesorioClasificacion": row["accesorioclasificacion"],
             "sectorId": row["sectorid"],
-            "sectorNombre": (row["sector"] or "").title() or None,
+            "sectorNombre": _titulo(row["sector"]),
             "distritoId": row["distritoid"],
-            "distritoNombre": (row["distrito"] or "").title() or None,
+            "distritoNombre": _titulo(row["distrito"]),
         }
 
     async def _elemento_caja(self, tabla: str, id_col: str, id_valor: int) -> dict | None:
@@ -231,11 +249,11 @@ class SigRedRepository:
             "id": row["id"],
             "inscripcion": row["inscripcion"],
             "tipoNombre": row["tipo"],
-            "cota": float(row["cota"]) if row["cota"] is not None else None,
+            "cota": _num(row["cota"]),
             "sectorId": row["sectorid"],
-            "sectorNombre": (row["sector"] or "").title() or None,
+            "sectorNombre": _titulo(row["sector"]),
             "distritoId": row["distritoid"],
-            "distritoNombre": (row["distrito"] or "").title() or None,
+            "distritoNombre": _titulo(row["distrito"]),
         }
 
     async def elemento_cajaagua(self, cajaaguaid: int) -> dict | None:
@@ -259,12 +277,12 @@ class SigRedRepository:
         return {
             "id": row["id"],
             "nombre": row["manzana"],
-            "area": float(row["area"]) if row["area"] is not None else None,
-            "perimetro": float(row["perimetro"]) if row["perimetro"] is not None else None,
+            "area": _num(row["area"]),
+            "perimetro": _num(row["perimetro"]),
             "sectorId": row["sectorid"],
-            "sectorNombre": (row["sector"] or "").title() or None,
+            "sectorNombre": _titulo(row["sector"]),
             "distritoId": row["distritoid"],
-            "distritoNombre": (row["distrito"] or "").title() or None,
+            "distritoNombre": _titulo(row["distrito"]),
         }
 
     async def elemento_lote(self, loteid: int) -> dict | None:
@@ -285,45 +303,101 @@ class SigRedRepository:
             "id": row["id"],
             "nombre": nombre,
             "tipoNombre": tipo_nombre,
-            "area": float(row["area"]) if row["area"] is not None else None,
-            "perimetro": float(row["perimetro"]) if row["perimetro"] is not None else None,
+            "area": _num(row["area"]),
+            "perimetro": _num(row["perimetro"]),
             "sectorId": row["sectorid"],
-            "sectorNombre": (row["sector"] or "").title() or None,
+            "sectorNombre": _titulo(row["sector"]),
             "distritoId": row["distritoid"],
-            "distritoNombre": (row["distrito"] or "").title() or None,
+            "distritoNombre": _titulo(row["distrito"]),
         }
 
 
-# ── Escritura sobre sig.agua/sig.alcantarillado (excepción explícita al
-# read-only, ver app/db/sig.py get_sig_write_session) — edición inline de
-# diámetro/material desde el panel de detalle del mapa.
+# ── Escritura sobre sig.* (excepción explícita al read-only, ver
+# app/db/sig.py get_sig_write_session) — edición inline desde el panel de detalle.
 
 
 class SigRedWriteRepository:
     def __init__(self, session: AsyncSession) -> None:
         self._session = session
 
-    async def actualizar_tuberia(self, aguaid: int, diametro: float | None, material_id: int | None) -> bool:
-        sets = []
-        params: dict = {"id": aguaid}
-        if diametro is not None:
-            sets.append("diametro = :diametro")
-            params["diametro"] = diametro
-        if material_id is not None:
-            sets.append("materialid = :material_id")
-            params["material_id"] = material_id
-        stmt = text(f"UPDATE sig.agua SET {', '.join(sets)} WHERE aguaid = :id")
+    async def _update_generico(
+        self, tabla: str, id_col: str, id_valor: int, cambios: dict
+    ) -> bool:
+        """Genera UPDATE ... SET col1=:col1, col2=:col2 WHERE id_col=:id.
+        Los nombres de columna vienen del código (whitelist en service.py), NO del
+        usuario — seguro para f-string.
+        """
+        if not cambios:
+            return False
+        sets = ", ".join(f"{col} = :{col}" for col in cambios)
+        params = {**cambios, "id": id_valor}
+        stmt = text(f"UPDATE sig.{tabla} SET {sets} WHERE {id_col} = :id")
         result = await self._session.execute(stmt, params)
         return result.rowcount > 0
 
-    async def actualizar_tramo(self, alcantarilladoid: int, material_id: int) -> bool:
-        stmt = text("UPDATE sig.alcantarillado SET materialid = :material_id WHERE alcantarilladoid = :id")
-        result = await self._session.execute(stmt, {"id": alcantarilladoid, "material_id": material_id})
-        return result.rowcount > 0
+    async def actualizar_tuberia(self, aguaid: int, cambios: dict) -> bool:
+        return await self._update_generico("agua", "aguaid", aguaid, cambios)
 
-    async def listar_materiales(self, grupo: str) -> list[dict]:
-        stmt = text(
-            "SELECT materialid, material FROM sig.materiales WHERE grupo = :grupo ORDER BY material"
+    async def actualizar_tramo(self, alcantarilladoid: int, cambios: dict) -> bool:
+        return await self._update_generico(
+            "alcantarillado", "alcantarilladoid", alcantarilladoid, cambios
         )
-        result = await self._session.execute(stmt, {"grupo": grupo})
+
+    async def actualizar_buzon(self, buzonid: int, cambios: dict) -> bool:
+        return await self._update_generico("buzones", "buzonid", buzonid, cambios)
+
+    async def actualizar_accesorio(self, accesorioid: int, cambios: dict) -> bool:
+        return await self._update_generico("accesorios", "accesorioid", accesorioid, cambios)
+
+    async def actualizar_cajaagua(self, cajaaguaid: int, cambios: dict) -> bool:
+        return await self._update_generico("cajaagua", "cajaaguaid", cajaaguaid, cambios)
+
+    async def actualizar_cajadesague(self, cajadesagueid: int, cambios: dict) -> bool:
+        return await self._update_generico("cajadesague", "cajadesagueid", cajadesagueid, cambios)
+
+    # ── Catálogos ─────────────────────────────────────────────────────
+
+    async def listar_materiales(self, grupo: str | None) -> list[dict]:
+        if grupo is None:
+            stmt = text(
+                "SELECT materialid, material FROM sig.materiales "
+                "WHERE estado = 'H' AND situacion = 'A' ORDER BY material"
+            )
+            params: dict = {}
+        else:
+            stmt = text(
+                "SELECT materialid, material FROM sig.materiales "
+                "WHERE grupo = :grupo AND estado = 'H' AND situacion = 'A' ORDER BY material"
+            )
+            params = {"grupo": grupo}
+        result = await self._session.execute(stmt, params)
         return [{"id": row.materialid, "nombre": row.material} for row in result]
+
+    async def listar_accesorio_tipos(self, grupo: str | None) -> list[dict]:
+        if grupo is None:
+            stmt = text(
+                "SELECT accesoriotipoid, accesoriotipo FROM sig.accesoriotipos "
+                "WHERE estado = 'H' AND situacion = 'A' ORDER BY accesoriotipo"
+            )
+            params: dict = {}
+        else:
+            stmt = text(
+                "SELECT accesoriotipoid, accesoriotipo FROM sig.accesoriotipos "
+                "WHERE grupo = :grupo AND estado = 'H' AND situacion = 'A' ORDER BY accesoriotipo"
+            )
+            params = {"grupo": grupo}
+        result = await self._session.execute(stmt, params)
+        return [{"id": row.accesoriotipoid, "nombre": row.accesoriotipo} for row in result]
+
+    async def listar_accesorio_clasificaciones(self) -> list[dict]:
+        stmt = text(
+            "SELECT accesorioclasificacionid, accesorioclasificacion "
+            "FROM sig.accesorioclasificacion "
+            "WHERE estado = 'H' AND situacion = 'A' "
+            "ORDER BY accesorioclasificacion"
+        )
+        result = await self._session.execute(stmt)
+        return [
+            {"id": row.accesorioclasificacionid, "nombre": row.accesorioclasificacion}
+            for row in result
+        ]

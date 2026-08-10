@@ -4,10 +4,16 @@ from fastapi import APIRouter, Path, Query, status
 
 from app.core.exceptions import ValidacionError
 from app.modules.red.repository import SigRedRepository, SigRedWriteRepository
-from app.modules.red.schemas import ElementoRedOut, ElementoRedPatchIn, MaterialOut
+from app.modules.red.schemas import (
+    AccesorioClasificacionOut,
+    AccesorioTipoOut,
+    ElementoRedOut,
+    ElementoRedPatchIn,
+    MaterialOut,
+)
 from app.modules.red.service import (
-    ELEMENTO_TIPO_A_GRUPO_MATERIAL,
     ELEMENTO_TIPOS_VALIDOS,
+    GRUPO_MATERIAL_POR_TIPO,
     TIPOS_VALIDOS,
     RedEdicionService,
     RedService,
@@ -62,26 +68,60 @@ async def actualizar_elemento(
     elemento_id: Annotated[int, Path()],
     patch: ElementoRedPatchIn,
 ) -> None:
-    """Edición inline (estilo Jira) de diámetro/material — escribe directo sobre
-    `sig`, ver app/db/sig.py:get_sig_write_session (excepción explícita al
-    read-only, decisión de Edgar 2026-08-07: no sobrevive a un restore futuro de
-    un backup de Fabiana, se evaluó y se aceptó ese riesgo)."""
+    """Edición inline desde el panel de detalle del mapa. Escribe directo sobre
+    `sig` (excepción explícita al read-only, ver app/db/sig.py:get_sig_write_session)."""
     service = RedEdicionService(SigRedWriteRepository(sig_write_session))
     await service.actualizar(tipo, elemento_id, patch)
 
 
-@router.get("/materiales/{tipo}", response_model=list[MaterialOut])
+# ── Catálogos para poblar los combos editables ─────────────────────────────────
+
+
+@router.get("/materiales", response_model=list[MaterialOut])
 async def listar_materiales(
+    sig_session: SigSession,
+    _usuario: CurrentUser,
+    grupo: Annotated[str | None, Query()] = None,
+) -> list[MaterialOut]:
+    """Filtra por `grupo` (columna en sig.materiales: 'AGUA POTABLE' o 'ALCANTARILLADO').
+    Sin `grupo` devuelve todos los materiales activos."""
+    service = RedEdicionService(SigRedWriteRepository(sig_session))
+    return await service.listar_materiales(grupo)
+
+
+@router.get("/materiales/{tipo}", response_model=list[MaterialOut])
+async def listar_materiales_por_tipo(
     sig_session: SigSession,
     _usuario: CurrentUser,
     tipo: Annotated[str, Path()],
 ) -> list[MaterialOut]:
-    if tipo not in ELEMENTO_TIPO_A_GRUPO_MATERIAL:
+    """Compat: mismo resultado que /materiales?grupo=X, pero resolviendo el grupo
+    desde el tipo del elemento (tuberia -> AGUA POTABLE, tramo -> ALCANTARILLADO)."""
+    if tipo not in GRUPO_MATERIAL_POR_TIPO:
         raise ValidacionError(
             f"tipo sin catálogo de materiales: {tipo}",
-            campos={"tipo": f"valores válidos: {', '.join(sorted(ELEMENTO_TIPO_A_GRUPO_MATERIAL))}"},
+            campos={"tipo": f"valores válidos: {', '.join(sorted(GRUPO_MATERIAL_POR_TIPO))}"},
         )
-    # Solo lectura (catálogo) — se sirve de la sesión read-only normal, no de la
-    # de escritura, aunque comparta clase de repositorio con actualizar_elemento.
     service = RedEdicionService(SigRedWriteRepository(sig_session))
-    return await service.listar_materiales(tipo)
+    return await service.listar_materiales_por_tipo(tipo)
+
+
+@router.get("/accesorio-tipos", response_model=list[AccesorioTipoOut])
+async def listar_accesorio_tipos(
+    sig_session: SigSession,
+    _usuario: CurrentUser,
+    grupo: Annotated[str | None, Query()] = None,
+) -> list[AccesorioTipoOut]:
+    """Catálogo de sig.accesoriotipos. Sin `grupo` devuelve todos."""
+    service = RedEdicionService(SigRedWriteRepository(sig_session))
+    return await service.listar_accesorio_tipos(grupo)
+
+
+@router.get("/accesorio-clasificaciones", response_model=list[AccesorioClasificacionOut])
+async def listar_accesorio_clasificaciones(
+    sig_session: SigSession,
+    _usuario: CurrentUser,
+) -> list[AccesorioClasificacionOut]:
+    """Catálogo de sig.accesorioclasificacion."""
+    service = RedEdicionService(SigRedWriteRepository(sig_session))
+    return await service.listar_accesorio_clasificaciones()
