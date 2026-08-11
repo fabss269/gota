@@ -9,6 +9,7 @@ from app.modules.red.schemas import (
     AccesorioTipoOut,
     ElementoRedOut,
     ElementoRedPatchIn,
+    LongitudMaterialOut,
     MaterialOut,
 )
 from app.modules.red.service import (
@@ -125,3 +126,19 @@ async def listar_accesorio_clasificaciones(
     """Catálogo de sig.accesorioclasificacion."""
     service = RedEdicionService(SigRedWriteRepository(sig_session))
     return await service.listar_accesorio_clasificaciones()
+
+
+@router.get("/longitud-por-material", response_model=list[LongitudMaterialOut])
+async def longitud_por_material(
+    sig_session: SigSession,
+    _usuario: CurrentUser,
+    grupo: Annotated[str, Query()],
+    sector_id: Annotated[str | None, Query(alias="sectorId")] = None,
+    distrito_id: Annotated[str | None, Query(alias="distritoId")] = None,
+    provincia_id: Annotated[str | None, Query(alias="provinciaId")] = None,
+    diametro: Annotated[float | None, Query()] = None,
+) -> list[LongitudMaterialOut]:
+    """Metros de tubería por material. `grupo`: agua|alcantarillado. `diametro`
+    solo aplica a agua (sig.alcantarillado no tiene esa columna)."""
+    service = RedService(SigRedRepository(sig_session))
+    return await service.longitud_por_material(grupo, sector_id, distrito_id, provincia_id, diametro)

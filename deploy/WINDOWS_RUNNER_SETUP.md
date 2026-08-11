@@ -1,3 +1,10 @@
+> **SUPERSEDED (2026-08-10)**: el destino de producción real dejó de ser este
+> Windows Server (nunca se terminó de configurar) y pasó a ser un VPS Linux
+> (Contabo) — ver [`LINUX_RUNNER_SETUP.md`](./LINUX_RUNNER_SETUP.md) y
+> [`PRODUCTION_DEPLOY.md`](./PRODUCTION_DEPLOY.md), que son la fuente de
+> verdad actual. Este documento se deja sin borrar por si se retoma el
+> servidor Windows más adelante, no por estar en uso hoy.
+
 # Setup del self-hosted runner en el Windows Server de producción
 
 El servidor solo tiene RDP (sin SSH), así que el CI/CD ya no se conecta hacia él —

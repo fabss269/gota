@@ -143,6 +143,24 @@ class ParentescoSliceOut(BaseModel):
     pct: float
 
 
+# ============ Tortas (tipo_grupo / tipo_atencion) ============
+
+class SliceOut(BaseModel):
+    """Una porción de torta genérica — reusada por tipo-grupo-pie y
+    tipo-atencion-pie (mismo shape, ambos endpoints nuevos)."""
+    etiqueta: str
+    n: int
+    pct: float
+
+
+# ============ Robos por distrito ============
+
+class DistritoRoboOut(BaseModel):
+    distritoid: int | None
+    distrito: str
+    n_robos: int
+
+
 # ============ Alertas semáforo ============
 
 class AlertaOut(BaseModel):

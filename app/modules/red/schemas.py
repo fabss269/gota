@@ -94,3 +94,8 @@ class AccesorioTipoOut(BaseModel):
 class AccesorioClasificacionOut(BaseModel):
     id: int
     nombre: str
+
+
+class LongitudMaterialOut(BaseModel):
+    material: str
+    metros: float

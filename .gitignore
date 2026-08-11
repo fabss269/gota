@@ -10,3 +10,5 @@ venv/
 deploy/.env
 deploy/martin-config.yaml
 deploy/docker-compose.override.yml
+.claude/settings.local.json
+*.dump

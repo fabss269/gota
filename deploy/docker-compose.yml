@@ -9,6 +9,29 @@ services:
       - martin
     networks: [gota]
 
+  postgres:
+    # postgis/postgis, no postgres liso — sig.* usa geometry/geography (PostGIS
+    # 3.4.x, misma versión que se viene usando en local, ver deploy/
+    # DESPLIEGUE_LOCAL_TUNEL.md). Decisión 2026-08-10: la BD deja de ser externa
+    # (antes 172.16.5.222, servidor EPSEL) y pasa a vivir en este mismo VPS/
+    # docker-compose — ya no hace falta ninguna conectividad de red especial
+    # hacia afuera para que backend/martin le hablen.
+    image: postgis/postgis:16-3.4-alpine
+    container_name: gota-postgres
+    restart: unless-stopped
+    environment:
+      POSTGRES_USER: ${DB_USER:-postgres}
+      POSTGRES_PASSWORD: ${DB_PASSWORD}
+      POSTGRES_DB: ${DB_NAME:-bd_conhydra}
+    volumes:
+      - gota_postgres_data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ${DB_USER:-postgres}"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+    networks: [gota]
+
   backend:
     image: ${BACKEND_IMAGE:-ghcr.io/ivanedac/epsel-backend:latest}
     restart: unless-stopped
@@ -23,6 +46,8 @@ services:
       DANA_POLL_INTERVAL_SECONDS: ${DANA_POLL_INTERVAL_SECONDS:-10}
       DANA_POLL_OVERLAP_SECONDS: ${DANA_POLL_OVERLAP_SECONDS:-10}
     depends_on:
+      postgres:
+        condition: service_healthy
       redis:
         condition: service_started
     networks: [gota]
@@ -52,13 +77,9 @@ services:
     command: ["--config", "/config/martin-config.yaml", "--listen-addresses", "0.0.0.0:3000", "--cache-expiry", "60s"]
     volumes:
       - ./martin-config.yaml:/config/martin-config.yaml:ro
-    # host.docker.internal no se resuelve por defecto en Docker Engine (Linux) —
-    # solo en Docker Desktop. Sin esto Martin no puede conectar a Postgres si la
-    # connection_string apunta a host.docker.internal (confirmado en vivo
-    # 2026-08-07: "failed to lookup address information: Name or service not
-    # known").
-    extra_hosts:
-      - "host.docker.internal:host-gateway"
+    depends_on:
+      postgres:
+        condition: service_healthy
     networks: [gota]
 
 networks:
@@ -67,3 +88,4 @@ networks:
 
 volumes:
   gota_redis_data:
+  gota_postgres_data:
