@@ -1,25 +1,29 @@
 import { useNavigation } from 'expo-router';
+import { useState } from 'react';
 import { Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 
 import { AlertasPanel } from '@/components/dashboard-web/AlertasPanel';
 import { DashboardMap } from '@/components/dashboard-web/DashboardMap.web';
+import { DashboardTabsBar, type DashboardTab } from '@/components/dashboard-web/DashboardTabsBar';
 import { FilterBar } from '@/components/dashboard-web/FilterBar';
 import { KpiRow } from '@/components/dashboard-web/KpiRow';
+import { LongitudPorMaterialChart } from '@/components/dashboard-web/LongitudPorMaterialChart';
 import { MonthlyLineChart } from '@/components/dashboard-web/MonthlyLineChart';
-import {
-  ReincidentesRoboTable,
-  ReincidentesTable,
-} from '@/components/dashboard-web/ReincidentesTable';
+import { PrediccionSectoresChart } from '@/components/dashboard-web/PrediccionSectoresChart';
 import { RobosMensualChart } from '@/components/dashboard-web/RobosMensualChart';
+import { RobosPorDistritoChart } from '@/components/dashboard-web/RobosPorDistritoChart';
 import { TiempoResolucionChart } from '@/components/dashboard-web/TiempoResolucionChart';
+import { TipoAtencionPie } from '@/components/dashboard-web/TipoAtencionPie';
 import { TipoAtencionStacked } from '@/components/dashboard-web/TipoAtencionStacked';
+import { TipoGrupoPie } from '@/components/dashboard-web/TipoGrupoPie';
 import { TopSectoresBar } from '@/components/dashboard-web/TopSectoresBar';
 import { Colors, Spacing } from '@/constants/theme';
 import { openDrawer } from '@/navigation/openDrawer';
 
 export default function DashboardWebScreen() {
   const navigation = useNavigation();
+  const [tab, setTab] = useState<DashboardTab>('resumen');
 
   return (
     <SafeAreaView style={styles.container} edges={['top']}>
@@ -30,46 +34,68 @@ export default function DashboardWebScreen() {
         <Text style={styles.title}>Panel operativo · GOTA</Text>
       </View>
 
+      <DashboardTabsBar active={tab} onChange={setTab} />
+
       <ScrollView contentContainerStyle={styles.scroll}>
-        {/* Filtros globales */}
+        {/* Filtros globales — aplican a todos los tabs */}
         <FilterBar />
 
-        {/* KPIs */}
-        <KpiRow />
+        {tab === 'resumen' && (
+          <>
+            <KpiRow />
+            <View style={styles.mainRow}>
+              <View style={styles.mapCol}>
+                <DashboardMap />
+              </View>
+              <View style={styles.rightCol}>
+                <AlertasPanel />
+              </View>
+            </View>
+          </>
+        )}
 
-        {/* Fila principal: mapa (grande) + panel derecho (alertas + top sectores) */}
-        <View style={styles.mainRow}>
-          <View style={styles.mapCol}>
-            <DashboardMap />
-          </View>
-          <View style={styles.rightCol}>
-            <AlertasPanel />
+        {tab === 'sectores' && (
+          <View style={styles.chartsRow}>
             <TopSectoresBar />
+            <RobosPorDistritoChart />
           </View>
-        </View>
+        )}
 
-        {/* Charts temporales */}
-        <View style={styles.chartsRow}>
-          <MonthlyLineChart />
-          <TiempoResolucionChart />
-        </View>
-        <View style={styles.chartsRow}>
-          <TipoAtencionStacked />
-        </View>
+        {tab === 'tendencias' && (
+          <>
+            <View style={styles.chartsRow}>
+              <MonthlyLineChart mostrarProyeccion={false} />
+              <TiempoResolucionChart />
+            </View>
+            <View style={styles.chartsRow}>
+              <RobosMensualChart />
+            </View>
+          </>
+        )}
 
-        {/* Tablas operativas — layout:
-              [ Reincidentes ] [ Reincidentes robo   ]
-              [               ] [ Robos por mes      ]
-        */}
-        <View style={styles.tablesRow}>
-          <View style={styles.tablesLeftCol}>
-            <ReincidentesTable />
+        {tab === 'composicion' && (
+          <>
+            <View style={styles.chartsRow}>
+              <TipoGrupoPie />
+              <TipoAtencionPie />
+            </View>
+            <View style={styles.chartsRow}>
+              <TipoAtencionStacked />
+            </View>
+          </>
+        )}
+
+        {tab === 'predictivo' && (
+          <View style={styles.chartsRow}>
+            <PrediccionSectoresChart />
           </View>
-          <View style={styles.tablesRightCol}>
-            <ReincidentesRoboTable />
-            <RobosMensualChart />
+        )}
+
+        {tab === 'red' && (
+          <View style={styles.chartsRow}>
+            <LongitudPorMaterialChart />
           </View>
-        </View>
+        )}
       </ScrollView>
     </SafeAreaView>
   );
@@ -120,19 +146,5 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     gap: Spacing.md,
     flexWrap: 'wrap',
-  },
-  tablesRow: {
-    flexDirection: 'row',
-    gap: Spacing.md,
-    flexWrap: 'wrap',
-  },
-  tablesLeftCol: {
-    flex: 1.4,   // más grande — la lista es la protagonista
-    minWidth: 500,
-  },
-  tablesRightCol: {
-    flex: 1,
-    minWidth: 380,
-    gap: Spacing.md,
   },
 });

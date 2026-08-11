@@ -1,15 +1,10 @@
 import maplibregl from 'maplibre-gl';
 import 'maplibre-gl/dist/maplibre-gl.css';
-import { useEffect, useRef, useState } from 'react';
-import { createPortal } from 'react-dom';
+import { useEffect, useRef } from 'react';
 import { StyleSheet, View } from 'react-native';
 
 import { useHeatmapSectores } from '@/hooks/useDashboardGeo';
 import { useDashboardFilters } from '@/state/dashboardFilters';
-
-import { IncidenciaPopup } from './IncidenciaPopup';
-import { LayersPanel, type CapaCatastro } from './LayersPanel';
-import { HALO_COLOR, registerPinIcons } from './pinIcons';
 
 // Basemap OSM (raster). Suficiente para dev/demo.
 const BASEMAP_STYLE: maplibregl.StyleSpecification = {
@@ -36,141 +31,6 @@ const BASEMAP_STYLE: maplibregl.StyleSpecification = {
 const MARTIN_URL = process.env.EXPO_PUBLIC_MARTIN_URL ?? 'https://tiles-gota.kasqan.com';
 const DEFAULT_CENTER: [number, number] = [-79.8409, -6.7714];
 
-// Umbral de zoom para cambiar entre heatmap agregado y pines individuales.
-// A bajo zoom (< 14) los pines se saturan; el heatmap muestra densidad clara.
-const ZOOM_PINES = 14;
-
-type PopupState = {
-  codigo: string;
-  container: HTMLDivElement;
-  popup: maplibregl.Popup;
-};
-
-// Configuración de capas catastrales (id, tipo, paint props). Todas empiezan
-// ocultas y se activan desde el panel lateral.
-const CAPAS_CATASTRO: Record<CapaCatastro, {
-  layer: maplibregl.LayerSpecification;
-  before?: string;
-}> = {
-  agua: {
-    layer: {
-      id: 'catastro-agua', type: 'line', source: 'agua-catastro',
-      'source-layer': 'agua',
-      layout: { visibility: 'none' },
-      paint: { 'line-color': '#1E40AF', 'line-width': 2, 'line-opacity': 0.7 },
-    },
-    before: 'sectores-fill',
-  },
-  alcantarillado: {
-    layer: {
-      id: 'catastro-alcantarillado', type: 'line', source: 'alcantarillado-catastro',
-      'source-layer': 'alcantarillado',
-      layout: { visibility: 'none' },
-      paint: { 'line-color': '#166534', 'line-width': 2, 'line-opacity': 0.7 },
-    },
-    before: 'sectores-fill',
-  },
-  alcantarillado_flujo: {
-    layer: {
-      id: 'catastro-alcantarillado-flujo', type: 'line', source: 'alcantarillado_flujo-catastro',
-      'source-layer': 'alcantarillado_flujo',
-      layout: { visibility: 'none' },
-      paint: {
-        // Primaria = línea más gruesa/oscura; secundaria más clara
-        'line-color': ['case', ['get', 'primaria'], '#064E3B', '#059669'],
-        'line-width': ['case', ['get', 'primaria'], 2.5, 1.5],
-        'line-opacity': 0.8,
-      },
-    },
-    before: 'sectores-fill',
-  },
-  cajaagua: {
-    layer: {
-      id: 'catastro-cajaagua', type: 'circle', source: 'cajaagua-catastro',
-      'source-layer': 'cajaagua',
-      layout: { visibility: 'none' },
-      paint: {
-        'circle-radius': ['interpolate', ['linear'], ['zoom'], 13, 1, 17, 4],
-        'circle-color': '#3B82F6',
-        'circle-opacity': 0.6,
-      },
-    },
-    before: 'sectores-fill',
-  },
-  cajadesague: {
-    layer: {
-      id: 'catastro-cajadesague', type: 'circle', source: 'cajadesague-catastro',
-      'source-layer': 'cajadesague',
-      layout: { visibility: 'none' },
-      paint: {
-        'circle-radius': ['interpolate', ['linear'], ['zoom'], 13, 1, 17, 4],
-        'circle-color': '#22C55E',
-        'circle-opacity': 0.6,
-      },
-    },
-    before: 'sectores-fill',
-  },
-  cajaaguaconexion: {
-    layer: {
-      id: 'catastro-cajaaguaconexion', type: 'line', source: 'cajaaguaconexion-catastro',
-      'source-layer': 'cajaaguaconexion',
-      layout: { visibility: 'none' },
-      paint: { 'line-color': '#60A5FA', 'line-width': 0.6, 'line-opacity': 0.6 },
-    },
-    before: 'sectores-fill',
-  },
-  cajadesagueconexion: {
-    layer: {
-      id: 'catastro-cajadesagueconexion', type: 'line', source: 'cajadesagueconexion-catastro',
-      'source-layer': 'cajadesagueconexion',
-      layout: { visibility: 'none' },
-      paint: { 'line-color': '#4ADE80', 'line-width': 0.6, 'line-opacity': 0.6 },
-    },
-    before: 'sectores-fill',
-  },
-  accesorios: {
-    layer: {
-      id: 'catastro-accesorios', type: 'circle', source: 'accesorios-catastro',
-      'source-layer': 'accesorios',
-      layout: { visibility: 'none' },
-      paint: {
-        'circle-radius': ['interpolate', ['linear'], ['zoom'], 13, 2, 17, 6],
-        'circle-color': '#EAB308',
-        'circle-stroke-color': '#78350F',
-        'circle-stroke-width': 1,
-        'circle-opacity': 0.85,
-      },
-    },
-    before: 'sectores-fill',
-  },
-  lotes: {
-    layer: {
-      id: 'catastro-lotes', type: 'line', source: 'lotes-catastro',
-      'source-layer': 'lotes',
-      layout: { visibility: 'none' },
-      paint: { 'line-color': '#8B5CF6', 'line-width': 0.5, 'line-opacity': 0.5 },
-    },
-    before: 'sectores-fill',
-  },
-  manzanas: {
-    layer: {
-      id: 'catastro-manzanas', type: 'line', source: 'manzanas-catastro',
-      'source-layer': 'manzanas',
-      layout: { visibility: 'none' },
-      paint: { 'line-color': '#EC4899', 'line-width': 1, 'line-opacity': 0.6 },
-    },
-    before: 'sectores-fill',
-  },
-};
-
-const CAPA_A_SOURCE: Record<CapaCatastro, string> = {
-  agua: 'agua', alcantarillado: 'alcantarillado',
-  alcantarillado_flujo: 'alcantarillado_flujo',
-  cajaagua: 'cajaagua', cajadesague: 'cajadesague',
-  cajaaguaconexion: 'cajaaguaconexion', cajadesagueconexion: 'cajadesagueconexion',
-  accesorios: 'accesorios', lotes: 'lotes', manzanas: 'manzanas',
-};
-
 function colorPorDensidad(n: number, maxN: number): string {
   if (n === 0) return 'rgba(200, 200, 200, 0.1)';
   const ratio = maxN > 0 ? Math.min(n / maxN, 1) : 0;
@@ -183,20 +43,12 @@ function colorPorDensidad(n: number, maxN: number): string {
   return `hsl(${hue}, ${sat}%, ${light}%)`;
 }
 
+/** Mapa de calor por sector — tab Resumen. Sin pines de incidencias ni capas de
+ * catastro: esas se editan desde el mapa operativo, aquí solo interesa la
+ * densidad agregada por sector (y el drill-down de click → filtrar sector). */
 export function DashboardMap() {
   const containerRef = useRef<HTMLDivElement | null>(null);
   const mapRef = useRef<maplibregl.Map | null>(null);
-  const pulseRafRef = useRef<number | null>(null);
-  const [popupState, setPopupState] = useState<PopupState | null>(null);
-  const popupStateRef = useRef<PopupState | null>(null);
-  useEffect(() => { popupStateRef.current = popupState; }, [popupState]);
-
-  const [capasActivas, setCapasActivas] = useState<Record<CapaCatastro, boolean>>({
-    agua: false, alcantarillado: false, alcantarillado_flujo: false,
-    cajaagua: false, cajadesague: false,
-    cajaaguaconexion: false, cajadesagueconexion: false,
-    accesorios: false, lotes: false, manzanas: false,
-  });
 
   const { grupo, sectorid, seleccionarSector } = useDashboardFilters();
   const { data: heatmap } = useHeatmapSectores();
@@ -220,7 +72,6 @@ export function DashboardMap() {
     });
     map.addControl(new maplibregl.NavigationControl({ showCompass: false }), 'top-right');
     mapRef.current = map;
-    (window as any).__dashMap = map;
 
     const addSourceIfMissing = (id: string, source: maplibregl.SourceSpecification) => {
       if (!map.getSource(id)) map.addSource(id, source);
@@ -230,21 +81,8 @@ export function DashboardMap() {
     };
 
     map.on('load', () => {
-      registerPinIcons(map);
-
-      // Sources principales
       addSourceIfMissing('sectores', {
         type: 'vector', tiles: [`${MARTIN_URL}/sectores/{z}/{x}/{y}`],
-      });
-      addSourceIfMissing('incidencias', {
-        type: 'vector', tiles: [`${MARTIN_URL}/incidencias/{z}/{x}/{y}`],
-      });
-
-      // Sources catastro (una source por capa)
-      Object.entries(CAPA_A_SOURCE).forEach(([capaId, martinId]) => {
-        addSourceIfMissing(`${capaId}-catastro`, {
-          type: 'vector', tiles: [`${MARTIN_URL}/${martinId}/{z}/{x}/{y}`],
-        });
       });
 
       // Polígonos de sectores
@@ -265,67 +103,6 @@ export function DashboardMap() {
         paint: { 'line-color': '#0D2B52', 'line-width': 3 },
       });
 
-      // Capas catastrales (ocultas por default)
-      Object.values(CAPAS_CATASTRO).forEach(({ layer, before }) => {
-        addLayerIfMissing(layer, before);
-      });
-
-      // (no incidencias-heatmap gradiente — se usa el heatmap por SECTOR
-      // vía sectores-fill que ya está más arriba y muestra contexto real:
-      // polígonos con nombre de sector, no una mancha amorfa)
-
-      // Halo pulsante rojo (SOLO a alto zoom, para no saturar la vista general)
-      addLayerIfMissing({
-        id: 'incidencias-halo',
-        type: 'circle',
-        source: 'incidencias',
-        'source-layer': 'incidencias',
-        minzoom: ZOOM_PINES,
-        filter: ['==', ['get', 'es_resolucion_lenta'], true],
-        paint: {
-          'circle-radius': 14,
-          'circle-color': HALO_COLOR,
-          'circle-opacity': 0.25,
-          'circle-stroke-color': HALO_COLOR,
-          'circle-stroke-width': 2,
-          'circle-stroke-opacity': 0.7,
-        },
-      });
-
-      // Pines (SOLO a alto zoom)
-      addLayerIfMissing({
-        id: 'incidencias-pins',
-        type: 'symbol',
-        source: 'incidencias',
-        'source-layer': 'incidencias',
-        minzoom: ZOOM_PINES,
-        layout: {
-          'icon-image': [
-            'match', ['get', 'grupo'],
-            'agua', 'pin-agua',
-            'desague', 'pin-desague',
-            'pin-agua',
-          ],
-          'icon-size': 1.5,
-          'icon-anchor': 'bottom',
-          'icon-allow-overlap': true,
-          'text-field': ['to-string', ['get', 'n_reclamos']],
-          'text-font': ['Open Sans Bold'],
-          'text-size': 13,
-          'text-offset': [0, -1.85],
-          'text-anchor': 'center',
-          'text-allow-overlap': true,
-          'text-ignore-placement': true,
-        },
-        paint: { 'text-color': '#111' },
-      });
-
-      map.on('mouseenter', 'incidencias-pins', () => {
-        map.getCanvas().style.cursor = 'pointer';
-      });
-      map.on('mouseleave', 'incidencias-pins', () => {
-        map.getCanvas().style.cursor = '';
-      });
       // Tooltip al hover en sector: nombre + # incidencias
       const sectorTooltip = new maplibregl.Popup({
         closeButton: false, closeOnClick: false, offset: 8,
@@ -355,29 +132,8 @@ export function DashboardMap() {
         sectorTooltip.remove();
       });
 
-      // Click en pin → popup
-      map.on('click', 'incidencias-pins', (e) => {
-        const f = e.features?.[0];
-        if (!f?.properties) return;
-        const codigo = f.properties.codigo as string;
-        if (!codigo) return;
-        popupStateRef.current?.popup.remove();
-        const container = document.createElement('div');
-        const popup = new maplibregl.Popup({
-          closeButton: false, closeOnClick: false,
-          maxWidth: '380px', offset: [0, -35],
-        }).setLngLat(e.lngLat).setDOMContent(container).addTo(map);
-        popup.on('close', () => setPopupState(null));
-        setPopupState({ codigo, container, popup });
-        map.easeTo({ center: e.lngLat, offset: [0, 180], duration: 400 });
-      });
-
       // Click en sector → filtro drill-down
       map.on('click', 'sectores-fill', (e) => {
-        const pinFeatures = map.queryRenderedFeatures(e.point, {
-          layers: ['incidencias-pins'],
-        });
-        if (pinFeatures.length > 0) return;
         const f = e.features?.[0];
         if (!f?.properties) return;
         const sid = f.properties.sectorid as number;
@@ -412,19 +168,6 @@ export function DashboardMap() {
       (map as any).__aplicarHeatmap();
       map.on('idle', () => (map as any).__aplicarHeatmap?.());
 
-      // Animación del halo pulsante
-      const start = performance.now();
-      const tick = () => {
-        if (!mapRef.current || !mapRef.current.getLayer('incidencias-halo')) return;
-        const t = (performance.now() - start) / 1000;
-        const pulse = (Math.sin(t * 2.4) + 1) / 2;
-        mapRef.current.setPaintProperty('incidencias-halo', 'circle-radius', 10 + pulse * 8);
-        mapRef.current.setPaintProperty('incidencias-halo', 'circle-opacity', 0.12 + pulse * 0.28);
-        mapRef.current.setPaintProperty('incidencias-halo', 'circle-stroke-opacity', 0.4 + pulse * 0.4);
-        pulseRafRef.current = requestAnimationFrame(tick);
-      };
-      tick();
-
       // Fix del layout async
       [0, 100, 300].forEach((delay) => {
         setTimeout(() => {
@@ -447,12 +190,9 @@ export function DashboardMap() {
 
     return () => {
       resizeObs.disconnect();
-      if (pulseRafRef.current !== null) cancelAnimationFrame(pulseRafRef.current);
-      popupStateRef.current?.popup.remove();
       map.remove();
       mapRef.current = null;
     };
-    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
   // ============ Heatmap por sector — trigger apply cuando llega data ============
@@ -466,56 +206,23 @@ export function DashboardMap() {
     return () => timers.forEach(clearTimeout);
   }, [heatmap]);
 
-  // ============ Filtros grupo / sector ============
+  // ============ Highlight de sector seleccionado ============
   useEffect(() => {
     const map = mapRef.current;
     if (!map || !map.isStyleLoaded()) return;
-    const conds: any[] = ['all'];
-    if (grupo !== 'todos') conds.push(['==', ['get', 'grupo'], grupo]);
-    if (sectorid != null) conds.push(['==', ['get', 'sectorid'], sectorid]);
-    const pinFilter = conds.length === 1 ? null : conds;
-    if (map.getLayer('incidencias-pins')) map.setFilter('incidencias-pins', pinFilter);
-
-    const haloFilter: any[] = ['all', ['==', ['get', 'es_resolucion_lenta'], true]];
-    if (grupo !== 'todos') haloFilter.push(['==', ['get', 'grupo'], grupo]);
-    if (sectorid != null) haloFilter.push(['==', ['get', 'sectorid'], sectorid]);
-    if (map.getLayer('incidencias-halo')) map.setFilter('incidencias-halo', haloFilter);
-
     if (map.getLayer('sectores-line-highlight')) {
       map.setFilter('sectores-line-highlight',
         sectorid != null
           ? ['==', ['get', 'sectorid'], sectorid]
           : ['==', ['get', 'sectorid'], -1]);
     }
+    // El grupo (agua/desague) no filtra el heatmap por sector, que es agregado —
+    // se deja como referencia visual del filtro activo, sin efecto en el mapa.
   }, [grupo, sectorid]);
-
-  // ============ Toggle de capas catastrales ============
-  useEffect(() => {
-    const map = mapRef.current;
-    if (!map || !map.isStyleLoaded()) return;
-    (Object.entries(capasActivas) as [CapaCatastro, boolean][]).forEach(([capa, activa]) => {
-      const layerId = CAPAS_CATASTRO[capa].layer.id;
-      if (map.getLayer(layerId)) {
-        map.setLayoutProperty(layerId, 'visibility', activa ? 'visible' : 'none');
-      }
-    });
-  }, [capasActivas]);
-
-  const toggleCapa = (c: CapaCatastro) =>
-    setCapasActivas((prev) => ({ ...prev, [c]: !prev[c] }));
 
   return (
     <View style={styles.wrapper}>
       <div ref={containerRef} style={styles.mapContainer as any} />
-      <LayersPanel activas={capasActivas} onToggle={toggleCapa} />
-      {popupState &&
-        createPortal(
-          <IncidenciaPopup
-            codigo={popupState.codigo}
-            onClose={() => popupState.popup.remove()}
-          />,
-          popupState.container,
-        )}
     </View>
   );
 }

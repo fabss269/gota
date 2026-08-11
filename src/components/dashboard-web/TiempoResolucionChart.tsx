@@ -61,10 +61,10 @@ const styles = StyleSheet.create({
     borderWidth: 1,
     borderColor: Colors.border,
     flex: 1,
-    minHeight: 280,
+    height: 320,
   },
   titulo: { fontSize: 14, fontWeight: '700', color: Colors.textBody },
   subtitulo: { fontSize: 11, color: Colors.textMuted, marginTop: 2, marginBottom: 8 },
-  chartWrap: { flex: 1, minHeight: 200 },
+  chartWrap: { flex: 1 },
   muted: { fontSize: 12, color: Colors.textMuted, textAlign: 'center', marginTop: Spacing.lg },
 });

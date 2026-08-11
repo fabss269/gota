@@ -24,83 +24,83 @@
     "manzanas": {
       "type": "vector",
       "tiles": [
-        "/tiles/manzanas/{z}/{x}/{y}"
+        "https://gota.kasqan.com/tiles/manzanas/{z}/{x}/{y}"
       ],
       "promoteId": "manzanaid"
     },
     "lotes": {
       "type": "vector",
       "tiles": [
-        "/tiles/lotes/{z}/{x}/{y}"
+        "https://gota.kasqan.com/tiles/lotes/{z}/{x}/{y}"
       ],
       "promoteId": "loteid"
     },
     "agua": {
       "type": "vector",
       "tiles": [
-        "/tiles/agua/{z}/{x}/{y}"
+        "https://gota.kasqan.com/tiles/agua/{z}/{x}/{y}"
       ],
       "promoteId": "aguaid"
     },
     "alcantarillado": {
       "type": "vector",
       "tiles": [
-        "/tiles/alcantarillado/{z}/{x}/{y}"
+        "https://gota.kasqan.com/tiles/alcantarillado/{z}/{x}/{y}"
       ],
       "promoteId": "alcantarilladoid"
     },
     "buzones": {
       "type": "vector",
       "tiles": [
-        "/tiles/buzones/{z}/{x}/{y}"
+        "https://gota.kasqan.com/tiles/buzones/{z}/{x}/{y}"
       ],
       "promoteId": "buzonid"
     },
     "accesorios": {
       "type": "vector",
       "tiles": [
-        "/tiles/accesorios/{z}/{x}/{y}"
+        "https://gota.kasqan.com/tiles/accesorios/{z}/{x}/{y}"
       ],
       "promoteId": "accesorioid"
     },
     "cajaagua": {
       "type": "vector",
       "tiles": [
-        "/tiles/cajaagua/{z}/{x}/{y}"
+        "https://gota.kasqan.com/tiles/cajaagua/{z}/{x}/{y}"
       ],
       "promoteId": "cajaaguaid"
     },
     "cajadesague": {
       "type": "vector",
       "tiles": [
-        "/tiles/cajadesague/{z}/{x}/{y}"
+        "https://gota.kasqan.com/tiles/cajadesague/{z}/{x}/{y}"
       ],
       "promoteId": "cajadesagueid"
     },
     "cajaaguaconexion": {
       "type": "vector",
       "tiles": [
-        "/tiles/cajaaguaconexion/{z}/{x}/{y}"
+        "https://gota.kasqan.com/tiles/cajaaguaconexion/{z}/{x}/{y}"
       ],
       "promoteId": "cajaaguaid"
     },
     "cajadesagueconexion": {
       "type": "vector",
       "tiles": [
-        "/tiles/cajadesagueconexion/{z}/{x}/{y}"
+        "https://gota.kasqan.com/tiles/cajadesagueconexion/{z}/{x}/{y}"
       ],
       "promoteId": "cajadesagueid"
     },
     "sectores": {
       "type": "vector",
       "tiles": [
-        "/tiles/sectores/{z}/{x}/{y}"
+        "https://gota.kasqan.com/tiles/sectores/{z}/{x}/{y}"
       ]
     },
     "alcantarillado_flujo": {
       "type": "vector",
       "tiles": [
-        "/tiles/alcantarillado_flujo/{z}/{x}/{y}"
+        "https://gota.kasqan.com/tiles/alcantarillado_flujo/{z}/{x}/{y}"
       ]
     }
   },
