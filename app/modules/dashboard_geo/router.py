@@ -5,6 +5,7 @@ from fastapi import APIRouter, Depends, Query
 from app.modules.dashboard_geo.repository import DashboardGeoRepository
 from app.modules.dashboard_geo.schemas import (
     AlertaOut,
+    DistritoRoboOut,
     HeatmapSectorOut,
     IncidenciaPopupOut,
     KpisOut,
@@ -17,6 +18,7 @@ from app.modules.dashboard_geo.schemas import (
     SerieStackedOut,
     SerieTiempoResolucionOut,
     SinSolucionRowOut,
+    SliceOut,
     StorytellingOut,
     TramoRankOut,
 )
@@ -81,9 +83,11 @@ async def sectores(
     session: PropiaSession,
     grupo: Annotated[Grupo, Query()] = "todos",
     limite: Annotated[int, Query(ge=1, le=50)] = 10,
+    distrito_id: Annotated[str | None, Query(alias="distritoId")] = None,
+    provincia_id: Annotated[str | None, Query(alias="provinciaId")] = None,
 ) -> list[SectorRankOut]:
     g = None if grupo == "todos" else grupo
-    return await _svc(session).sectores(limite, g)
+    return await _svc(session).sectores(limite, g, distrito_id, provincia_id)
 
 
 @router.get("/heatmap-sectores", response_model=list[HeatmapSectorOut])
@@ -206,6 +210,36 @@ async def parentesco(
 @router.get("/alertas", response_model=list[AlertaOut])
 async def alertas(session: PropiaSession) -> list[AlertaOut]:
     return await _svc(session).alertas()
+
+
+# ---------------- Tortas ----------------
+
+@router.get("/tipo-grupo-pie", response_model=list[SliceOut])
+async def tipo_grupo_pie(
+    session: PropiaSession,
+    sectorid: Annotated[int | None, Query()] = None,
+) -> list[SliceOut]:
+    return await _svc(session).tipo_grupo_pie(sectorid)
+
+
+@router.get("/tipo-atencion-pie", response_model=list[SliceOut])
+async def tipo_atencion_pie(
+    session: PropiaSession,
+    grupo: Annotated[Grupo, Query()] = "todos",
+    sectorid: Annotated[int | None, Query()] = None,
+) -> list[SliceOut]:
+    g = None if grupo == "todos" else grupo
+    return await _svc(session).tipo_atencion_pie(g, sectorid)
+
+
+# ---------------- Robos por distrito ----------------
+
+@router.get("/robos-por-distrito", response_model=list[DistritoRoboOut])
+async def robos_por_distrito(
+    session: PropiaSession,
+    limite: Annotated[int, Query(ge=1, le=20)] = 5,
+) -> list[DistritoRoboOut]:
+    return await _svc(session).robos_por_distrito(limite)
 
 
 # ---------------- Predicción (regresión) ----------------

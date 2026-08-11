@@ -79,27 +79,25 @@ psql -h 127.0.0.1 -p 5432 -U postgres -d bd_conhydra_local -f sql/fixes_post_res
   (estaba mal etiquetado como Pimentel, es Chiclayo) — dato sucio puntual de este
   backup, no una migración de schema.
 
-**Después de los dos fixes de arriba, SIEMPRE reconstruir la caché Redis** — si
-no, `GET /incidencias` con el filtro de prioridad (el que manda el mapa por
-defecto) devuelve casi nada, aunque la BD tenga los 16,971 incidentes bien:
+**Ya NO hace falta reconstruir la caché Redis después de un restore** (decisión
+de Edgar 2026-08-10, revierte lo que decía esta sección antes). `GET
+/incidencias` filtra `estado`/`sector`/`distrito` directo contra Postgres/`sig`
+— Redis quedó solo como caché de lectura individual (`cache:incidente:{id}:
+resumen`, se llena sola incidente por incidente al leerse, como cualquier
+caché), ya no hay índices invertidos (`idx:estado:*`/`idx:sector:*`/
+`idx:prioridad:*`) que dependieran de un rebuild manual. Un restore de BD deja
+Redis con claves huérfanas apuntando a UUIDs que ya no existen, pero eso ya no
+rompe nada — simplemente son cache misses que se recalculan solos en la
+próxima lectura de cada incidente; si molesta tener basura vieja dando vueltas,
+`docker exec gota-redis redis-cli FLUSHALL` alcanza, no hace falta el script.
 
-```bash
-.venv/bin/python -m scripts.rebuild_incidencia_cache
-```
-
-**Por qué es obligatorio, no opcional** (encontrado en vivo 2026-08-07 — el
-síntoma reportado fue "solo me cargan dos incidencias"): `GET /incidencias`
-filtra por prioridad/estado/sector contra índices invertidos en Redis
-(`idx:prioridad:*` etc, specs/00-arquitectura.md §7), no contra Postgres
-directamente. Esos índices quedan apuntando a los `incidente_id` (UUID) de la
-BD *anterior* al restore — un restore completo reemplaza la tabla `gota.incidente`
-entera con UUIDs nuevos, así que la caché vieja queda huérfana (620 claves
-apuntando a incidentes que ya no existen, verificado). El filtro de prioridad
-intersecta contra esos índices vacíos/viejos y el resultado colapsa a casi 0,
-aunque la query sin ese filtro sí devuelva los 625 reales. El script primero
-borra TODO lo viejo (`_limpiar_claves`) y repuebla desde cero solo con lo que
-hay hoy en `gota.incidente` — tarda unos 3-4 minutos para ~17k incidentes
-(secuencial, un lookup a `sig` por incidente).
+`scripts/rebuild_incidencia_cache.py` sigue existiendo pero es opcional —
+`poblar_cache_incidentes` la sigue usando `dana_ingest.py` para precargar el
+resumen de incidentes recién ingeridos (ese sí es un caso legítimo de "poblar
+antes de que alguien lea"), y el CLI completo (`python -m
+scripts.rebuild_incidencia_cache`) sirve como warm-up manual si algún día se
+quiere evitar el costo de los primeros cache-miss, pero no es necesario para
+que nada funcione.
 
 **Verificado compatible con este backup (2026-08-07)**, sin perder funcionalidad
 propia — análisis completo hecho antes de restaurar, comparando el schema del

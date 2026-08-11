@@ -152,6 +152,24 @@ class CatalogoMedioRecepcion(Base):
     nombre: Mapped[str]
 
 
+class IncidenteAlertaRegla(Base):
+    """Prioridad real de un incidente, calculada por el módulo de alertas (specs/00
+    §7 la da por "fuera de alcance" — la tabla existe en el DDL pero hoy está vacía,
+    nadie la escribe todavía). Cuando exista una fila, gana la más reciente por
+    `fecha` (mismo criterio que `EstadoIncidenteEvento` para el estado actual)."""
+
+    __tablename__ = "incidente_alerta_regla"
+
+    incidente_alerta_regla_id: Mapped[uuid.UUID] = mapped_column(
+        UUID(as_uuid=True), primary_key=True, server_default=text("gen_random_uuid()")
+    )
+    incidente_id: Mapped[uuid.UUID] = mapped_column(ForeignKey("incidente.incidente_id"))
+    alerta_regla_id: Mapped[int]
+    prioridad_id: Mapped[int | None] = mapped_column(ForeignKey("catalogo_prioridad.prioridad_id"))
+    fecha: Mapped[datetime]
+    descripcion: Mapped[str]
+
+
 class EstadoIncidenteEvento(Base):
     __tablename__ = "estado_incidente_evento"
 

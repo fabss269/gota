@@ -12,6 +12,7 @@ from app.core.exceptions import NoEncontradoError
 from app.modules.dashboard_geo.repository import DashboardGeoRepository
 from app.modules.dashboard_geo.schemas import (
     AlertaOut,
+    DistritoRoboOut,
     HeatmapSectorOut,
     IncidenciaPopupOut,
     KpiOut,
@@ -29,6 +30,7 @@ from app.modules.dashboard_geo.schemas import (
     SerieStackedPuntoOut,
     SerieTiempoResolucionOut,
     SinSolucionRowOut,
+    SliceOut,
     StorytellingOut,
     TramoRankOut,
 )
@@ -257,8 +259,14 @@ class DashboardGeoService:
 
     # ---------------- Sectores ----------------
 
-    async def sectores(self, limite: int, grupo: str | None) -> list[SectorRankOut]:
-        rows = await self._repo.sectores_ranking(limite, grupo)
+    async def sectores(
+        self,
+        limite: int,
+        grupo: str | None,
+        distrito_id: str | None = None,
+        provincia_id: str | None = None,
+    ) -> list[SectorRankOut]:
+        rows = await self._repo.sectores_ranking(limite, grupo, distrito_id, provincia_id)
         return [
             SectorRankOut(
                 sectorid=r["sectorid"], sector=r["sector"],
@@ -444,6 +452,35 @@ class DashboardGeoService:
         total = sum(r["n"] for r in rows) or 1
         return [
             ParentescoSliceOut(parentesco=r["parentesco"], n=r["n"], pct=round(r["n"] * 100 / total, 1))
+            for r in rows
+        ]
+
+    # ---------------- Tortas ----------------
+
+    async def tipo_grupo_pie(self, sectorid: int | None) -> list[SliceOut]:
+        rows = await self._repo.tipo_grupo_split(sectorid)
+        total = sum(r["n"] for r in rows) or 1
+        return [
+            SliceOut(etiqueta=r["etiqueta"], n=r["n"], pct=round(r["n"] * 100 / total, 1))
+            for r in rows
+        ]
+
+    async def tipo_atencion_pie(self, grupo: str | None, sectorid: int | None) -> list[SliceOut]:
+        rows = await self._repo.tipo_atencion_split(grupo, sectorid)
+        total = sum(r["n"] for r in rows) or 1
+        return [
+            SliceOut(etiqueta=r["etiqueta"], n=r["n"], pct=round(r["n"] * 100 / total, 1))
+            for r in rows
+        ]
+
+    # ---------------- Robos por distrito ----------------
+
+    async def robos_por_distrito(self, limite: int) -> list[DistritoRoboOut]:
+        rows = await self._repo.robos_por_distrito(limite)
+        return [
+            DistritoRoboOut(
+                distritoid=r["distritoid"], distrito=r["distrito"] or "—", n_robos=r["n_robos"]
+            )
             for r in rows
         ]
 

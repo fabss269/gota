@@ -203,8 +203,28 @@ class DashboardGeoRepository:
         self,
         limite: int = 10,
         grupo: str | None = None,
+        distrito_id: str | None = None,
+        provincia_id: str | None = None,
     ) -> list[dict[str, Any]]:
         gsql, gparams = await self._filtro_grupo_sql(grupo)
+        # `distrito_id`/`provincia_id` llegan del catálogo del frontend (ubigeo /
+        # provinciacod, ver catalogos/sig_repository.py) — NO son las PK internas
+        # `sig.distritos.distritoid` ni el código corto de `sig.sectores.provincia`
+        # (ese último usa otra numeración interna, no INEI). Se resuelven siempre
+        # vía JOIN con sig.distritos, mismo patrón que red/repository.py.
+        condiciones = []
+        params: dict[str, Any] = {"limite": limite, **gparams}
+        necesita_distritos = bool(distrito_id or provincia_id)
+        join_distritos = (
+            "LEFT JOIN sig.distritos d ON d.distritoid = s.distritoid" if necesita_distritos else ""
+        )
+        if distrito_id:
+            condiciones.append("d.ubigeo = :distrito_id")
+            params["distrito_id"] = distrito_id
+        if provincia_id:
+            condiciones.append("d.provinciacod = :provincia_id")
+            params["provincia_id"] = provincia_id
+        wsql = (" AND " + " AND ".join(condiciones)) if condiciones else ""
         rows = (
             await self._session.execute(
                 text(
@@ -215,15 +235,17 @@ class DashboardGeoRepository:
                         COUNT(mv.incidente_id) FILTER (WHERE mv.grupo = 'agua')    AS n_agua,
                         COUNT(mv.incidente_id) FILTER (WHERE mv.grupo = 'desague') AS n_desague
                     FROM sig.sectores s
+                    {join_distritos}
                     LEFT JOIN gota.mv_incidente_enriquecido mv
                         ON mv.sectorid = s.sectorid {gsql}
+                    WHERE 1=1 {wsql}
                     GROUP BY s.sectorid, s.sector
                     HAVING COUNT(mv.incidente_id) > 0
                     ORDER BY n_incidencias DESC
                     LIMIT :limite
                     """
                 ),
-                {"limite": limite, **gparams},
+                params,
             )
         ).mappings().all()
         return [dict(r) for r in rows]
@@ -557,6 +579,86 @@ class DashboardGeoRepository:
                     """
                 ),
                 {**gparams, **sparams},
+            )
+        ).mappings().all()
+        return [dict(r) for r in rows]
+
+    # ---------------- Tortas (tipo_grupo / tipo_atencion) ----------------
+
+    async def tipo_grupo_split(self, sectorid: int | None = None) -> list[dict[str, Any]]:
+        ssql, sparams = await self._filtro_sector_sql(sectorid)
+        rows = (
+            await self._session.execute(
+                text(
+                    f"""
+                    SELECT grupo AS etiqueta, COUNT(*) AS n
+                    FROM gota.mv_incidente_enriquecido
+                    WHERE 1=1 {ssql}
+                    GROUP BY grupo
+                    ORDER BY n DESC
+                    """
+                ),
+                sparams,
+            )
+        ).mappings().all()
+        return [dict(r) for r in rows]
+
+    async def tipo_atencion_split(
+        self, grupo: str | None = None, sectorid: int | None = None, top_n: int = 6
+    ) -> list[dict[str, Any]]:
+        """Snapshot (no por mes, a diferencia de tipo_atencion_mensual_stacked) —
+        top N tipo_atencion + resto agrupado como 'Otros', mismo criterio que la
+        versión mensual para no mostrar una torta con demasiadas porciones chicas."""
+        gsql, gparams = await self._filtro_grupo_sql(grupo)
+        ssql, sparams = await self._filtro_sector_sql(sectorid)
+        rows = (
+            await self._session.execute(
+                text(
+                    f"""
+                    WITH top_tipos AS (
+                        SELECT tipo_atencion, COUNT(*) AS n
+                        FROM gota.mv_incidente_enriquecido
+                        WHERE 1=1 {gsql} {ssql}
+                        GROUP BY tipo_atencion
+                        ORDER BY n DESC LIMIT :top_n
+                    )
+                    SELECT
+                        CASE WHEN t.tipo_atencion IS NULL THEN 'Otros' ELSE mv.tipo_atencion END AS etiqueta,
+                        COUNT(*) AS n
+                    FROM gota.mv_incidente_enriquecido mv
+                    LEFT JOIN top_tipos t USING (tipo_atencion)
+                    WHERE 1=1 {gsql} {ssql}
+                    GROUP BY etiqueta
+                    ORDER BY n DESC
+                    """
+                ),
+                {"top_n": top_n, **gparams, **sparams},
+            )
+        ).mappings().all()
+        return [dict(r) for r in rows]
+
+    # ---------------- Robos por distrito ----------------
+
+    async def robos_por_distrito(self, limite: int = 5) -> list[dict[str, Any]]:
+        """Mismo origen de datos que serie_robos_mensual (gota.reclamo WHERE
+        es_robo=true) — no mezclar con reclamo_sin_suministro (166 filas reales,
+        pero sin incidente_id ni sig_distritoid resuelto, forma de dato distinta;
+        se deja fuera a propósito, ver plan de esta feature)."""
+        rows = (
+            await self._session.execute(
+                text(
+                    """
+                    SELECT d.distritoid, d.distrito, COUNT(*) AS n_robos
+                    FROM gota.mv_incidente_enriquecido mv
+                    JOIN gota.reclamo r ON r.incidente_id = mv.incidente_id
+                    LEFT JOIN sig.distritos d ON d.distritoid = mv.sig_distritoid
+                    WHERE r.es_robo = true
+                    GROUP BY d.distritoid, d.distrito
+                    ORDER BY n_robos DESC
+                    LIMIT :limite
+                    """
+                ),
+                {"limite": limite},
             )
         ).mappings().all()
         return [dict(r) for r in rows]

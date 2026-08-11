@@ -1,18 +1,17 @@
 """Reconstruye la caché Redis de `estado`/`prioridad`/`sector` de `incidente`
-(specs/00-arquitectura.md §7).
+(specs/00-arquitectura.md §7) — OPCIONAL, no obligatorio para que nada funcione.
 
-Es una caché externa, desechable por definición: si se pierde o se vacía, se
-reconstruye por completo desde Postgres+`sig` sin perder información, porque nunca fue
-la única fuente de esos datos.
+Es una caché externa de lectura individual (no un índice de filtrado — ese diseño
+se sacó 2026-08-10, ver `IncidenciaService.listar`/`cache_repository.py`): si se
+pierde o se vacía, cada incidente se recalcula solo la próxima vez que se lee,
+como cualquier caché. Correr este script entero solo tiene sentido si se quiere
+"precalentar" todo de una para evitar el costo de los primeros cache-miss — nunca
+es un requisito para que `GET /incidencias` (ni el mapa, ni el dashboard) funcionen.
 
 `poblar_cache_incidentes` es la pieza reutilizable — la usa tanto este script (CLI,
 `incidente_ids=None` = todos) como `app/modules/incidencias/dana_ingest.py` (solo los
 incidentes tocados por el último pull, no una reconstrucción completa en cada corrida
-del scheduler). Bug real encontrado 2026-08-04: el ingest de DANA escribe directo a
-Postgres via `tickets_loader` (mismo camino que la carga histórica original, que
-siempre asumía que se corría este script aparte después) — sin esto, los incidentes
-nuevos quedan invisibles en `GET /incidencias` porque el filtro de prioridad/estado/
-sector resuelve candidatos desde los índices invertidos de Redis, no desde Postgres.
+del scheduler) — ese sí es un uso legítimo de "poblar antes de que alguien lea".
 
 Uso: .venv/bin/python -m scripts.rebuild_incidencia_cache
 """
@@ -60,9 +59,6 @@ async def poblar_cache_incidentes(
     catastro_svc = CatastroEnrichmentService(sig_session)
 
     mapa_estados_inv = {v: k for k, v in (await propia_repo.mapa_estados()).items()}
-    mapa_prioridades_inv = {v: k for k, v in (await propia_repo.mapa_prioridades()).items()}
-    prioridad_default = await propia_repo.prioridad_default_codigo()
-    prioridad_default_id = mapa_prioridades_inv.get(prioridad_default) if prioridad_default else None
 
     query = select(Incidente).join(Incidente.tipo_atencion)
     if incidente_ids is not None:
@@ -70,6 +66,8 @@ async def poblar_cache_incidentes(
             return 0
         query = query.where(Incidente.incidente_id.in_(incidente_ids))
     incidentes = list(await propia_session.scalars(query))
+
+    mapa_prioridad_real = await propia_repo.mapa_prioridad_real([i.incidente_id for i in incidentes])
 
     poblados = 0
     for incidente in incidentes:
@@ -86,8 +84,9 @@ async def poblar_cache_incidentes(
             kwargs["sector_id"] = str(predio.sector_id)
             kwargs["sector_nombre"] = predio.sector_nombre
             kwargs["distrito_id"] = str(predio.distrito_id)
-        if prioridad_default_id is not None:
-            kwargs["prioridad_id"] = str(prioridad_default_id)
+        prioridad_id = mapa_prioridad_real.get(incidente.incidente_id)
+        if prioridad_id is not None:
+            kwargs["prioridad_id"] = str(prioridad_id)
 
         if kwargs:
             await cache_repo.set_resumen(str(incidente.incidente_id), **kwargs)

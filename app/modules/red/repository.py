@@ -311,6 +311,55 @@ class SigRedRepository:
             "distritoNombre": _titulo(row["distrito"]),
         }
 
+    # ── Dashboard: longitud de red por material ─────────────────────────────
+
+    async def longitud_por_material(
+        self,
+        grupo: str,
+        sector_id: str | None,
+        distrito_id: str | None,
+        provincia_id: str | None,
+        diametro: float | None,
+    ) -> list[dict]:
+        """`grupo`: 'agua' (sig.agua, filtrable por diametro) o 'alcantarillado'
+        (sig.alcantarillado, sin diametro — esa tabla no tiene esa columna, gap
+        real ya documentado en otros lugares de este módulo). `distrito_id` es el
+        ubigeo (mismo criterio que el resto del repo); `provincia_id` es
+        `provinciacod` (NO `provinciaid` — esa columna viene NULL en `sig.
+        distritos` en esta BD, la única relación confiable con `sig.provincias`
+        es por código, ver `catalogos/sig_repository.py:listar_distritos`)."""
+        tabla = "agua" if grupo == "agua" else "alcantarillado"
+        necesita_distritos = bool(distrito_id or provincia_id)
+        join = "LEFT JOIN sig.distritos d ON d.distritoid = t.distritoid" if necesita_distritos else ""
+        condiciones = ["t.geom IS NOT NULL", "t.distancia IS NOT NULL"]
+        params: dict = {}
+        if distrito_id:
+            condiciones.append("d.ubigeo = :distrito_id")
+            params["distrito_id"] = distrito_id
+        if provincia_id:
+            condiciones.append("d.provinciacod = :provincia_id")
+            params["provincia_id"] = provincia_id
+        if sector_id:
+            condiciones.append("t.sectorid = :sector_id")
+            params["sector_id"] = int(sector_id)
+        if diametro is not None and grupo == "agua":
+            condiciones.append("t.diametro = :diametro")
+            params["diametro"] = diametro
+        where = " AND ".join(condiciones)
+        stmt = text(
+            f"""
+            SELECT COALESCE(m.material, 'Sin dato') AS material, SUM(t.distancia) AS metros
+            FROM sig.{tabla} t
+            LEFT JOIN sig.materiales m ON m.materialid = t.materialid
+            {join}
+            WHERE {where}
+            GROUP BY m.material
+            ORDER BY metros DESC
+            """
+        )
+        result = await self._session.execute(stmt, params)
+        return [{"material": row.material, "metros": float(row.metros or 0)} for row in result]
+
 
 # ── Escritura sobre sig.* (excepción explícita al read-only, ver
 # app/db/sig.py get_sig_write_session) — edición inline desde el panel de detalle.

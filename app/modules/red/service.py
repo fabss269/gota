@@ -7,6 +7,7 @@ from app.modules.red.schemas import (
     AccesorioTipoOut,
     ElementoRedOut,
     ElementoRedPatchIn,
+    LongitudMaterialOut,
     MaterialOut,
 )
 
@@ -124,6 +125,21 @@ class RedService:
         if fila is None:
             raise NoEncontradoError(f"{tipo} {elemento_id} no encontrado")
         return ElementoRedOut(tipo=tipo, **fila)
+
+    async def longitud_por_material(
+        self,
+        grupo: str,
+        sector_id: str | None,
+        distrito_id: str | None,
+        provincia_id: str | None,
+        diametro: float | None,
+    ) -> list[LongitudMaterialOut]:
+        if grupo not in ("agua", "alcantarillado"):
+            raise ValidacionError(
+                f"grupo desconocido: {grupo}", campos={"grupo": "valores válidos: agua, alcantarillado"}
+            )
+        filas = await self._repo.longitud_por_material(grupo, sector_id, distrito_id, provincia_id, diametro)
+        return [LongitudMaterialOut(**fila) for fila in filas]
 
 
 class RedEdicionService:

@@ -78,7 +78,6 @@ class IncidenciaService:
         self._mapa_estados_inv: dict[str, int] = {}
         self._mapa_prioridades: dict[int, str] = {}
         self._mapa_prioridades_inv: dict[str, int] = {}
-        self._prioridad_default: str | None = None
 
     async def _precargar_mapas(self) -> None:
         if self._mapas_cargados:
@@ -87,7 +86,6 @@ class IncidenciaService:
         self._mapa_estados_inv = {v: k for k, v in self._mapa_estados.items()}
         self._mapa_prioridades = await self._propia.mapa_prioridades()
         self._mapa_prioridades_inv = {v: k for k, v in self._mapa_prioridades.items()}
-        self._prioridad_default = await self._propia.prioridad_default_codigo()
         self._mapas_cargados = True
 
     async def _resolver_resumen(self, incidente: Incidente, categoria: str) -> tuple[str, str | None, str | None]:
@@ -105,7 +103,7 @@ class IncidenciaService:
         )
         sector_nombre = resumen.sector_nombre if resumen else None
 
-        set_kwargs: dict[str, str] = {}
+        set_kwargs: dict[str, str | bool] = {}
         if estado_codigo is None:
             estado_row = await self._propia.get_estado_actual(incidente.incidente_id)
             estado_codigo = estado_row.codigo if estado_row else "CREADO"
@@ -113,13 +111,15 @@ class IncidenciaService:
             if estado_id is not None:
                 set_kwargs["estado_actual_id"] = str(estado_id)
 
-        if sector_nombre is None:
+        if not sector_resuelto:
             predio = await self._catastro.resolver_predio(incidente.suministro_codigo, categoria)
             if predio is not None:
                 sector_nombre = predio.sector_nombre
                 set_kwargs["sector_id"] = str(predio.sector_id)
                 set_kwargs["sector_nombre"] = predio.sector_nombre
                 set_kwargs["distrito_id"] = str(predio.distrito_id)
+            else:
+                set_kwargs["sin_catastro"] = True
 
         if set_kwargs:
             await self._cache.set_resumen(str(incidente.incidente_id), **set_kwargs)
@@ -128,6 +128,96 @@ class IncidenciaService:
             incidente.creado_en, incidente.fecha_solucion, categoria
         )
         return estado_codigo, prioridad_codigo, sector_nombre
+
+    async def _resolver_resumenes_pagina(
+        self, incidentes: list[Incidente]
+    ) -> dict[uuid.UUID, tuple[str, str | None, str | None]]:
+        """Igual que `_resolver_resumen`, pero para una página entera de una sola
+        vez — bug real encontrado en vivo 2026-08-10: `listar()` llamaba
+        `_resolver_resumen` una vez por fila (hasta 100), cada una con su propio
+        round-trip a Redis (`get_resumen`) sin pipeline; listar 100 incidencias
+        tardaba ~1.2s y NO mejoraba con caché caliente (100 round-trips secuenciales
+        de todos modos). Acá: un solo `mget_resumenes` (pipeline) para toda la
+        página, y los cache-miss se resuelven agrupados por sesión de BD — `gota`
+        (estado + prioridad, mismo `self._propia`) y `sig` (sector, `self._catastro`)
+        corren EN PARALELO entre sí (dos conexiones distintas), pero cada grupo es
+        secuencial puertas adentro porque una `AsyncSession` de SQLAlchemy no
+        soporta queries concurrentes sobre la misma sesión."""
+        await self._precargar_mapas()
+        ids = [str(i.incidente_id) for i in incidentes]
+        resumenes = await self._cache.mget_resumenes(ids)
+
+        estados: dict[uuid.UUID, str] = {}
+        sectores: dict[uuid.UUID, str | None] = {}
+        prioridades: dict[uuid.UUID, str | None] = {}
+        pendientes_estado: list[Incidente] = []
+        pendientes_sector: list[Incidente] = []
+        pendientes_prioridad: list[Incidente] = []
+
+        for incidente in incidentes:
+            resumen = resumenes.get(str(incidente.incidente_id))
+            if resumen and resumen.estado_actual_id:
+                estados[incidente.incidente_id] = self._mapa_estados.get(int(resumen.estado_actual_id), "CREADO")
+            else:
+                pendientes_estado.append(incidente)
+
+            if resumen and resumen.sector_resuelto:
+                sectores[incidente.incidente_id] = resumen.sector_nombre
+            else:
+                pendientes_sector.append(incidente)
+
+            if resumen and resumen.prioridad_id:
+                prioridades[incidente.incidente_id] = self._mapa_prioridades.get(int(resumen.prioridad_id))
+            else:
+                pendientes_prioridad.append(incidente)
+
+        set_kwargs_por_incidente: dict[str, dict[str, str | bool]] = {}
+
+        async def _resolver_gota() -> None:
+            for incidente in pendientes_estado:
+                estado_row = await self._propia.get_estado_actual(incidente.incidente_id)
+                estado_codigo = estado_row.codigo if estado_row else "CREADO"
+                estado_id = estado_row.estado_id if estado_row else self._mapa_estados_inv.get("CREADO")
+                estados[incidente.incidente_id] = estado_codigo
+                if estado_id is not None:
+                    set_kwargs_por_incidente.setdefault(str(incidente.incidente_id), {})["estado_actual_id"] = str(
+                        estado_id
+                    )
+            for incidente in pendientes_prioridad:
+                prioridad_id = await self._propia.get_prioridad_real(incidente.incidente_id)
+                if prioridad_id is not None:
+                    prioridades[incidente.incidente_id] = self._mapa_prioridades.get(prioridad_id)
+                    set_kwargs_por_incidente.setdefault(str(incidente.incidente_id), {})["prioridad_id"] = str(
+                        prioridad_id
+                    )
+                else:
+                    prioridades[incidente.incidente_id] = None
+
+        async def _resolver_sig() -> None:
+            for incidente in pendientes_sector:
+                categoria = incidente.tipo_atencion.tipo_grupo.codigo
+                predio = await self._catastro.resolver_predio(incidente.suministro_codigo, categoria)
+                kwargs = set_kwargs_por_incidente.setdefault(str(incidente.incidente_id), {})
+                if predio is not None:
+                    sectores[incidente.incidente_id] = predio.sector_nombre
+                    kwargs["sector_id"] = str(predio.sector_id)
+                    kwargs["sector_nombre"] = predio.sector_nombre
+                    kwargs["distrito_id"] = str(predio.distrito_id)
+                else:
+                    sectores[incidente.incidente_id] = None
+                    kwargs["sin_catastro"] = True
+
+        await asyncio.gather(_resolver_gota(), _resolver_sig())
+        await self._cache.set_resumenes(set_kwargs_por_incidente)
+
+        return {
+            incidente.incidente_id: (
+                estados[incidente.incidente_id],
+                prioridades.get(incidente.incidente_id),
+                sectores.get(incidente.incidente_id),
+            )
+            for incidente in incidentes
+        }
 
     def _a_incidencia_out(
         self, incidente: Incidente, categoria: str, estado: str, prioridad: str | None, sector: str | None
@@ -181,9 +271,9 @@ class IncidenciaService:
         if filtros.estado:
             estado_ids = [str(i) for i in await self._propia.resolver_estado_ids(filtros.csv(filtros.estado) or [])]
         if filtros.sectorId or filtros.distritoId:
-            ids: set[str] = set()
+            sector_ids: set[str] = set()
             if filtros.sectorId:
-                ids.update(filtros.csv(filtros.sectorId) or [])
+                sector_ids.update(filtros.csv(filtros.sectorId) or [])
             if filtros.distritoId:
                 sectores = await self._sig_catalogo.listar_sectores(filtros.distritoId)
                 ids.update(s["id"] for s in sectores)
@@ -207,7 +297,8 @@ class IncidenciaService:
             q=filtros.q,
             bbox=filtros.bbox_tuple(),
             resuelto=filtros.resuelto,
-            candidatos=candidatos,
+            estado_ids=estado_ids,
+            suministro_codigos=suministro_codigos,
             page=filtros.page,
             page_size=filtros.pageSize,
         )
