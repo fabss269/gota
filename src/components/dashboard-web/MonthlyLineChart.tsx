@@ -8,8 +8,12 @@ import { ensureChartRegistered } from './ChartSetup';
 
 ensureChartRegistered();
 
-/** Línea mensual con overlay 2025 vs 2026 + proyección (regresión lineal). */
-export function MonthlyLineChart() {
+type Props = { mostrarProyeccion?: boolean };
+
+/** Línea mensual con overlay 2025 vs 2026 + proyección opcional (regresión
+ * lineal). `mostrarProyeccion=false` la oculta — mismo componente para la vista
+ * "Tendencias" (sin proyección) sin bifurcar en dos. */
+export function MonthlyLineChart({ mostrarProyeccion = true }: Props) {
   const { data, isLoading } = useSerieMensual();
 
   const chartLabels = [
@@ -55,16 +59,20 @@ export function MonthlyLineChart() {
         fill: true,
         tension: 0.3,
       },
-      {
-        label: 'Proyección',
-        data: yPred,
-        borderColor: '#EF4444',
-        backgroundColor: 'transparent',
-        borderDash: [3, 3],
-        pointRadius: 4,
-        pointStyle: 'triangle',
-        tension: 0,
-      },
+      ...(mostrarProyeccion
+        ? [
+            {
+              label: 'Proyección',
+              data: yPred,
+              borderColor: '#EF4444',
+              backgroundColor: 'transparent',
+              borderDash: [3, 3],
+              pointRadius: 4,
+              pointStyle: 'triangle',
+              tension: 0,
+            },
+          ]
+        : []),
     ],
   };
 
@@ -86,7 +94,8 @@ export function MonthlyLineChart() {
     <View style={styles.card}>
       <Text style={styles.titulo}>Incidencias por mes</Text>
       <Text style={styles.subtitulo}>
-        Comparativo 2026 vs 2025. Línea roja = proyección próximos 2 meses (regresión lineal).
+        Comparativo 2026 vs 2025.
+        {mostrarProyeccion && ' Línea roja = proyección próximos 2 meses (regresión lineal).'}
       </Text>
       <View style={styles.chartWrap}>
         {isLoading ? (
@@ -108,10 +117,10 @@ const styles = StyleSheet.create({
     borderWidth: 1,
     borderColor: Colors.border,
     flex: 1,
-    minHeight: 320,
+    height: 320,
   },
   titulo: { fontSize: 14, fontWeight: '700', color: Colors.textBody },
   subtitulo: { fontSize: 11, color: Colors.textMuted, marginTop: 2, marginBottom: 8 },
-  chartWrap: { flex: 1, minHeight: 240 },
+  chartWrap: { flex: 1 },
   muted: { fontSize: 12, color: Colors.textMuted, textAlign: 'center', marginTop: Spacing.lg },
 });

@@ -6,6 +6,14 @@ import { PERIODO_ACTUAL, useDashboardFilters } from '@/state/dashboardFilters';
 
 import { KpiCard } from './KpiCard';
 
+// Días del período seleccionado, para el KPI "promedio/día" — no hay endpoint
+// nuevo, se deriva del volumen que useKpis() ya trae.
+function diasDelPeriodo(periodo: 'anual' | 'mensual', anio: number, mes: number): number {
+  if (periodo === 'mensual') return new Date(anio, mes, 0).getDate();
+  const esBisiesto = (anio % 4 === 0 && anio % 100 !== 0) || anio % 400 === 0;
+  return esBisiesto ? 366 : 365;
+}
+
 export function KpiRow() {
   const { data, isLoading } = useKpis();
   const { periodo, anio, mes } = useDashboardFilters();
@@ -18,6 +26,9 @@ export function KpiRow() {
     anio === PERIODO_ACTUAL.anio &&
     mes === PERIODO_ACTUAL.mes;
 
+  const dias = diasDelPeriodo(periodo, anio, mes);
+  const promedioDia = data?.volumen.valor != null ? data.volumen.valor / dias : null;
+
   return (
     <View style={styles.row}>
       <KpiCard
@@ -27,6 +38,14 @@ export function KpiRow() {
         sparkline={data?.volumen.sparkline ?? []}
         color="#0D2B52"
         icono="stats-chart-outline"
+        cargando={isLoading}
+      />
+      <KpiCard
+        titulo="Promedio/día"
+        valor={promedioDia != null ? promedioDia.toFixed(1) : '—'}
+        deltaAbs={null}
+        color="#0152AC"
+        icono="calendar-outline"
         cargando={isLoading}
       />
       <KpiCard

@@ -1,6 +1,6 @@
 import { useQuery } from '@tanstack/react-query';
 
-import { dashboardGeoApi, type Grupo } from '@/api/dashboardGeo';
+import { dashboardGeoApi, type Grupo, type GrupoRed } from '@/api/dashboardGeo';
 import { useDashboardFilters } from '@/state/dashboardFilters';
 
 // Todos los hooks leen del store global, así se re-fetchean automáticamente
@@ -38,11 +38,16 @@ export function useStorytelling() {
   });
 }
 
-export function useTopSectores(limite = 10) {
+export function useTopSectores(
+  limite = 10,
+  geo: { distritoId?: string | null; provinciaId?: string | null } = {}
+) {
   const { grupo } = useDashboardFilters();
+  const { distritoId, provinciaId } = geo;
   return useQuery({
-    queryKey: ['dashboard-geo', 'sectores', grupo, limite],
-    queryFn: () => dashboardGeoApi.sectores({ grupo: grupoParam(grupo), limite }),
+    queryKey: ['dashboard-geo', 'sectores', grupo, limite, distritoId, provinciaId],
+    queryFn: () =>
+      dashboardGeoApi.sectores({ grupo: grupoParam(grupo), limite, distritoId, provinciaId }),
     staleTime: STALE,
   });
 }
@@ -160,6 +165,55 @@ export function useAlertas() {
   return useQuery({
     queryKey: ['dashboard-geo', 'alertas'],
     queryFn: () => dashboardGeoApi.alertas(),
+    staleTime: STALE,
+  });
+}
+
+export function usePrediccionSectores(lookback = 6) {
+  return useQuery({
+    queryKey: ['dashboard-geo', 'prediccion-sectores', lookback],
+    queryFn: () => dashboardGeoApi.prediccionSectores({ lookback }),
+    staleTime: STALE,
+  });
+}
+
+export function useTipoGrupoPie() {
+  const { sectorid } = useDashboardFilters();
+  return useQuery({
+    queryKey: ['dashboard-geo', 'tipo-grupo-pie', sectorid],
+    queryFn: () => dashboardGeoApi.tipoGrupoPie({ sectorid }),
+    staleTime: STALE,
+  });
+}
+
+export function useTipoAtencionPie() {
+  const { grupo, sectorid } = useDashboardFilters();
+  return useQuery({
+    queryKey: ['dashboard-geo', 'tipo-atencion-pie', grupo, sectorid],
+    queryFn: () => dashboardGeoApi.tipoAtencionPie({ grupo: grupoParam(grupo), sectorid }),
+    staleTime: STALE,
+  });
+}
+
+export function useRobosPorDistrito(limite = 5) {
+  return useQuery({
+    queryKey: ['dashboard-geo', 'robos-por-distrito', limite],
+    queryFn: () => dashboardGeoApi.robosPorDistrito({ limite }),
+    staleTime: STALE,
+  });
+}
+
+export function useLongitudPorMaterial(filtros: {
+  grupo: GrupoRed;
+  sectorId?: string | null;
+  distritoId?: string | null;
+  provinciaId?: string | null;
+  diametro?: number | null;
+}) {
+  const { grupo, sectorId, distritoId, provinciaId, diametro } = filtros;
+  return useQuery({
+    queryKey: ['dashboard-geo', 'longitud-material', grupo, sectorId, distritoId, provinciaId, diametro],
+    queryFn: () => dashboardGeoApi.longitudPorMaterial(filtros),
     staleTime: STALE,
   });
 }

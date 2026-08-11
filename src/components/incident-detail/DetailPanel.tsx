@@ -7,6 +7,7 @@ import { RegistrarAvanceSheet } from '@/components/incident-actions/RegistrarAva
 import { SeleccionarResponsableSheet } from '@/components/incident-actions/SeleccionarResponsableSheet';
 import { FocoTab } from '@/components/incident-detail/FocoTab';
 import { TrazabilidadTab } from '@/components/incident-detail/TrazabilidadTab';
+import { SkeletonBlock } from '@/components/shared/Skeleton';
 import { Colors } from '@/constants/theme';
 import { useIncidentDetail } from '@/hooks/useIncidentDetail';
 import type { IncidenciaDetalle } from '@/mocks/incidentDetailMock';
@@ -33,8 +34,40 @@ export function DetailPanel({ incidenciaId, onClose }: Props) {
   if (isLoading) {
     return (
       <div style={panel}>
-        <div style={statusBox}>
-          <span style={{ color: Colors.textMuted, fontSize: 13 }}>Cargando…</span>
+        <div style={header}>
+          <div style={topRow}>
+            <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
+              <SkeletonBlock width={70} height={10} />
+              <SkeletonBlock width={110} height={22} />
+            </div>
+            <SkeletonBlock width={70} height={22} radius={20} />
+          </div>
+          <div style={{ marginTop: 10 }}>
+            <SkeletonBlock width={180} height={13} />
+          </div>
+          <div style={{ marginTop: 10 }}>
+            <SkeletonBlock width="90%" height={12} />
+          </div>
+          <div style={{ marginTop: 10, display: 'flex', justifyContent: 'space-between' }}>
+            <SkeletonBlock width={90} height={20} radius={999} />
+            <SkeletonBlock width={110} height={20} radius={999} />
+          </div>
+        </div>
+        <div style={scrollable}>
+          <Section title="DATOS DEL RECLAMO (DANA)">
+            <SkeletonFieldRow />
+            <SkeletonFieldRow />
+            <SkeletonFieldRow />
+          </Section>
+          <Divider />
+          <Section title="TRAZABILIDAD">
+            <SkeletonFieldRow />
+            <SkeletonFieldRow />
+          </Section>
+          <Divider />
+          <Section title="FOCO">
+            <SkeletonFieldRow />
+          </Section>
         </div>
       </div>
     );
@@ -225,6 +258,15 @@ function DetalleBloque({ texto }: { texto: string }) {
         Detalle del ticket
       </div>
       <div style={detalleTextoStyle}>{texto}</div>
+    </div>
+  );
+}
+
+function SkeletonFieldRow() {
+  return (
+    <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '5px 0', gap: 8 }}>
+      <SkeletonBlock width={90} height={11} />
+      <SkeletonBlock width={70} height={12} />
     </div>
   );
 }

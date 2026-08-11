@@ -107,6 +107,11 @@ export type PrediccionSector = {
   cambio_pct_mensual: number;
 };
 
+export type Slice = { etiqueta: string; n: number; pct: number };
+export type DistritoRobo = { distritoid: number | null; distrito: string; n_robos: number };
+export type LongitudMaterial = { material: string; metros: number };
+export type GrupoRed = 'agua' | 'alcantarillado';
+
 // ============ Helpers ============
 
 function qs(params: Record<string, string | number | boolean | null | undefined>) {
@@ -137,8 +142,9 @@ export const dashboardGeoApi = {
   storytelling: (p: FiltrosConPeriodo = {}) =>
     apiFetch<Storytelling>(`/dashboard-v2/storytelling${qs(p)}`),
 
-  sectores: (p: FiltrosBase & { limite?: number } = {}) =>
-    apiFetch<SectorRank[]>(`/dashboard-v2/sectores${qs(p)}`),
+  sectores: (
+    p: FiltrosBase & { limite?: number; distritoId?: string | null; provinciaId?: string | null } = {}
+  ) => apiFetch<SectorRank[]>(`/dashboard-v2/sectores${qs(p)}`),
 
   heatmapSectores: (p: FiltrosBase = {}) =>
     apiFetch<HeatmapSector[]>(`/dashboard-v2/heatmap-sectores${qs(p)}`),
@@ -174,4 +180,21 @@ export const dashboardGeoApi = {
 
   prediccionSectores: (p: { lookback?: number } = {}) =>
     apiFetch<PrediccionSector[]>(`/dashboard-v2/prediccion-sectores${qs(p)}`),
+
+  tipoGrupoPie: (p: { sectorid?: number | null } = {}) =>
+    apiFetch<Slice[]>(`/dashboard-v2/tipo-grupo-pie${qs(p)}`),
+
+  tipoAtencionPie: (p: FiltrosBase = {}) =>
+    apiFetch<Slice[]>(`/dashboard-v2/tipo-atencion-pie${qs(p)}`),
+
+  robosPorDistrito: (p: { limite?: number } = {}) =>
+    apiFetch<DistritoRobo[]>(`/dashboard-v2/robos-por-distrito${qs(p)}`),
+
+  longitudPorMaterial: (p: {
+    grupo: GrupoRed;
+    sectorId?: string | null;
+    distritoId?: string | null;
+    provinciaId?: string | null;
+    diametro?: number | null;
+  }) => apiFetch<LongitudMaterial[]>(`/red/longitud-por-material${qs(p)}`),
 };
