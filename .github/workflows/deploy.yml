@@ -67,7 +67,12 @@ jobs:
       - name: Desplegar (pull + up)
         working-directory: ${{ vars.DEPLOY_PATH }}
         env:
-          GHCR_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          # secrets.GITHUB_TOKEN no alcanza acá: docker compose pull trae TODAS
+          # las imágenes del compose, incluida epsel-movil (paquete de OTRO
+          # repo) — el token automático solo ve paquetes del propio repo.
+          # GHCR_TOKEN es un PAT con scope read:packages nada más, cargado a
+          # mano como secret (nunca en git).
+          GHCR_TOKEN: ${{ secrets.GHCR_TOKEN }}
           GHCR_ACTOR: ${{ github.actor }}
         run: |
           echo "$GHCR_TOKEN" | docker login ghcr.io -u "$GHCR_ACTOR" --password-stdin
