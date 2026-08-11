@@ -1,4 +1,3 @@
-from contextlib import asynccontextmanager
 from pathlib import Path
 
 from fastapi import FastAPI
@@ -7,34 +6,17 @@ from fastapi.responses import FileResponse
 
 from app.core.config import settings
 from app.core.exceptions import register_exception_handlers
-from app.db.propia import PropiaSessionFactory
-from app.db.redis import redis_client
-from app.db.sig import SigSessionFactory
 from app.modules.auth.router import router as auth_router
 from app.modules.catalogos.router import router as catalogos_router
 from app.modules.dashboard.router import router as dashboard_router
 from app.modules.dashboard_geo.router import router as dashboard_geo_router
 from app.modules.grafo.router import router as grafo_router
-from app.modules.incidencias.cache_rebuild import self_check_y_rebuild
 from app.modules.incidencias.ingest_router import router as ingest_router
 from app.modules.incidencias.router import router as incidencias_router
 from app.modules.red.router import router as red_router
 from app.modules.usuarios.router import router as usuarios_router
 
-
-@asynccontextmanager
-async def lifespan(app: FastAPI):
-    # Self-check de los indices Redis al arrancar (idx:sector/prioridad/estado):
-    # si el usuario restauro la BD desde un backup, los uuids en Redis dejan de
-    # coincidir con gota.incidente y las intersecciones se rompen. El check
-    # compara conteos, y auto-rebuildea si hay drift >5%. Ver
-    # `cache_rebuild.py` para detalle. No bloquea el arranque si falla.
-    async with PropiaSessionFactory() as propia, SigSessionFactory() as sig:
-        await self_check_y_rebuild(propia, sig, redis_client)
-    yield
-
-
-app = FastAPI(title="GOTA backend", version="0.1.0", lifespan=lifespan)
+app = FastAPI(title="GOTA backend", version="0.1.0")
 
 # Desarrollo local: Expo web corre en localhost con puerto variable (8081, 19006, 8082...).
 # Producción: el frontend se sirve same-origin detrás de nginx (proxy /api), así que

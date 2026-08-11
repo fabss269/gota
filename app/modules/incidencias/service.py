@@ -102,6 +102,7 @@ class IncidenciaService:
             else None
         )
         sector_nombre = resumen.sector_nombre if resumen else None
+        sector_resuelto = bool(resumen and resumen.sector_resuelto)
 
         set_kwargs: dict[str, str | bool] = {}
         if estado_codigo is None:
@@ -263,28 +264,26 @@ class IncidenciaService:
         return date.fromisoformat(valor)
 
     async def listar(self, filtros: IncidenciaFilterParams) -> IncidenciaListResponse:
-        # Filtros que sí usan índice Redis (estado + sector). Prioridad se
-        # calcula en SQL al vuelo — no depende de cache.
-        estado_ids: list[str] | None = None
-        sector_ids: list[str] | None = None
-
+        # `estado`/`sector`/`distrito` se filtran directo contra Postgres/`sig`, no
+        # contra índices en Redis (decisión de Edgar 2026-08-10 — Redis es una
+        # caché de lectura individual nada más, nunca una fuente de verdad para
+        # filtrar). `prioridad` se calcula y filtra en SQL al vuelo
+        # (_prioridad_codigo_expr en propia_repository) — no depende de cache
+        # ni del módulo de alertas (incidente_alerta_regla, siempre vacía).
+        estado_ids: list[int] | None = None
         if filtros.estado:
-            estado_ids = [str(i) for i in await self._propia.resolver_estado_ids(filtros.csv(filtros.estado) or [])]
+            estado_ids = await self._propia.resolver_estado_ids(filtros.csv(filtros.estado) or [])
+
+        suministro_codigos: list[str] | None = None
         if filtros.sectorId or filtros.distritoId:
             sector_ids: set[str] = set()
             if filtros.sectorId:
                 sector_ids.update(filtros.csv(filtros.sectorId) or [])
             if filtros.distritoId:
                 sectores = await self._sig_catalogo.listar_sectores(filtros.distritoId)
-                ids.update(s["id"] for s in sectores)
-            sector_ids = list(ids)
-
-        candidatos = None
-        if estado_ids is not None or sector_ids is not None:
-            candidatos = await self._cache.resolver_candidatos(
-                estado_ids=estado_ids, sector_ids=sector_ids
-            )
-            if candidatos is not None and not candidatos:
+                sector_ids.update(s["id"] for s in sectores)
+            suministro_codigos = await self._catastro.listar_suministros_por_sector([int(s) for s in sector_ids])
+            if not suministro_codigos:
                 return IncidenciaListResponse(items=[], page=filtros.page, pageSize=filtros.pageSize, total=0)
 
         filas, total = await self._propia.listar(
@@ -303,12 +302,23 @@ class IncidenciaService:
             page_size=filtros.pageSize,
         )
 
-        items = []
-        for incidente, prioridad_sql in filas:
-            categoria = incidente.tipo_atencion.tipo_grupo.codigo
-            estado, _prioridad_dummy, sector = await self._resolver_resumen(incidente, categoria)
-            # Prioridad viene del SQL — más rápido que recomputar en Python.
-            items.append(self._a_incidencia_out(incidente, categoria, estado, prioridad_sql, sector))
+        incidentes = [incidente for incidente, _ in filas]
+        prioridad_por_id = {incidente.incidente_id: prioridad_sql for incidente, prioridad_sql in filas}
+        # Estado/sector resueltos en bloque (evita N+1 — bug real 2026-08-10,
+        # ver _resolver_resumenes_pagina). La prioridad de ahí se ignora: la de
+        # arriba (SQL, misma query que ya trajo las filas) es más fresca y no
+        # cuesta un round-trip extra.
+        resumenes = await self._resolver_resumenes_pagina(incidentes)
+        items = [
+            self._a_incidencia_out(
+                incidente,
+                incidente.tipo_atencion.tipo_grupo.codigo,
+                resumenes[incidente.incidente_id][0],
+                prioridad_por_id[incidente.incidente_id],
+                resumenes[incidente.incidente_id][2],
+            )
+            for incidente in incidentes
+        ]
 
         return IncidenciaListResponse(items=items, page=filtros.page, pageSize=filtros.pageSize, total=total)
 

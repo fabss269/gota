@@ -1,7 +1,7 @@
 import uuid
 from datetime import date, datetime
 
-from sqlalchemy import Select, and_, case, func, literal_column, or_, select, text
+from sqlalchemy import Select, and_, any_, case, func, literal_column, or_, select, text
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.db.models_propia import (
@@ -175,9 +175,6 @@ class PropiaIncidenciaRepository:
         prioridad_expr = _prioridad_codigo_expr().label('prioridad_codigo')
         stmt = stmt.add_columns(prioridad_expr)
 
-        if candidatos is not None:
-            ids = [uuid.UUID(c) for c in candidatos]
-            stmt = stmt.where(Incidente.incidente_id.in_(ids))
         if prioridad_codigos:
             stmt = stmt.where(prioridad_expr.in_(prioridad_codigos))
 

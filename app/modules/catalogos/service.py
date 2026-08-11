@@ -1,5 +1,11 @@
 from app.modules.catalogos.propia_repository import PropiaCatalogoRepository
-from app.modules.catalogos.schemas import DistritoOut, ProvinciaOut, SectorOut, TipoAtencionOut, TipoGrupoOut
+from app.modules.catalogos.schemas import (
+    DistritoOut,
+    ProvinciaOut,
+    SectorOut,
+    TipoAtencionOut,
+    TipoGrupoOut,
+)
 from app.modules.catalogos.sig_repository import SigCatalogoRepository
 
 
