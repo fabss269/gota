@@ -43,42 +43,52 @@ class CatastroEnrichmentService:
     async def resolver_predio(
         self, suministro_codigo: str, categoria: str
     ) -> PredioCatastral | None:
-        """Busca en `sig.cajaagua` (categoria=agua) o `sig.cajadesague`
-        (categoria=desague) por `inscripcion = suministro_codigo`, excluyendo el
-        centinela '00000000'. Desempate por id ascendente si hay más de una fila
-        (~0.01% de los códigos reales, ver memoria del proyecto)."""
+        """Resuelve el sector/predio del suministro desde SIG.
+
+        Política (decidida con Fabiana 2026-08-11): SIEMPRE se toma primero
+        `sig.cajaagua` y solo se cae a `sig.cajadesague` si no hay match ahí.
+        SIG tiene ~2.9k suministros duplicados entre ambas tablas con sectores
+        distintos (error de datos que EPSEL no puede corregir); fijar una
+        política única evita que el mismo incidente termine en dos sectores
+        distintos según qué código lo lea. El parámetro `categoria` se
+        conserva por compatibilidad con los callers pero ya no discrimina.
+
+        Sentinela '00000000' se descarta explícitamente. Desempate por id
+        ascendente si hay >1 fila en la misma tabla.
+        """
+        del categoria  # ver docstring: la política ya no depende de la categoría.
         if suministro_codigo == _SENTINEL_INSCRIPCION:
             return None
 
-        tabla, id_col = ("cajaagua", "cajaaguaid") if categoria == "agua" else ("cajadesague", "cajadesagueid")
-        stmt = text(
-            f"""
-            SELECT c.sectorid, s.sector, c.distritoid, c.localidadid,
-                   ST_Y(ST_Transform(c.geom, 4326)) AS lat,
-                   ST_X(ST_Transform(c.geom, 4326)) AS lon
-            FROM sig.{tabla} c
-            LEFT JOIN sig.sectores s ON s.sectorid = c.sectorid
-            WHERE c.inscripcion = :suministro AND c.inscripcion <> :sentinel
-            ORDER BY c.{id_col}
-            LIMIT 1
-            """
-        )
-        row = (
-            await self._session.execute(
-                stmt, {"suministro": suministro_codigo, "sentinel": _SENTINEL_INSCRIPCION}
+        for tabla, id_col in (("cajaagua", "cajaaguaid"), ("cajadesague", "cajadesagueid")):
+            stmt = text(
+                f"""
+                SELECT c.sectorid, s.sector, c.distritoid, c.localidadid,
+                       ST_Y(ST_Transform(c.geom, 4326)) AS lat,
+                       ST_X(ST_Transform(c.geom, 4326)) AS lon
+                FROM sig.{tabla} c
+                LEFT JOIN sig.sectores s ON s.sectorid = c.sectorid
+                WHERE c.inscripcion = :suministro AND c.inscripcion <> :sentinel
+                ORDER BY c.{id_col}
+                LIMIT 1
+                """
             )
-        ).first()
-        if row is None:
-            return None
+            row = (
+                await self._session.execute(
+                    stmt, {"suministro": suministro_codigo, "sentinel": _SENTINEL_INSCRIPCION}
+                )
+            ).first()
+            if row is not None:
+                return PredioCatastral(
+                    sector_id=row.sectorid,
+                    sector_nombre=(row.sector or "").title(),
+                    distrito_id=row.distritoid,
+                    localidad_id=row.localidadid,
+                    lat=float(row.lat),
+                    lon=float(row.lon),
+                )
 
-        return PredioCatastral(
-            sector_id=row.sectorid,
-            sector_nombre=(row.sector or "").title(),
-            distrito_id=row.distritoid,
-            localidad_id=row.localidadid,
-            lat=float(row.lat),
-            lon=float(row.lon),
-        )
+        return None
 
     async def resolver_catastro_cercano(self, lat: float, lon: float, categoria: str) -> CatastroCercano:
         """Vecino más cercano en `sig.agua`/`sig.alcantarillado` (según `categoria`) +

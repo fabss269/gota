@@ -1,7 +1,7 @@
 import uuid
 from datetime import date, datetime
 
-from sqlalchemy import Select, and_, func, or_, select
+from sqlalchemy import Select, and_, case, func, literal_column, or_, select, text
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.db.models_propia import (
@@ -13,6 +13,48 @@ from app.db.models_propia import (
     Incidente,
     Reclamo,
 )
+
+# Umbrales de prioridad calculada por tipo de grupo, en días.
+# Deriva del análisis de percentiles p50/p80 sobre `dias` hasta `fecha_solucion`
+# en la BD real (decisión Fabiana 2026-08-11):
+#   - AGUA:   p50 = 18, p80 = 32
+#   - DESAGUE: p50 =  8, p80 = 22
+# Si un incidente no resuelto lleva ≥ p80 días → 'critica'; si ≥ p50 → 'alerta';
+# si es menor o si ya tiene fecha_solucion → 'a_tiempo'.
+UMBRALES_DIAS_PRIORIDAD: dict[str, tuple[int, int]] = {
+    'agua':    (18, 32),
+    'desague':  (8, 22),
+}
+PRIORIDAD_DEFAULT_UMBRAL = (18, 32)  # fallback para grupos futuros del catálogo
+
+
+def _prioridad_codigo_expr():
+    """Expresión SQL que calcula la prioridad de una incidencia al vuelo.
+
+    Escrita SARGable (`creado_en <= NOW() - INTERVAL 'X days'`) para que el
+    planner pueda usar el índice parcial `incidente_creado_no_resueltas_idx`.
+    Usa `CatalogoTipoGrupo.codigo` (requiere que la query esté joined con
+    tipo_atencion → tipo_grupo, cosa que _query_base ya hace cuando aplica).
+    """
+    when_clauses = []
+    for grupo, (dias_alerta, dias_critica) in UMBRALES_DIAS_PRIORIDAD.items():
+        when_clauses.append((
+            and_(
+                CatalogoTipoGrupo.codigo == grupo,
+                Incidente.fecha_solucion.is_(None),
+                Incidente.creado_en <= func.now() - text(f"INTERVAL '{dias_critica} days'"),
+            ),
+            'critica',
+        ))
+        when_clauses.append((
+            and_(
+                CatalogoTipoGrupo.codigo == grupo,
+                Incidente.fecha_solucion.is_(None),
+                Incidente.creado_en <= func.now() - text(f"INTERVAL '{dias_alerta} days'"),
+            ),
+            'alerta',
+        ))
+    return case(*when_clauses, else_=literal_column("'a_tiempo'"))
 
 
 class PropiaIncidenciaRepository:
@@ -31,7 +73,10 @@ class PropiaIncidenciaRepository:
         bbox: tuple[float, float, float, float] | None,
         resuelto: bool | None,
     ) -> Select:
-        stmt = select(Incidente).join(Incidente.tipo_atencion)
+        # JOIN a tipo_grupo siempre — la expresión de prioridad calculada la
+        # necesita para evaluar los umbrales por grupo, aunque no venga filtro
+        # `categorias`.
+        stmt = select(Incidente).join(Incidente.tipo_atencion).join(CatalogoTipoAtencion.tipo_grupo)
         condiciones = []
         if fecha is not None:
             condiciones.append(func.date(Incidente.creado_en) == fecha)
@@ -44,7 +89,6 @@ class PropiaIncidenciaRepository:
                 Incidente.fecha_solucion.is_not(None) if resuelto else Incidente.fecha_solucion.is_(None)
             )
         if categorias:
-            stmt = stmt.join(CatalogoTipoAtencion.tipo_grupo)
             condiciones.append(CatalogoTipoGrupo.codigo.in_(categorias))
         if tipo_atencion_codigo is not None:
             condiciones.append(CatalogoTipoAtencion.codigo == tipo_atencion_codigo)
@@ -69,13 +113,18 @@ class PropiaIncidenciaRepository:
         fecha_hasta: date | None = None,
         categorias: list[str] | None = None,
         tipo_atencion_codigo: str | None = None,
+        prioridad_codigos: list[str] | None = None,
         q: str | None = None,
         bbox: tuple[float, float, float, float] | None = None,
         resuelto: bool | None = None,
         candidatos: set[str] | None = None,
         page: int = 1,
         page_size: int = 10,
-    ) -> tuple[list[Incidente], int]:
+    ) -> tuple[list[tuple[Incidente, str]], int]:
+        """Devuelve tuples `(Incidente, prioridad_codigo)`. La prioridad se
+        calcula al vuelo en SQL con `_prioridad_codigo_expr` — no se persiste
+        en la BD ni se cachea en Redis, así que siempre refleja la edad actual
+        del incidente sin necesidad de rebuilds periódicos."""
         stmt = self._query_base(
             fecha=fecha,
             fecha_desde=fecha_desde,
@@ -86,9 +135,14 @@ class PropiaIncidenciaRepository:
             bbox=bbox,
             resuelto=resuelto,
         )
+        prioridad_expr = _prioridad_codigo_expr().label('prioridad_codigo')
+        stmt = stmt.add_columns(prioridad_expr)
+
         if candidatos is not None:
             ids = [uuid.UUID(c) for c in candidatos]
             stmt = stmt.where(Incidente.incidente_id.in_(ids))
+        if prioridad_codigos:
+            stmt = stmt.where(prioridad_expr.in_(prioridad_codigos))
 
         total = (
             await self._session.scalar(
@@ -97,7 +151,8 @@ class PropiaIncidenciaRepository:
         ) or 0
 
         stmt = stmt.order_by(Incidente.creado_en.desc()).limit(page_size).offset((page - 1) * page_size)
-        filas = list(await self._session.scalars(stmt))
+        result = await self._session.execute(stmt)
+        filas: list[tuple[Incidente, str]] = [(row[0], row.prioridad_codigo) for row in result.all()]
         return filas, total
 
     async def get_by_codigo(self, codigo: str) -> Incidente | None:

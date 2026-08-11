@@ -24,8 +24,4 @@ async def refresh(body: RefreshRequest, session: PropiaSession) -> LoginResponse
 
 @router.post("/logout", status_code=status.HTTP_204_NO_CONTENT)
 async def logout(usuario: CurrentUser) -> Response:
-    # Invalidación server-side del refresh token: API.md lo marca opcional y no hay
-    # tabla de sesiones/tokens revocados todavía (ver specs/01-auth.md) — el cliente
-    # descarta el token, el backend solo valida que la sesión sea válida al momento
-    # de llamar este endpoint.
     return Response(status_code=status.HTTP_204_NO_CONTENT)

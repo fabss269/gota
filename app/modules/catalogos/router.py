@@ -11,6 +11,7 @@ from app.modules.catalogos.schemas import (
     SectorOut,
     SuministroOut,
     TipoAtencionOut,
+    TipoGrupoOut,
 )
 from app.modules.catalogos.service import PropiaCatalogoService, SigCatalogoService
 from app.modules.catalogos.sig_repository import SigCatalogoRepository
@@ -63,6 +64,15 @@ async def buscar_suministro(codigo: str, sig_session: SigSession) -> SuministroO
     return SuministroOut(
         lat=predio.lat, lon=predio.lon, sectorId=predio.sector_id, sectorNombre=predio.sector_nombre
     )
+
+
+@router.get("/tipos-grupo", response_model=list[TipoGrupoOut])
+async def listar_tipos_grupo(
+    response: Response, propia_session: PropiaSession
+) -> list[TipoGrupoOut]:
+    response.headers["Cache-Control"] = _CACHE_CONTROL
+    service = PropiaCatalogoService(PropiaCatalogoRepository(propia_session))
+    return await service.listar_tipos_grupo()
 
 
 @router.get("/tipos-atencion", response_model=list[TipoAtencionOut])

@@ -1,5 +1,5 @@
 from app.modules.catalogos.propia_repository import PropiaCatalogoRepository
-from app.modules.catalogos.schemas import DistritoOut, ProvinciaOut, SectorOut, TipoAtencionOut
+from app.modules.catalogos.schemas import DistritoOut, ProvinciaOut, SectorOut, TipoAtencionOut, TipoGrupoOut
 from app.modules.catalogos.sig_repository import SigCatalogoRepository
 
 
@@ -27,6 +27,12 @@ class PropiaCatalogoService:
 
     def __init__(self, repository: PropiaCatalogoRepository) -> None:
         self._repository = repository
+
+    async def listar_tipos_grupo(self) -> list[TipoGrupoOut]:
+        grupos = await self._repository.listar_tipos_grupo()
+        return [
+            TipoGrupoOut(id=g.tipo_grupo_id, codigo=g.codigo, nombre=g.nombre) for g in grupos
+        ]
 
     async def listar_tipos_atencion(self) -> list[TipoAtencionOut]:
         tipos = await self._repository.listar_tipos_atencion()

@@ -41,3 +41,11 @@ class TipoAtencionOut(BaseModel):
     id: str
     nombre: str
     categoria: str
+
+
+class TipoGrupoOut(BaseModel):
+    """Grupo de incidencia: agua / desagüe (gota.catalogo_tipo_grupo)."""
+
+    id: int
+    codigo: str
+    nombre: str

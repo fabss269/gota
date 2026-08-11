@@ -9,7 +9,11 @@ from app.modules.catalogos.sig_repository import SigCatalogoRepository
 from app.modules.grafo.service import GrafoService
 from app.modules.incidencias.cache_repository import IncidenciaCacheRepository
 from app.modules.incidencias.catastro_enrichment import CatastroEnrichmentService
-from app.modules.incidencias.propia_repository import PropiaIncidenciaRepository
+from app.modules.incidencias.propia_repository import (
+    PRIORIDAD_DEFAULT_UMBRAL,
+    UMBRALES_DIAS_PRIORIDAD,
+    PropiaIncidenciaRepository,
+)
 from app.modules.incidencias.schemas import (
     AvanceRequest,
     CatastroOut,
@@ -32,6 +36,27 @@ from app.shared.deps import IncidenciaFilterParams
 
 def _now() -> datetime:
     return datetime.now(UTC).replace(tzinfo=None)
+
+
+def _calcular_prioridad(
+    creado_en: datetime, fecha_solucion: datetime | None, categoria: str
+) -> str:
+    """Version Python de `_prioridad_codigo_expr` (propia_repository). Debe
+    devolver EXACTAMENTE el mismo resultado que la expresión SQL. Se usa cuando
+    tenemos un `Incidente` ya cargado (detalle, respuesta a un PATCH, etc.) y
+    queremos evitar un round-trip extra al SQL solo para computar la prioridad.
+    """
+    if fecha_solucion is not None:
+        return 'a_tiempo'
+    dias_alerta, dias_critica = UMBRALES_DIAS_PRIORIDAD.get(
+        categoria, PRIORIDAD_DEFAULT_UMBRAL
+    )
+    edad = _now() - creado_en
+    if edad >= timedelta(days=dias_critica):
+        return 'critica'
+    if edad >= timedelta(days=dias_alerta):
+        return 'alerta'
+    return 'a_tiempo'
 
 
 class IncidenciaService:
@@ -66,9 +91,10 @@ class IncidenciaService:
         self._mapas_cargados = True
 
     async def _resolver_resumen(self, incidente: Incidente, categoria: str) -> tuple[str, str | None, str | None]:
-        """Lee `estado`/`prioridad`/`sector` de la caché Redis (spec 00 §7); en
-        *cache miss* recalcula contra la fuente real y repuebla la entrada — nunca se
-        devuelve un dato inconsistente por no estar en caché."""
+        """Lee `estado`/`sector` de la caché Redis (spec 00 §7); en *cache miss*
+        recalcula contra la fuente real y repuebla la entrada. La prioridad se
+        computa siempre en Python con `_calcular_prioridad` (cambia con el
+        reloj, no cachearla). Ya no se persiste `prioridad_id` en Redis."""
         await self._precargar_mapas()
         resumen = await self._cache.get_resumen(str(incidente.incidente_id))
 
@@ -78,11 +104,6 @@ class IncidenciaService:
             else None
         )
         sector_nombre = resumen.sector_nombre if resumen else None
-        prioridad_codigo = (
-            self._mapa_prioridades.get(int(resumen.prioridad_id))
-            if resumen and resumen.prioridad_id
-            else None
-        )
 
         set_kwargs: dict[str, str] = {}
         if estado_codigo is None:
@@ -100,15 +121,12 @@ class IncidenciaService:
                 set_kwargs["sector_nombre"] = predio.sector_nombre
                 set_kwargs["distrito_id"] = str(predio.distrito_id)
 
-        if prioridad_codigo is None and self._prioridad_default is not None:
-            prioridad_codigo = self._prioridad_default
-            prioridad_id = self._mapa_prioridades_inv.get(prioridad_codigo)
-            if prioridad_id is not None:
-                set_kwargs["prioridad_id"] = str(prioridad_id)
-
         if set_kwargs:
             await self._cache.set_resumen(str(incidente.incidente_id), **set_kwargs)
 
+        prioridad_codigo = _calcular_prioridad(
+            incidente.creado_en, incidente.fecha_solucion, categoria
+        )
         return estado_codigo, prioridad_codigo, sector_nombre
 
     def _a_incidencia_out(
@@ -155,16 +173,13 @@ class IncidenciaService:
         return date.fromisoformat(valor)
 
     async def listar(self, filtros: IncidenciaFilterParams) -> IncidenciaListResponse:
+        # Filtros que sí usan índice Redis (estado + sector). Prioridad se
+        # calcula en SQL al vuelo — no depende de cache.
         estado_ids: list[str] | None = None
-        prioridad_ids: list[str] | None = None
         sector_ids: list[str] | None = None
 
         if filtros.estado:
             estado_ids = [str(i) for i in await self._propia.resolver_estado_ids(filtros.csv(filtros.estado) or [])]
-        if filtros.prioridad:
-            prioridad_ids = [
-                str(i) for i in await self._propia.resolver_prioridad_ids(filtros.csv(filtros.prioridad) or [])
-            ]
         if filtros.sectorId or filtros.distritoId:
             ids: set[str] = set()
             if filtros.sectorId:
@@ -175,9 +190,9 @@ class IncidenciaService:
             sector_ids = list(ids)
 
         candidatos = None
-        if estado_ids is not None or prioridad_ids is not None or sector_ids is not None:
+        if estado_ids is not None or sector_ids is not None:
             candidatos = await self._cache.resolver_candidatos(
-                estado_ids=estado_ids, prioridad_ids=prioridad_ids, sector_ids=sector_ids
+                estado_ids=estado_ids, sector_ids=sector_ids
             )
             if candidatos is not None and not candidatos:
                 return IncidenciaListResponse(items=[], page=filtros.page, pageSize=filtros.pageSize, total=0)
@@ -188,6 +203,7 @@ class IncidenciaService:
             fecha_hasta=filtros.fechaHasta,
             categorias=filtros.csv(filtros.categoria),
             tipo_atencion_codigo=filtros.tipoAtencionId,
+            prioridad_codigos=filtros.csv(filtros.prioridad),
             q=filtros.q,
             bbox=filtros.bbox_tuple(),
             resuelto=filtros.resuelto,
@@ -197,10 +213,11 @@ class IncidenciaService:
         )
 
         items = []
-        for incidente in filas:
+        for incidente, prioridad_sql in filas:
             categoria = incidente.tipo_atencion.tipo_grupo.codigo
-            estado, prioridad, sector = await self._resolver_resumen(incidente, categoria)
-            items.append(self._a_incidencia_out(incidente, categoria, estado, prioridad, sector))
+            estado, _prioridad_dummy, sector = await self._resolver_resumen(incidente, categoria)
+            # Prioridad viene del SQL — más rápido que recomputar en Python.
+            items.append(self._a_incidencia_out(incidente, categoria, estado, prioridad_sql, sector))
 
         return IncidenciaListResponse(items=items, page=filtros.page, pageSize=filtros.pageSize, total=total)
 
