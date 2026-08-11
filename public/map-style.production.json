@@ -12,6 +12,15 @@
       "maxzoom": 19,
       "attribution": "© OpenStreetMap contributors"
     },
+    "satellite": {
+      "type": "raster",
+      "tiles": [
+        "https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}"
+      ],
+      "tileSize": 256,
+      "maxzoom": 19,
+      "attribution": "Tiles © Esri — Source: Esri, Maxar, Earthstar Geographics"
+    },
     "manzanas": {
       "type": "vector",
       "tiles": [
@@ -100,6 +109,14 @@
       "id": "osm",
       "type": "raster",
       "source": "osm"
+    },
+    {
+      "id": "satellite",
+      "type": "raster",
+      "source": "satellite",
+      "layout": {
+        "visibility": "none"
+      }
     },
     {
       "id": "manzanas-fill",

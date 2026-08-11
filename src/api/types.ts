@@ -77,6 +77,7 @@ export type ApiProvincia = { id: string; nombre: string; bbox: ApiBbox };
 export type ApiDistrito = { id: string; nombre: string; provinciaId: string; bbox: ApiBbox };
 export type ApiSector = { id: string; nombre: string; distritoId: string; bbox: ApiBbox };
 export type ApiSuministro = { lat: number; lon: number; sectorId: number | null; sectorNombre: string | null };
+export type ApiTipoGrupo = { id: number; codigo: string; nombre: string };
 
 // GET /red/elemento/{tipo}/{id} — panel de info al hacer click en un elemento de
 // catastro (ver API.md § 7). Campos no aplicables al `tipo` consultado vienen `null`.

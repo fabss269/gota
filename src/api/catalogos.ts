@@ -1,5 +1,9 @@
 import { apiFetch } from '@/api/client';
-import type { ApiDistrito, ApiProvincia, ApiSector, ApiSuministro } from '@/api/types';
+import type { ApiDistrito, ApiProvincia, ApiSector, ApiSuministro, ApiTipoGrupo } from '@/api/types';
+
+export function getTiposGrupo(): Promise<ApiTipoGrupo[]> {
+  return apiFetch<ApiTipoGrupo[]>('/catalogos/tipos-grupo');
+}
 
 export function getProvincias(): Promise<ApiProvincia[]> {
   return apiFetch<ApiProvincia[]>('/catalogos/provincias');

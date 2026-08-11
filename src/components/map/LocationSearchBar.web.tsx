@@ -5,6 +5,7 @@ import { useEffect, useRef, useState } from 'react';
 import { buscarSuministro } from '@/api/catalogos';
 import { ApiError } from '@/api/client';
 import { buscarDireccion, type DireccionResultado } from '@/api/geocoding';
+import { Loader } from '@/components/shared/Loader.web';
 import { useMapSearchStore } from '@/state/mapSearchStore';
 
 type Modo = 'direccion' | 'suministro';
@@ -230,7 +231,6 @@ export function LocationSearchBar() {
   return (
     <div style={wrapper}>
       <style>{`
-        @keyframes gota-spin { to { transform: rotate(360deg); } }
         @keyframes gota-mic-pulse {
           0%   { box-shadow: 0 0 0 0 rgba(220, 53, 69, 0.55); }
           70%  { box-shadow: 0 0 0 12px rgba(220, 53, 69, 0); }
@@ -273,19 +273,7 @@ export function LocationSearchBar() {
 
       {!buscando && !isFlying && error && <div style={errorMsg}>{error}</div>}
 
-      {(buscando || isFlying) && (
-        <div style={loaderOverlay} role="status" aria-live="polite">
-          <div style={loaderCard}>
-            <span style={spinnerWrap} aria-hidden>
-              <span style={spinnerRing} />
-              <span style={spinnerDot} />
-            </span>
-            <span style={loaderText}>
-              {modo === 'suministro' ? 'Buscando por suministro' : 'Buscando por dirección'}
-            </span>
-          </div>
-        </div>
-      )}
+      {(buscando || isFlying) && <Loader />}
 
       {modo === 'direccion' && mostrarResultados && resultados.length > 0 && (
         <div style={dropdown}>
@@ -314,63 +302,6 @@ const wrapper: CSSProperties = {
   zIndex: 10,
   width: 320,
   maxWidth: 'calc(100% - 24px)',
-};
-
-// Overlay centrado sobre toda la pantalla — se muestra mientras la búsqueda está en
-// curso o el mapa está animando el flyTo. `pointerEvents: 'none'` permite que el
-// usuario siga interactuando con el mapa mientras aparece.
-const loaderOverlay: CSSProperties = {
-  position: 'fixed',
-  inset: 0,
-  display: 'flex',
-  alignItems: 'center',
-  justifyContent: 'center',
-  pointerEvents: 'none',
-  zIndex: 1000,
-};
-
-const loaderCard: CSSProperties = {
-  display: 'inline-flex',
-  flexDirection: 'column',
-  alignItems: 'center',
-  gap: 12,
-  padding: '18px 28px',
-  minWidth: 180,
-  backgroundColor: 'var(--map-surface)',
-  borderRadius: 10,
-  boxShadow: '0 4px 16px rgba(0,0,0,0.20)',
-};
-
-const spinnerWrap: CSSProperties = {
-  position: 'relative',
-  width: 36,
-  height: 36,
-  display: 'inline-flex',
-  alignItems: 'center',
-  justifyContent: 'center',
-};
-
-const spinnerRing: CSSProperties = {
-  position: 'absolute',
-  inset: 0,
-  border: '3px solid var(--map-surface-alt)',
-  borderTopColor: 'var(--map-accent)',
-  borderRadius: '50%',
-  animation: 'gota-spin 0.85s linear infinite',
-};
-
-const spinnerDot: CSSProperties = {
-  width: 10,
-  height: 10,
-  borderRadius: '50%',
-  backgroundColor: 'var(--map-accent)',
-};
-
-const loaderText: CSSProperties = {
-  fontSize: 13,
-  fontWeight: 600,
-  color: 'var(--map-text)',
-  textAlign: 'center',
 };
 
 const errorMsg: CSSProperties = {
