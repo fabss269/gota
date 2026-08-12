@@ -7,8 +7,9 @@ import { useThemeColors } from '@/state/themeStore';
 import { useUbicacionStore } from '@/state/ubicacionStore';
 
 /**
- * Selector de UBICACIÓN del tab "Capas" (Bottom Sheet móvil) — Distrito como combo box
- * (selección única) y Sectores como multi-select con chips + búsqueda (estilo Jira).
+ * Selector de UBICACIÓN del tab "Capas" (Bottom Sheet móvil) — Distrito y Sector
+ * como combo box de selección única en cascada (rediseño 2026-08-11, ver
+ * ubicacionStore.ts — antes el sector era multi-select con chips).
  *
  * Reemplaza el árbol Provincia→Distrito→Sector con checkboxes anidados (versión
  * anterior): en una pantalla angosta esa jerarquía completa se sentía muy pesada —
@@ -21,12 +22,13 @@ export function UbicacionPicker() {
   const distritos = useUbicacionStore((s) => s.distritos);
   const sectores = useUbicacionStore((s) => s.sectores);
   const cargando = useUbicacionStore((s) => s.cargando);
-  const provinciasActivas = useUbicacionStore((s) => s.provinciasActivas);
-  const distritosActivos = useUbicacionStore((s) => s.distritosActivos);
-  const sectoresActivos = useUbicacionStore((s) => s.sectoresActivos);
+  const provinciaActiva = useUbicacionStore((s) => s.provinciaActiva);
+  const distritoActivoId = useUbicacionStore((s) => s.distritoActivo);
+  const sectorActivoId = useUbicacionStore((s) => s.sectorActivo);
   const cargar = useUbicacionStore((s) => s.cargar);
   const seleccionarDistrito = useUbicacionStore((s) => s.seleccionarDistrito);
-  const toggleSector = useUbicacionStore((s) => s.toggleSector);
+  const seleccionarSector = useUbicacionStore((s) => s.seleccionarSector);
+  const previsualizarSector = useUbicacionStore((s) => s.previsualizarSector);
 
   useEffect(() => {
     cargar();
@@ -36,17 +38,18 @@ export function UbicacionPicker() {
   const [sectorModalAbierto, setSectorModalAbierto] = useState(false);
 
   const distritosDisponibles = useMemo(
-    () => distritos.filter((d) => provinciasActivas.has(d.provinciaId)),
-    [distritos, provinciasActivas]
+    () => distritos.filter((d) => d.provinciaId === provinciaActiva),
+    [distritos, provinciaActiva]
   );
 
-  const distritoActivoId = [...distritosActivos][0] ?? null;
   const distritoActivo = distritosDisponibles.find((d) => d.id === distritoActivoId) ?? null;
 
   const sectoresDelDistrito = useMemo(
     () => (distritoActivoId ? sectores.filter((s) => s.distritoId === distritoActivoId) : []),
     [sectores, distritoActivoId]
   );
+
+  const sectorActivo = sectoresDelDistrito.find((s) => s.id === sectorActivoId) ?? null;
 
   if (cargando && distritosDisponibles.length === 0) {
     return (
@@ -67,26 +70,9 @@ export function UbicacionPicker() {
 
       {distritoActivoId && sectoresDelDistrito.length > 0 && (
         <>
-          <Text style={styles.fieldLabel}>Sectores</Text>
-          <Pressable style={styles.multiSelectBox} onPress={() => setSectorModalAbierto(true)}>
-            {sectoresActivos.size === 0 ? (
-              <Text style={styles.multiSelectPlaceholder}>Todos los sectores</Text>
-            ) : (
-              <View style={styles.chipWrap}>
-                {sectoresDelDistrito
-                  .filter((s) => sectoresActivos.has(s.id))
-                  .map((s) => (
-                    <View key={s.id} style={styles.chip}>
-                      <Text style={styles.chipLabel} numberOfLines={1}>
-                        {s.nombre}
-                      </Text>
-                      <Pressable hitSlop={8} onPress={() => toggleSector(s.id)}>
-                        <Text style={styles.chipRemove}>×</Text>
-                      </Pressable>
-                    </View>
-                  ))}
-              </View>
-            )}
+          <Text style={styles.fieldLabel}>Sector</Text>
+          <Pressable style={styles.comboBox} onPress={() => setSectorModalAbierto(true)}>
+            <Text style={styles.comboValue}>{sectorActivo?.nombre ?? 'Todos los sectores'}</Text>
             <Text style={styles.chevron}>▾</Text>
           </Pressable>
         </>
@@ -100,14 +86,18 @@ export function UbicacionPicker() {
         seleccionado={distritoActivoId}
         onSeleccionar={seleccionarDistrito}
       />
-      <SectorMultiSelectModal
+      <SectorModal
         styles={styles}
         colors={t}
         visible={sectorModalAbierto}
-        onClose={() => setSectorModalAbierto(false)}
+        onClose={() => {
+          previsualizarSector(null);
+          setSectorModalAbierto(false);
+        }}
         sectores={sectoresDelDistrito}
-        seleccionados={sectoresActivos}
-        onToggle={toggleSector}
+        seleccionado={sectorActivoId}
+        onSeleccionar={seleccionarSector}
+        onPreview={previsualizarSector}
       />
     </View>
   );
@@ -167,32 +157,46 @@ function DistritoModal({
   );
 }
 
-// ── Multi-select de sectores con búsqueda (estilo Jira) ──────────────
-
-function SectorMultiSelectModal({
+// ── Combo box de sector (selección única) con búsqueda + ojito de preview ──
+//
+// El 👁 de cada fila solo llama a `previsualizarSector` (pinta el contorno del
+// sector en el mapa, ver applySectorHighlight/buildEffectiveStyle) sin cerrar el
+// modal ni tocar la selección real — tocar la fila en sí es lo que selecciona el
+// sector (cierra el modal y sí dispara fetch, vía seleccionarSector). Mismo
+// contrato que el 👁/🔍 del dropdown de sector en FiltersSidebar (web).
+function SectorModal({
   styles,
   colors,
   visible,
   onClose,
   sectores,
-  seleccionados,
-  onToggle,
+  seleccionado,
+  onSeleccionar,
+  onPreview,
 }: {
   styles: Styles;
   colors: ColorPalette;
   visible: boolean;
   onClose: () => void;
   sectores: ApiSector[];
-  seleccionados: Set<string>;
-  onToggle: (id: string) => void;
+  seleccionado: string | null;
+  onSeleccionar: (id: string | null) => void;
+  onPreview: (id: string | null) => void;
 }) {
   const [busqueda, setBusqueda] = useState('');
+  const [previsualizado, setPrevisualizado] = useState<string | null>(null);
 
   const filtrados = useMemo(() => {
     const texto = busqueda.trim().toLowerCase();
     if (!texto) return sectores;
     return sectores.filter((s) => s.nombre.toLowerCase().includes(texto));
   }, [sectores, busqueda]);
+
+  const togglePreview = (id: string) => {
+    const next = previsualizado === id ? null : id;
+    setPrevisualizado(next);
+    onPreview(next);
+  };
 
   return (
     <Modal visible={visible} transparent animationType="fade" onRequestClose={onClose}>
@@ -207,16 +211,40 @@ function SectorMultiSelectModal({
             autoFocus
           />
           <ScrollView style={styles.sectorList}>
+            <Pressable
+              style={styles.sectorRow}
+              onPress={() => {
+                onSeleccionar(null);
+                onClose();
+              }}
+            >
+              <View style={[styles.checkbox, seleccionado === null && styles.checkboxChecked]}>
+                {seleccionado === null && <Text style={styles.checkmark}>✓</Text>}
+              </View>
+              <Text style={styles.sectorRowLabel}>Todos los sectores</Text>
+            </Pressable>
             {filtrados.length === 0 && <Text style={styles.noResults}>Sin resultados</Text>}
             {filtrados.map((s) => {
-              const activo = seleccionados.has(s.id);
+              const activo = seleccionado === s.id;
+              const preview = previsualizado === s.id;
               return (
-                <Pressable key={s.id} style={styles.sectorRow} onPress={() => onToggle(s.id)}>
-                  <View style={[styles.checkbox, activo && styles.checkboxChecked]}>
-                    {activo && <Text style={styles.checkmark}>✓</Text>}
-                  </View>
-                  <Text style={styles.sectorRowLabel}>{s.nombre}</Text>
-                </Pressable>
+                <View key={s.id} style={styles.sectorRow}>
+                  <Pressable
+                    style={styles.sectorRowMain}
+                    onPress={() => {
+                      onSeleccionar(s.id);
+                      onClose();
+                    }}
+                  >
+                    <View style={[styles.checkbox, activo && styles.checkboxChecked]}>
+                      {activo && <Text style={styles.checkmark}>✓</Text>}
+                    </View>
+                    <Text style={styles.sectorRowLabel}>{s.nombre}</Text>
+                  </Pressable>
+                  <Pressable hitSlop={8} onPress={() => togglePreview(s.id)}>
+                    <Text style={[styles.previewIcon, preview && styles.previewIconActive]}>👁</Text>
+                  </Pressable>
+                </View>
               );
             })}
           </ScrollView>
@@ -248,36 +276,6 @@ function makeStyles(t: ColorPalette) {
     },
     comboValue: { fontSize: 13, fontWeight: '600', color: t.textBody },
     chevron: { color: t.textMuted, fontSize: 12 },
-
-    multiSelectBox: {
-      flexDirection: 'row',
-      alignItems: 'center',
-      justifyContent: 'space-between',
-      borderWidth: 1,
-      borderColor: t.border,
-      borderRadius: Radius.sm,
-      paddingHorizontal: Spacing.sm,
-      paddingVertical: 8,
-      minHeight: 40,
-      gap: Spacing.xs,
-    },
-    multiSelectPlaceholder: { fontSize: 13, color: t.textMuted, flex: 1 },
-    chipWrap: { flex: 1, flexDirection: 'row', flexWrap: 'wrap', gap: 6 },
-    chip: {
-      flexDirection: 'row',
-      alignItems: 'center',
-      gap: 4,
-      backgroundColor: t.background,
-      borderWidth: 1,
-      borderColor: t.accent,
-      borderRadius: Radius.pill,
-      paddingLeft: 10,
-      paddingRight: 6,
-      paddingVertical: 3,
-      maxWidth: 150,
-    },
-    chipLabel: { fontSize: 12, color: t.accent, fontWeight: '600' },
-    chipRemove: { fontSize: 14, color: t.accent, fontWeight: '700', paddingHorizontal: 2 },
 
     modalBackdrop: {
       flex: 1,
@@ -325,7 +323,16 @@ function makeStyles(t: ColorPalette) {
     },
     sectorList: { maxHeight: 280 },
     noResults: { fontSize: 12, color: t.textMuted, paddingVertical: Spacing.sm, textAlign: 'center' },
-    sectorRow: { flexDirection: 'row', alignItems: 'center', gap: Spacing.xs, paddingVertical: 8 },
+    sectorRow: {
+      flexDirection: 'row',
+      alignItems: 'center',
+      justifyContent: 'space-between',
+      gap: Spacing.xs,
+      paddingVertical: 8,
+    },
+    sectorRowMain: { flex: 1, flexDirection: 'row', alignItems: 'center', gap: Spacing.xs },
+    previewIcon: { fontSize: 16, opacity: 0.35 },
+    previewIconActive: { opacity: 1 },
     checkbox: {
       width: 18,
       height: 18,

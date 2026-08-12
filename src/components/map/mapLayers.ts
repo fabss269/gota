@@ -36,8 +36,9 @@ export const CAPA_KEY_POR_LAYER_ID: Partial<Record<string, CapaKey>> = Object.fr
   Object.entries(CAPA_LAYER_IDS).flatMap(([capa, layers]) => layers.map((l) => [l, capa as CapaKey]))
 );
 
-// Capas de catastro filtrables por sectorid cuando hay un sector activo en UBICACIÓN
-// (ver ubicacionStore.sectoresActivos). alcantarillado-primaria/secundaria ya traen su
+// Capas de catastro filtrables por sectorid cuando hay algo activo en UBICACIÓN
+// (ver sectorIdsEfectivos() más abajo, cascadea sector→distrito→provincia).
+// alcantarillado-primaria/secundaria ya traen su
 // propio filtro base (primaria true/false) que hay que preservar combinándolo con el
 // de sector.
 export const CATASTRO_SECTOR_FILTER_LAYERS: { id: string; baseFilter?: MapExpression }[] = [
@@ -121,6 +122,40 @@ export const SECTOR_COLOR_LAYER_IDS: [string, 'fill-color' | 'line-color'][] = [
 export function colorForSectorId(sectorId: string): string {
   const hue = (Number(sectorId) * 137.508) % 360;
   return `hsl(${hue.toFixed(0)}, 75%, 45%)`;
+}
+
+// Calcula los `sectorid` efectivos a pintar/filtrar cascadeando
+// sector→distrito→provincia (mismo criterio que ya usaba el fitBounds de cámara,
+// ver MapView.web.tsx/MapView.tsx) — bug real 2026-08-11: applySectorHighlight/
+// applyCatastroSectorFilter (y su equivalente buildEffectiveStyle en nativo) solo
+// miraban sectorActivo, así que con un distrito/provincia activo pero SIN sector
+// elegido, no caían a ningún nivel: el catastro se mostraba sin acotar (o el
+// resaltado no pintaba nada). No pide nada nuevo al backend — sectores/distritos ya
+// están cargados en ubicacionStore, con distritoId/provinciaId listos para filtrar.
+//
+// El "ojito" (sectorPreview) NO pasa por acá: quien pinta el contorno del sector
+// (SECTOR_LAYER_IDS) lo une aparte a este resultado; el filtro de catastro
+// (CATASTRO_SECTOR_FILTER_LAYERS) nunca debe incluirlo — el preview solo muestra
+// dónde está el sector, no carga su red completa sin que sea el filtro activo.
+export function sectorIdsEfectivos(args: {
+  sectores: { id: string; distritoId: string }[];
+  distritos: { id: string; provinciaId: string }[];
+  provinciaActiva: string | null;
+  distritoActivo: string | null;
+  sectorActivo: string | null;
+}): number[] {
+  const { sectores, distritos, provinciaActiva, distritoActivo, sectorActivo } = args;
+  if (sectorActivo) return [Number(sectorActivo)];
+  if (distritoActivo) {
+    return sectores.filter((s) => s.distritoId === distritoActivo).map((s) => Number(s.id));
+  }
+  if (provinciaActiva) {
+    const idsDistritosDeLaProvincia = new Set(
+      distritos.filter((d) => d.provinciaId === provinciaActiva).map((d) => d.id)
+    );
+    return sectores.filter((s) => idsDistritosDeLaProvincia.has(s.distritoId)).map((s) => Number(s.id));
+  }
+  return [];
 }
 
 export function unionBbox(boxes: ApiBbox[]): ApiBbox {

@@ -17,6 +17,12 @@ type FiltersState = {
   tipoAtencion: string | null;
   estado: EstadoIncidencia | null;
   rangoFechas: RangoFechas;
+  // Rango de fechas explícito (dd/mm/aaaa × 2 en FiltersSidebar web, rediseño
+  // 2026-08-11) — ISO 'yyyy-mm-dd' o null. Cuando AMBOS están seteados, manda
+  // sobre `rangoFechas` (ver paramsDeFecha en useIncidentsToday.ts); si falta
+  // alguno, se sigue usando el preset como hasta ahora.
+  fechaDesde: string | null;
+  fechaHasta: string | null;
   // Filtro por defecto al entrar (pedido de Edgar 2026-08-07): sin resolver =
   // incidente.fecha_solucion IS NULL, sin acotar por fecha. Independiente de
   // `rangoFechas` — se puede combinar con cualquier rango, o apagar para ver
@@ -29,6 +35,8 @@ type FiltersState = {
   setTipoAtencion: (tipoAtencion: string | null) => void;
   setEstado: (estado: EstadoIncidencia | null) => void;
   setRangoFechas: (rango: RangoFechas) => void;
+  setFechaDesde: (fecha: string | null) => void;
+  setFechaHasta: (fecha: string | null) => void;
   setSoloNoResueltas: (value: boolean) => void;
   setMapMode: (mode: MapMode) => void;
   reset: () => void;
@@ -36,7 +44,15 @@ type FiltersState = {
 
 const DEFAULTS: Pick<
   FiltersState,
-  'categorias' | 'prioridades' | 'tipoAtencion' | 'estado' | 'rangoFechas' | 'soloNoResueltas' | 'mapMode'
+  | 'categorias'
+  | 'prioridades'
+  | 'tipoAtencion'
+  | 'estado'
+  | 'rangoFechas'
+  | 'fechaDesde'
+  | 'fechaHasta'
+  | 'soloNoResueltas'
+  | 'mapMode'
 > = {
   categorias: ['agua', 'desague'],
   prioridades: ['a_tiempo', 'alerta', 'critica'],
@@ -47,6 +63,8 @@ const DEFAULTS: Pick<
   // arrancaba en '7d' (pedido de Edgar 2026-08-05) y con datos reales eso dejaba
   // ver casi nada. 'hoy'/'7d'/etc. siguen disponibles en el selector.
   rangoFechas: 'todo',
+  fechaDesde: null,
+  fechaHasta: null,
   soloNoResueltas: true,
   mapMode: 'normal',
 };
@@ -74,6 +92,8 @@ export const useFiltersStore = create<FiltersState>((set) => ({
   setTipoAtencion: (tipoAtencion) => set({ tipoAtencion }),
   setEstado: (estado) => set({ estado }),
   setRangoFechas: (rangoFechas) => set({ rangoFechas }),
+  setFechaDesde: (fechaDesde) => set({ fechaDesde }),
+  setFechaHasta: (fechaHasta) => set({ fechaHasta }),
   setSoloNoResueltas: (soloNoResueltas) => set({ soloNoResueltas }),
   setMapMode: (mapMode) => set({ mapMode }),
   reset: () => set({ ...DEFAULTS }),

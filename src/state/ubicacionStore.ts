@@ -17,16 +17,21 @@ type UbicacionState = {
   sectores: ApiSector[];
   cargando: boolean;
   error: string | null;
-  provinciasActivas: Set<string>;
-  distritosActivos: Set<string>;
-  sectoresActivos: Set<string>;
+  // Selección única en cascada (rediseño 2026-08-11: antes eran Sets multi-select
+  // — ver FiltersSidebar.tsx/UbicacionPicker.tsx, ahora son 3 dropdowns
+  // Provincia→Distrito→Sector de un solo valor cada uno, como un <select> encadenado).
+  provinciaActiva: string | null;
+  distritoActivo: string | null;
+  sectorActivo: string | null;
+  // Preview del "ojito" en el dropdown de Sector: pinta el contorno del sector en
+  // el mapa (ver applySectorHighlight/buildEffectiveStyle) sin tocar sectorActivo —
+  // no cambia el filtro de datos ni dispara fetch (useIncidentsToday no lo lee).
+  sectorPreview: string | null;
   cargar: () => Promise<void>;
-  toggleProvincia: (provinciaId: string) => void;
-  toggleDistrito: (distritoId: string) => void;
-  toggleSector: (sectorId: string) => void;
-  // Selección única (combo box de distrito, versión móvil — ver UbicacionPicker.tsx)
-  // a diferencia de toggleDistrito (multi-select, usado por FiltersSidebar en web).
+  seleccionarProvincia: (provinciaId: string | null) => void;
   seleccionarDistrito: (distritoId: string | null) => void;
+  seleccionarSector: (sectorId: string | null) => void;
+  previsualizarSector: (sectorId: string | null) => void;
 };
 
 export const useUbicacionStore = create<UbicacionState>((set, get) => ({
@@ -35,9 +40,10 @@ export const useUbicacionStore = create<UbicacionState>((set, get) => ({
   sectores: [],
   cargando: false,
   error: null,
-  provinciasActivas: new Set([PROVINCIA_DEFAULT]),
-  distritosActivos: new Set([DISTRITO_DEFAULT]),
-  sectoresActivos: new Set([SECTOR_DEFAULT]),
+  provinciaActiva: PROVINCIA_DEFAULT,
+  distritoActivo: DISTRITO_DEFAULT,
+  sectorActivo: SECTOR_DEFAULT,
+  sectorPreview: null,
 
   cargar: async () => {
     if (get().provincias.length > 0 || get().cargando) return;
@@ -54,73 +60,16 @@ export const useUbicacionStore = create<UbicacionState>((set, get) => ({
     }
   },
 
-  // Colapsar una provincia limpia también sus distritos (y los sectores de esos
-  // distritos): no tiene sentido dejar selección "invisible" dentro de un grupo cerrado.
-  toggleProvincia: (provinciaId) =>
-    set((state) => {
-      const provinciasActivas = new Set(state.provinciasActivas);
-      let distritosActivos = state.distritosActivos;
-      let sectoresActivos = state.sectoresActivos;
+  // Cambiar de provincia invalida distrito/sector elegidos antes (igual que un
+  // <select> encadenado: la opción vieja puede ya ni pertenecer a la provincia nueva).
+  seleccionarProvincia: (provinciaId) =>
+    set({ provinciaActiva: provinciaId, distritoActivo: null, sectorActivo: null }),
 
-      if (provinciasActivas.has(provinciaId)) {
-        provinciasActivas.delete(provinciaId);
-        const idsDistritosDeLaProvincia = new Set(
-          state.distritos.filter((d) => d.provinciaId === provinciaId).map((d) => d.id)
-        );
-        distritosActivos = new Set(
-          [...state.distritosActivos].filter((id) => !idsDistritosDeLaProvincia.has(id))
-        );
-        const idsSectoresDeLaProvincia = new Set(
-          state.sectores.filter((s) => idsDistritosDeLaProvincia.has(s.distritoId)).map((s) => s.id)
-        );
-        sectoresActivos = new Set(
-          [...state.sectoresActivos].filter((id) => !idsSectoresDeLaProvincia.has(id))
-        );
-      } else {
-        provinciasActivas.add(provinciaId);
-      }
+  // Mismo criterio un nivel abajo: cambiar de distrito invalida el sector elegido.
+  seleccionarDistrito: (distritoId) => set({ distritoActivo: distritoId, sectorActivo: null }),
 
-      return { provinciasActivas, distritosActivos, sectoresActivos };
-    }),
+  seleccionarSector: (sectorId) => set({ sectorActivo: sectorId }),
 
-  // Mismo criterio un nivel abajo: colapsar un distrito limpia sus sectores.
-  toggleDistrito: (distritoId) =>
-    set((state) => {
-      const distritosActivos = new Set(state.distritosActivos);
-      let sectoresActivos = state.sectoresActivos;
-
-      if (distritosActivos.has(distritoId)) {
-        distritosActivos.delete(distritoId);
-        const idsSectoresDelDistrito = new Set(
-          state.sectores.filter((s) => s.distritoId === distritoId).map((s) => s.id)
-        );
-        sectoresActivos = new Set(
-          [...state.sectoresActivos].filter((id) => !idsSectoresDelDistrito.has(id))
-        );
-      } else {
-        distritosActivos.add(distritoId);
-      }
-
-      return { distritosActivos, sectoresActivos };
-    }),
-
-  toggleSector: (sectorId) =>
-    set((state) => {
-      const next = new Set(state.sectoresActivos);
-      if (next.has(sectorId)) {
-        next.delete(sectorId);
-      } else {
-        next.add(sectorId);
-      }
-      return { sectoresActivos: next };
-    }),
-
-  // Reemplaza (no acumula) el distrito activo y limpia los sectores del distrito
-  // anterior — mismo criterio de "colapsar limpia hijos" que toggleDistrito, pero
-  // como reemplazo en vez de acumulación (combo box: un solo valor a la vez).
-  seleccionarDistrito: (distritoId) =>
-    set({
-      distritosActivos: new Set(distritoId ? [distritoId] : []),
-      sectoresActivos: new Set(),
-    }),
+  // Solo el "ojito" la usa — nunca toca provinciaActiva/distritoActivo/sectorActivo.
+  previsualizarSector: (sectorId) => set({ sectorPreview: sectorId }),
 }));

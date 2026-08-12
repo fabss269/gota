@@ -1,13 +1,15 @@
 import { Ionicons, MaterialCommunityIcons } from '@expo/vector-icons';
 import { useQuery } from '@tanstack/react-query';
-import { useEffect, useState, type CSSProperties, type ReactNode } from 'react';
+import { useEffect, type CSSProperties, type ReactNode } from 'react';
 
 import { getTiposGrupo } from '@/api/catalogos';
-import type { ApiDistrito, ApiSector, ApiTipoGrupo } from '@/api/types';
+import type { ApiTipoGrupo } from '@/api/types';
+import { LocationDropdown } from '@/components/map/LocationDropdown';
 import { Colors } from '@/constants/theme';
-import type { Categoria, Prioridad } from '@/mocks/incidentsMock';
+import type { Categoria, EstadoIncidencia, Prioridad } from '@/mocks/incidentsMock';
 import { useCapasStore, type CapaKey } from '@/state/capasStore';
 import { useFiltersStore } from '@/state/filtersStore';
+import { useMapSearchStore } from '@/state/mapSearchStore';
 import { useUbicacionStore } from '@/state/ubicacionStore';
 
 // Colores del semáforo de prioridad — mismos tokens que el resto del proyecto.
@@ -15,6 +17,16 @@ const PRIORIDADES: { codigo: Prioridad; nombre: string; color: string }[] = [
   { codigo: 'a_tiempo', nombre: 'A tiempo', color: Colors.statusATiempo },
   { codigo: 'alerta',   nombre: 'Alerta',   color: Colors.statusAlerta },
   { codigo: 'critica',  nombre: 'Crítica',  color: Colors.statusCritica },
+];
+
+// Mismos valores/labels que ya usa el Bottom Sheet móvil (FiltrosTab.tsx) — no
+// existe un catálogo real de estados todavía (docs/API.md § 2), así que se
+// hardcodea igual que allá.
+const ESTADO_OPTIONS: { value: EstadoIncidencia; label: string }[] = [
+  { value: 'CREADO', label: 'Creado' },
+  { value: 'PENDIENTE', label: 'Pendiente' },
+  { value: 'EN_PROGRESO', label: 'En progreso' },
+  { value: 'ATENDIDO', label: 'Atendido' },
 ];
 
 // Íconos por código de grupo. Se cae a un default seguro si el catálogo trae
@@ -41,6 +53,12 @@ export function FiltersSidebar() {
   const toggleCategoria = useFiltersStore((s) => s.toggleCategoria);
   const prioridades = useFiltersStore((s) => s.prioridades);
   const togglePrioridad = useFiltersStore((s) => s.togglePrioridad);
+  const estado = useFiltersStore((s) => s.estado);
+  const setEstado = useFiltersStore((s) => s.setEstado);
+  const fechaDesde = useFiltersStore((s) => s.fechaDesde);
+  const fechaHasta = useFiltersStore((s) => s.fechaHasta);
+  const setFechaDesde = useFiltersStore((s) => s.setFechaDesde);
+  const setFechaHasta = useFiltersStore((s) => s.setFechaHasta);
   const { data: tiposGrupo = [] } = useQuery({
     queryKey: ['tipos-grupo'],
     queryFn: getTiposGrupo,
@@ -53,14 +71,16 @@ export function FiltersSidebar() {
     distritos,
     sectores,
     cargando: ubicacionCargando,
-    provinciasActivas,
-    distritosActivos,
-    sectoresActivos,
+    provinciaActiva,
+    distritoActivo,
+    sectorActivo,
     cargar: cargarUbicacion,
-    toggleProvincia,
-    toggleDistrito,
-    toggleSector,
+    seleccionarProvincia,
+    seleccionarDistrito,
+    seleccionarSector,
+    previsualizarSector,
   } = useUbicacionStore();
+  const flyToBounds = useMapSearchStore((s) => s.flyToBounds);
 
   useEffect(() => {
     cargarUbicacion();
@@ -72,6 +92,16 @@ export function FiltersSidebar() {
     const next = new Set(capasVisibles);
     if (next.has(key)) { next.delete(key); } else { next.add(key); }
     aplicarCapas(next);
+  };
+
+  const distritosDeLaProvincia = distritos.filter((d) => d.provinciaId === provinciaActiva);
+  const sectoresDelDistrito = sectores.filter((s) => s.distritoId === distritoActivo);
+
+  // 🔍 lupa de la fila de Sector — solo mueve la cámara (mapSearchStore), nunca
+  // toca sectorActivo/sectorPreview ni dispara fetch.
+  const handleZoomSector = (sectorId: string) => {
+    const sector = sectores.find((s) => s.id === sectorId);
+    if (sector?.bbox) flyToBounds(sector.bbox);
   };
 
   return (
@@ -126,6 +156,38 @@ export function FiltersSidebar() {
         })}
       </div>
 
+      {/* Estado — dropdown simple, un solo valor (null = Todos) */}
+      <div style={grupoSectionLabel}>ESTADO</div>
+      <LocationDropdown
+        options={ESTADO_OPTIONS.map((o) => ({ id: o.value, nombre: o.label }))}
+        value={estado}
+        onSelect={(id) => setEstado(id as EstadoIncidencia | null)}
+        placeholder="Todos"
+        clearLabel="Todos"
+      />
+
+      {/* Rango de fechas — dos <input type="date"> nativos, sin librería nueva (no
+          hay ningún date-picker en el proyecto). Vacío = usa el preset de siempre
+          (rangoFechas), ver useIncidentsToday.paramsDeFecha. */}
+      <div style={grupoSectionLabel}>RANGO DE FECHAS</div>
+      <div style={fechaRow}>
+        <input
+          type="date"
+          style={fechaInput}
+          value={fechaDesde ?? ''}
+          onChange={(e) => setFechaDesde(e.target.value || null)}
+          aria-label="Desde"
+        />
+        <span style={fechaSeparador}>–</span>
+        <input
+          type="date"
+          style={fechaInput}
+          value={fechaHasta ?? ''}
+          onChange={(e) => setFechaHasta(e.target.value || null)}
+          aria-label="Hasta"
+        />
+      </div>
+
       <div style={divider} />
 
       {/* ── UBICACIÓN ─────────────────────────────── */}
@@ -142,20 +204,38 @@ export function FiltersSidebar() {
       {ubicacionCargando && provincias.length === 0 ? (
         <div style={{ fontSize: 12, color: 'var(--map-text-muted)', padding: '2px 0 4px' }}>Cargando…</div>
       ) : (
-        provincias.map((provincia) => (
-          <ProvinciaGroup
-            key={provincia.id}
-            nombre={provincia.nombre}
-            activa={provinciasActivas.has(provincia.id)}
-            onToggle={() => toggleProvincia(provincia.id)}
-            distritos={distritos.filter((d) => d.provinciaId === provincia.id)}
-            distritosActivos={distritosActivos}
-            onToggleDistrito={toggleDistrito}
-            sectores={sectores}
-            sectoresActivos={sectoresActivos}
-            onToggleSector={toggleSector}
+        <>
+          <div style={fieldLabel}>Provincia</div>
+          <LocationDropdown
+            options={provincias.map((p) => ({ id: p.id, nombre: p.nombre }))}
+            value={provinciaActiva}
+            onSelect={seleccionarProvincia}
+            placeholder="Todas las provincias"
+            clearLabel="Todas"
           />
-        ))
+
+          <div style={fieldLabel}>Distrito</div>
+          <LocationDropdown
+            options={distritosDeLaProvincia.map((d) => ({ id: d.id, nombre: d.nombre }))}
+            value={distritoActivo}
+            onSelect={seleccionarDistrito}
+            placeholder="Todos los distritos"
+            clearLabel="Todos"
+            disabled={!provinciaActiva}
+          />
+
+          <div style={fieldLabel}>Sector</div>
+          <LocationDropdown
+            options={sectoresDelDistrito.map((s) => ({ id: s.id, nombre: s.nombre }))}
+            value={sectorActivo}
+            onSelect={seleccionarSector}
+            placeholder="Todos los sectores"
+            clearLabel="Todos"
+            disabled={!distritoActivo}
+            onPreview={previsualizarSector}
+            onZoom={handleZoomSector}
+          />
+        </>
       )}
     </div>
   );
@@ -189,120 +269,6 @@ function GrupoPill({
       )}
       <span>{grupo.nombre}</span>
     </button>
-  );
-}
-
-// Grupo colapsable provincia → distritos: marcar la provincia expande la lista de
-// sus distritos; desmarcarla la colapsa y limpia la selección de distritos (y de los
-// sectores dentro de ellos, ver ubicacionStore.toggleProvincia) para no dejar
-// selección "invisible" en un grupo cerrado.
-function ProvinciaGroup({
-  nombre,
-  activa,
-  onToggle,
-  distritos,
-  distritosActivos,
-  onToggleDistrito,
-  sectores,
-  sectoresActivos,
-  onToggleSector,
-}: {
-  nombre: string;
-  activa: boolean;
-  onToggle: () => void;
-  distritos: ApiDistrito[];
-  distritosActivos: Set<string>;
-  onToggleDistrito: (id: string) => void;
-  sectores: ApiSector[];
-  sectoresActivos: Set<string>;
-  onToggleSector: (id: string) => void;
-}) {
-  // Expansion visual (chevron) separada del filtro (check): permite ver las 3
-  // provincias siempre y expandir solo una sin perder los filtros activos de otra.
-  const [abierta, setAbierta] = useState(activa);
-  return (
-    <div style={{ marginBottom: 4 }}>
-      <div style={provinciaRow}>
-        <input
-          type="checkbox"
-          checked={activa}
-          onChange={onToggle}
-          style={checkboxInput}
-          aria-label={`Filtrar por ${nombre}`}
-        />
-        <button
-          type="button"
-          onClick={() => setAbierta((v) => !v)}
-          aria-expanded={abierta}
-          style={provinciaToggleBtn}
-        >
-          <span style={provinciaLabel}>{nombre}</span>
-          <span style={{ ...chevron, transform: abierta ? 'rotate(0deg)' : 'rotate(-90deg)' }}>
-            ▾
-          </span>
-        </button>
-      </div>
-
-      {abierta && (
-        <div style={distritoList}>
-          {distritos.map((distrito) => (
-            <DistritoGroup
-              key={distrito.id}
-              nombre={distrito.nombre}
-              activa={distritosActivos.has(distrito.id)}
-              onToggle={() => onToggleDistrito(distrito.id)}
-              sectores={sectores.filter((s) => s.distritoId === distrito.id)}
-              sectoresActivos={sectoresActivos}
-              onToggleSector={onToggleSector}
-            />
-          ))}
-        </div>
-      )}
-    </div>
-  );
-}
-
-// Mismo patrón un nivel abajo: solo se ve la sublista de sectores si el distrito
-// tiene alguno (la mayoría no tiene ninguno — sectores es un catastro comercial
-// parcial, ver decisión en la conversación).
-function DistritoGroup({
-  nombre,
-  activa,
-  onToggle,
-  sectores,
-  sectoresActivos,
-  onToggleSector,
-}: {
-  nombre: string;
-  activa: boolean;
-  onToggle: () => void;
-  sectores: ApiSector[];
-  sectoresActivos: Set<string>;
-  onToggleSector: (id: string) => void;
-}) {
-  return (
-    <div>
-      <label style={distritoRow}>
-        <input type="checkbox" checked={activa} onChange={onToggle} style={checkboxInputSmall} />
-        <span style={distritoLabel}>{nombre}</span>
-      </label>
-
-      {activa && sectores.length > 0 && (
-        <div style={sectorList}>
-          {sectores.map((sector) => (
-            <label key={sector.id} style={sectorRow}>
-              <input
-                type="checkbox"
-                checked={sectoresActivos.has(sector.id)}
-                onChange={() => onToggleSector(sector.id)}
-                style={checkboxInputTiny}
-              />
-              <span style={sectorLabel}>{sector.nombre}</span>
-            </label>
-          ))}
-        </div>
-      )}
-    </div>
   );
 }
 
@@ -399,12 +365,6 @@ const ubicacionHeader: CSSProperties = {
   marginBottom: 8,
 };
 
-const chevron: CSSProperties = {
-  fontSize: 11,
-  color: 'var(--map-text-muted)',
-  transition: 'transform 150ms',
-};
-
 const grupoSectionLabel: CSSProperties = {
   fontSize: 10,
   fontWeight: 700,
@@ -412,6 +372,13 @@ const grupoSectionLabel: CSSProperties = {
   letterSpacing: 0.8,
   marginTop: 8,
   marginBottom: 8,
+};
+
+const fieldLabel: CSSProperties = {
+  fontSize: 11,
+  color: 'var(--map-text-muted)',
+  marginTop: 8,
+  marginBottom: 4,
 };
 
 const grupoRow: CSSProperties = {
@@ -438,6 +405,29 @@ const prioridadDot: CSSProperties = {
   boxSizing: 'border-box',
   cursor: 'pointer',
   transition: 'opacity 150ms',
+  flexShrink: 0,
+};
+
+const fechaRow: CSSProperties = {
+  display: 'flex',
+  alignItems: 'center',
+  gap: 6,
+};
+
+const fechaInput: CSSProperties = {
+  flex: 1,
+  minWidth: 0,
+  padding: '6px 6px',
+  fontSize: 11.5,
+  borderRadius: 8,
+  border: '1px solid var(--map-border)',
+  backgroundColor: 'var(--map-surface)',
+  color: 'var(--map-text)',
+};
+
+const fechaSeparador: CSSProperties = {
+  fontSize: 12,
+  color: 'var(--map-text-muted)',
   flexShrink: 0,
 };
 
@@ -496,100 +486,4 @@ const capaRow: CSSProperties = {
   paddingTop: 7,
   paddingBottom: 7,
   borderBottom: '1px solid var(--map-surface-alt)',
-};
-
-const provinciaRow: CSSProperties = {
-  display: 'flex',
-  alignItems: 'center',
-  gap: 8,
-  paddingTop: 6,
-  paddingBottom: 6,
-};
-
-const provinciaToggleBtn: CSSProperties = {
-  flex: 1,
-  display: 'flex',
-  alignItems: 'center',
-  justifyContent: 'space-between',
-  background: 'none',
-  border: 'none',
-  padding: 0,
-  cursor: 'pointer',
-  textAlign: 'left',
-};
-
-const provinciaLabel: CSSProperties = {
-  fontSize: 12.5,
-  fontWeight: '600',
-  color: 'var(--map-text)',
-};
-
-const distritoList: CSSProperties = {
-  display: 'flex',
-  flexDirection: 'column',
-  marginLeft: 22,
-  paddingLeft: 10,
-  borderLeft: '1.5px solid var(--map-border)',
-  marginBottom: 4,
-};
-
-const distritoRow: CSSProperties = {
-  display: 'flex',
-  alignItems: 'center',
-  gap: 8,
-  paddingTop: 4,
-  paddingBottom: 4,
-  cursor: 'pointer',
-};
-
-const distritoLabel: CSSProperties = {
-  fontSize: 12,
-  color: 'var(--map-text-muted)',
-};
-
-const sectorList: CSSProperties = {
-  display: 'flex',
-  flexDirection: 'column',
-  marginLeft: 20,
-  paddingLeft: 9,
-  borderLeft: '1.5px solid var(--map-surface-alt)',
-  marginBottom: 2,
-};
-
-const sectorRow: CSSProperties = {
-  display: 'flex',
-  alignItems: 'center',
-  gap: 7,
-  paddingTop: 3,
-  paddingBottom: 3,
-  cursor: 'pointer',
-};
-
-const sectorLabel: CSSProperties = {
-  fontSize: 11.5,
-  color: 'var(--map-text-muted)',
-};
-
-const checkboxInput: CSSProperties = {
-  width: 15,
-  height: 15,
-  accentColor: 'var(--map-accent)',
-  cursor: 'pointer',
-  flexShrink: 0,
-};
-
-const checkboxInputSmall: CSSProperties = {
-  width: 13,
-  height: 13,
-  accentColor: 'var(--map-accent)',
-  cursor: 'pointer',
-  flexShrink: 0,
-};
-
-const checkboxInputTiny: CSSProperties = {
-  width: 12,
-  height: 12,
-  accentColor: 'var(--map-accent)',
-  cursor: 'pointer',
-  flexShrink: 0,
 };

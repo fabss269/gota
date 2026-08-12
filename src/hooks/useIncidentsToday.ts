@@ -9,8 +9,12 @@ import { useUbicacionStore } from '@/state/ubicacionStore';
 
 /** `rangoFechas` (preset del filtro) -> parámetros de fecha que espera el backend
  * (API.md § 3: fecha=hoy es un atajo especial; fechaDesde/fechaHasta son fechas
- * ISO sueltas). 'todo' no manda ningún parámetro de fecha. */
-function paramsDeFecha(rango: RangoFechas): Record<string, string> {
+ * ISO sueltas). 'todo' no manda ningún parámetro de fecha. Si el usuario eligió un
+ * rango explícito (dos <input type="date">, FiltersSidebar web) con AMBOS extremos
+ * seteados, ese manda sobre el preset — mismos nombres de query param, el backend
+ * ya los soporta (app/shared/deps.py). */
+function paramsDeFecha(rango: RangoFechas, fechaDesde: string | null, fechaHasta: string | null): Record<string, string> {
+  if (fechaDesde && fechaHasta) return { fechaDesde, fechaHasta };
   if (rango === 'hoy') return { fecha: 'hoy' };
   if (rango === 'todo') return {};
 
@@ -41,9 +45,11 @@ export function useIncidentsToday() {
   const tipoAtencion = useFiltersStore((s) => s.tipoAtencion);
   const estado = useFiltersStore((s) => s.estado);
   const rangoFechas = useFiltersStore((s) => s.rangoFechas);
+  const fechaDesde = useFiltersStore((s) => s.fechaDesde);
+  const fechaHasta = useFiltersStore((s) => s.fechaHasta);
   const soloNoResueltas = useFiltersStore((s) => s.soloNoResueltas);
-  const distritosActivos = useUbicacionStore((s) => s.distritosActivos);
-  const sectoresActivos = useUbicacionStore((s) => s.sectoresActivos);
+  const distritoActivo = useUbicacionStore((s) => s.distritoActivo);
+  const sectorActivo = useUbicacionStore((s) => s.sectorActivo);
 
   return useQuery({
     queryKey: [
@@ -53,30 +59,30 @@ export function useIncidentsToday() {
       tipoAtencion,
       estado,
       rangoFechas,
+      fechaDesde,
+      fechaHasta,
       soloNoResueltas,
-      [...distritosActivos],
-      [...sectoresActivos],
+      distritoActivo,
+      sectorActivo,
     ],
     queryFn: async () => {
       const params = new URLSearchParams({
         categoria: categorias.join(','),
         prioridad: prioridades.join(','),
         pageSize: '100',
-        ...paramsDeFecha(rangoFechas),
+        ...paramsDeFecha(rangoFechas, fechaDesde, fechaHasta),
       });
       if (tipoAtencion) params.set('tipoAtencionId', tipoAtencion);
       if (estado) params.set('estado', estado);
       if (soloNoResueltas) params.set('resuelto', 'false');
       // Sector manda sobre distrito si hay ambos (más específico) — mismo criterio
-      // que ya usa MapView.web.tsx para centrar la cámara. distritoId es un solo
-      // valor en el backend (IncidenciaService.listar lo pasa directo a
-      // listar_sectores, no lo separa por coma como sectorId) — tomar el primero
-      // alcanza porque UbicacionPicker (la UI que llena este store acá) es de
-      // selección única para distrito.
-      if (sectoresActivos.size > 0) {
-        params.set('sectorId', [...sectoresActivos].join(','));
-      } else if (distritosActivos.size > 0) {
-        params.set('distritoId', [...distritosActivos][0]);
+      // que ya usa MapView.web.tsx para centrar la cámara. Ambos son selección
+      // única ahora (rediseño 2026-08-11, ver ubicacionStore.ts) — ya no hace
+      // falta desambiguar un Set a un solo valor.
+      if (sectorActivo) {
+        params.set('sectorId', sectorActivo);
+      } else if (distritoActivo) {
+        params.set('distritoId', distritoActivo);
       }
 
       const response = await apiFetch<ApiIncidenciaListResponse>(`/incidencias?${params.toString()}`);

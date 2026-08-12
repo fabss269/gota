@@ -24,7 +24,7 @@ import {
   SIMULACION_ISOLATE_LAYERS,
   SIMULACION_OCULTAR_EN_VISTA,
   colorForSectorId,
-  unionBbox,
+  sectorIdsEfectivos,
   type ElementoRedTipo,
 } from '@/components/map/mapLayers';
 import { SimulacionBorderOverlay } from '@/components/map/SimulacionBorderOverlay.web';
@@ -266,7 +266,12 @@ export function EpselMapView({ clusters, onPressCluster, onElementClick, element
   }, [capasVisibles]);
 
   const sectores = useUbicacionStore((state) => state.sectores);
-  const sectoresActivos = useUbicacionStore((state) => state.sectoresActivos);
+  const distritos = useUbicacionStore((state) => state.distritos);
+  const provincias = useUbicacionStore((state) => state.provincias);
+  const provinciaActiva = useUbicacionStore((state) => state.provinciaActiva);
+  const distritoActivo = useUbicacionStore((state) => state.distritoActivo);
+  const sectorActivo = useUbicacionStore((state) => state.sectorActivo);
+  const sectorPreview = useUbicacionStore((state) => state.sectorPreview);
 
   useEffect(() => {
     const map = mapRef.current;
@@ -291,13 +296,26 @@ export function EpselMapView({ clusters, onPressCluster, onElementClick, element
         }
       }
 
-      // El pintado es opcional (toggle "Resaltar sector" en UBICACIÓN): el sector
-      // sigue "activo" para filtrar catastro y mover la cámara, solo se deja de
-      // dibujar el polígono si el usuario no lo quiere ver.
+      // El pintado es opcional (toggle "Resaltar sector" en UBICACIÓN): el nivel
+      // activo (sector, o su cascada a distrito/provincia — ver sectorIdsEfectivos)
+      // sigue mandando sobre el filtro de catastro y la cámara aunque el usuario no
+      // quiera ver el polígono. El "ojito" (sectorPreview) se une acá -y SOLO acá-
+      // para previsualizar un sector sin tocarlo como filtro real (nunca entra en
+      // applyCatastroSectorFilter de abajo).
       const resaltarActivo = useCapasStore.getState().capasVisibles.has('resaltar_sector');
-      const idsActivos = resaltarActivo
-        ? [...useUbicacionStore.getState().sectoresActivos].map(Number)
+      const state = useUbicacionStore.getState();
+      const idsCascada = resaltarActivo
+        ? sectorIdsEfectivos({
+            sectores: state.sectores,
+            distritos: state.distritos,
+            provinciaActiva: state.provinciaActiva,
+            distritoActivo: state.distritoActivo,
+            sectorActivo: state.sectorActivo,
+          })
         : [];
+      const idsActivos = state.sectorPreview
+        ? [...new Set([...idsCascada, Number(state.sectorPreview)])]
+        : idsCascada;
       const filtro: maplibregl.FilterSpecification = ['in', ['get', 'sectorid'], ['literal', idsActivos]];
       for (const layerId of SECTOR_LAYER_IDS) {
         if (JSON.stringify(map.getFilter(layerId) ?? null) !== JSON.stringify(filtro)) {
@@ -312,17 +330,26 @@ export function EpselMapView({ clusters, onPressCluster, onElementClick, element
     return () => {
       map.off('styledata', applySectorHighlight);
     };
-  }, [sectores, sectoresActivos, capasVisibles]);
+  }, [sectores, distritos, provinciaActiva, distritoActivo, sectorActivo, sectorPreview, capasVisibles]);
 
-  // Con un sector marcado, todo lo de catastro (predio, alcantarillado, agua) se
-  // acota a ese sector — sin sector activo, cada capa vuelve a su filtro base (o a
-  // ninguno) tal como estaba antes de marcar algo.
+  // Con un sector/distrito/provincia activo, todo lo de catastro (predio,
+  // alcantarillado, agua) se acota a los sectores correspondientes (cascada, ver
+  // sectorIdsEfectivos) — sin nada activo, cada capa vuelve a su filtro base (o a
+  // ninguno) tal como estaba antes de marcar algo. El "ojito" (sectorPreview)
+  // NUNCA entra acá — solo lo pinta applySectorHighlight de arriba.
   useEffect(() => {
     const map = mapRef.current;
     if (!map) return;
 
     const applyCatastroSectorFilter = () => {
-      const idsActivos = [...useUbicacionStore.getState().sectoresActivos].map(Number);
+      const state = useUbicacionStore.getState();
+      const idsActivos = sectorIdsEfectivos({
+        sectores: state.sectores,
+        distritos: state.distritos,
+        provinciaActiva: state.provinciaActiva,
+        distritoActivo: state.distritoActivo,
+        sectorActivo: state.sectorActivo,
+      });
       const sectorFilter: maplibregl.FilterSpecification = ['in', ['get', 'sectorid'], ['literal', idsActivos]];
 
       for (const { id, baseFilter } of CATASTRO_SECTOR_FILTER_LAYERS) {
@@ -346,34 +373,30 @@ export function EpselMapView({ clusters, onPressCluster, onElementClick, element
     return () => {
       map.off('styledata', applyCatastroSectorFilter);
     };
-  }, [sectoresActivos]);
+  }, [sectores, distritos, provinciaActiva, distritoActivo, sectorActivo]);
 
-  const provincias = useUbicacionStore((state) => state.provincias);
-  const distritos = useUbicacionStore((state) => state.distritos);
-  const provinciasActivas = useUbicacionStore((state) => state.provinciasActivas);
-  const distritosActivos = useUbicacionStore((state) => state.distritosActivos);
   const lastBoundsKeyRef = useRef<string | null>(null);
 
-  // El nivel más específico con algo marcado manda la cámara: si hay un sector
-  // activo, gana sobre distrito/provincia (que igual siguen marcados como filtro
-  // de datos, solo dejan de mover el mapa). Varios ítems activos en el mismo nivel
-  // encuadran la unión de sus bbox.
+  // El nivel más específico con algo activo manda la cámara: sector > distrito >
+  // provincia (mismo orden que sectorIdsEfectivos). Selección única en cada nivel
+  // (rediseño 2026-08-11) — ya no hace falta unionBbox, se encuadra el bbox propio
+  // del único ítem activo en ese nivel.
   useEffect(() => {
     const map = mapRef.current;
     if (!map) return;
 
     const state = useUbicacionStore.getState();
-    let activos: { id: string; bbox: ApiBbox }[];
+    let activo: { id: string; bbox: ApiBbox } | undefined;
     let nivel: string;
 
-    if (state.sectoresActivos.size > 0) {
-      activos = state.sectores.filter((s) => state.sectoresActivos.has(s.id));
+    if (state.sectorActivo) {
+      activo = state.sectores.find((s) => s.id === state.sectorActivo);
       nivel = 'sector';
-    } else if (state.distritosActivos.size > 0) {
-      activos = state.distritos.filter((d) => state.distritosActivos.has(d.id));
+    } else if (state.distritoActivo) {
+      activo = state.distritos.find((d) => d.id === state.distritoActivo);
       nivel = 'distrito';
-    } else if (state.provinciasActivas.size > 0) {
-      activos = state.provincias.filter((p) => state.provinciasActivas.has(p.id));
+    } else if (state.provinciaActiva) {
+      activo = state.provincias.find((p) => p.id === state.provinciaActiva);
       nivel = 'provincia';
     } else {
       return;
@@ -381,15 +404,14 @@ export function EpselMapView({ clusters, onPressCluster, onElementClick, element
 
     // Guarda defensiva: un catálogo cacheado por el navegador desde antes de que
     // el backend empezara a mandar `bbox` (Cache-Control de estos endpoints es de
-    // 1h) puede traer items sin bbox — se ignoran en vez de romper el fitBounds.
-    activos = activos.filter((a) => a.bbox);
-    if (activos.length === 0) return;
+    // 1h) puede traer items sin bbox — se ignora en vez de romper el fitBounds.
+    if (!activo?.bbox) return;
 
-    const key = `${nivel}:${activos.map((a) => a.id).sort().join(',')}`;
+    const key = `${nivel}:${activo.id}`;
     if (key === lastBoundsKeyRef.current) return;
     lastBoundsKeyRef.current = key;
 
-    const bbox = unionBbox(activos.map((a) => a.bbox));
+    const bbox = activo.bbox;
     // maxZoom 17 uniforme (antes era 19 para sector): a z=17 ya se ve la manzana y
     // se piden 16x menos tiles que a z=19, mejor hit-rate del cache de Martin.
     // duration:0 salta directo al zoom final en vez de animar por zooms intermedios
@@ -402,9 +424,10 @@ export function EpselMapView({ clusters, onPressCluster, onElementClick, element
       ],
       { padding: 48, maxZoom: 17, duration: 0 }
     );
-  }, [provincias, distritos, sectores, provinciasActivas, distritosActivos, sectoresActivos]);
+  }, [provincias, distritos, sectores, provinciaActiva, distritoActivo, sectorActivo]);
 
   const flyTarget = useMapSearchStore((state) => state.flyTarget);
+  const flyBoundsTarget = useMapSearchStore((state) => state.flyBoundsTarget);
   const pin = useMapSearchStore((state) => state.pin);
   const setFlying = useMapSearchStore((state) => state.setFlying);
   const pinMarkerRef = useRef<maplibregl.Marker | null>(null);
@@ -421,6 +444,22 @@ export function EpselMapView({ clusters, onPressCluster, onElementClick, element
       map.off('moveend', onMoveEnd);
     };
   }, [flyTarget, setFlying]);
+
+  // 🔍 lupa de cada fila de sector (FiltersSidebar/LocationDropdown) — solo mueve
+  // la cámara al bbox del sector, sin plantar pin, sin encender el loader del
+  // buscador y sin tocar sectorActivo/sectorPreview (no filtra ni fetchea nada).
+  useEffect(() => {
+    const map = mapRef.current;
+    if (!map || !flyBoundsTarget) return;
+    const { bbox } = flyBoundsTarget;
+    map.fitBounds(
+      [
+        [bbox.minLon, bbox.minLat],
+        [bbox.maxLon, bbox.maxLat],
+      ],
+      { padding: 48, maxZoom: 17, duration: 800 }
+    );
+  }, [flyBoundsTarget]);
 
   // Marker default de MapLibre (pin rojo SVG built-in). Se planta al buscar y se
   // limpia si el store lo resetea (`clearPin`) o si se reemplaza por otra búsqueda.

@@ -39,8 +39,8 @@ export const MapBottomSheet = forwardRef<BottomSheet, Props>(({ onSheetPositionC
   // checkboxes de CapasTab aplican al toque (sin botón "Ver en el mapa"), y si
   // el sheet se colapsara en cada toque el usuario tendría que reabrirlo para
   // tildar la siguiente capa — justo la fricción que se quería sacar.
-  const sectoresActivos = useUbicacionStore((s) => s.sectoresActivos);
-  const distritosActivos = useUbicacionStore((s) => s.distritosActivos);
+  const sectorActivo = useUbicacionStore((s) => s.sectorActivo);
+  const distritoActivo = useUbicacionStore((s) => s.distritoActivo);
   const isFirstRender = useRef(true);
 
   useEffect(() => {
@@ -49,7 +49,7 @@ export const MapBottomSheet = forwardRef<BottomSheet, Props>(({ onSheetPositionC
       return;
     }
     sheetRef.current?.snapToIndex(0);
-  }, [sectoresActivos, distritosActivos]);
+  }, [sectorActivo, distritoActivo]);
 
   return (
     <BottomSheet
