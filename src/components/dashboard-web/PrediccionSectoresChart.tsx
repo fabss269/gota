@@ -1,8 +1,8 @@
-import { StyleSheet, Text, View } from 'react-native';
 import { Bar } from 'react-chartjs-2';
 
 import { makeBarValueLabelsPlugin } from '@/components/dashboard-web/barValueLabelsPlugin';
-import { Colors, Radius, Spacing } from '@/constants/theme';
+import { ChartCard, ChartTable, type ChartTableColumn } from '@/components/dashboard-web/ChartCard';
+import { Colors } from '@/constants/theme';
 import { usePrediccionSectores } from '@/hooks/useDashboardGeo';
 
 import { ensureChartRegistered } from './ChartSetup';
@@ -23,9 +23,24 @@ const ETIQUETA_TENDENCIA: Record<string, string> = {
   estable: '→ Estable',
 };
 
+type Row = {
+  sectorid: number;
+  sector: string;
+  tendencia: string;
+  pred_proximo_mes: number;
+  cambio_pct_mensual: number;
+};
+
+const COLUMNAS: ChartTableColumn<Row>[] = [
+  { header: 'Sector', render: (r) => r.sector.replace('CHICLAYO - ', '') },
+  { header: 'Previsto', align: 'right', render: (r) => r.pred_proximo_mes.toFixed(1) },
+  { header: 'Tendencia', align: 'right', render: (r) => `${ETIQUETA_TENDENCIA[r.tendencia] ?? r.tendencia} (${r.cambio_pct_mensual.toFixed(1)}%/mes)` },
+];
+
 /** Predicción de sectores en riesgo (regresión lineal simple, 6 meses de
  * lookback) — barra horizontal ordenada por volumen previsto, coloreada por
- * tendencia para lectura ejecutiva rápida. */
+ * tendencia para lectura ejecutiva rápida. Sin modo torta: la métrica es una
+ * predicción/tendencia, no una proporción de un total. */
 export function PrediccionSectoresChart() {
   const { data, isLoading } = usePrediccionSectores(6);
   const rows = [...(data ?? [])]
@@ -70,37 +85,19 @@ export function PrediccionSectoresChart() {
   };
 
   return (
-    <View style={styles.card}>
-      <Text style={styles.titulo}>Sectores en riesgo — predicción</Text>
-      <Text style={styles.subtitulo}>
-        Regresión lineal sobre 6 meses. Rojo = creciente, verde = decreciente, gris = estable.
-      </Text>
-      <View style={styles.chartWrap}>
-        {isLoading ? (
-          <Text style={styles.muted}>Cargando…</Text>
-        ) : rows.length === 0 ? (
-          <Text style={styles.muted}>Sin datos</Text>
-        ) : (
-          // @ts-ignore
-          <Bar data={chartData} options={options} plugins={[valueLabels]} />
-        )}
-      </View>
-    </View>
+    <ChartCard
+      titulo="Sectores en riesgo — predicción"
+      subtitulo="Regresión lineal sobre 6 meses. Rojo = creciente, verde = decreciente, gris = estable."
+      modos={['bar', 'table']}
+      cargando={isLoading}
+      vacio={rows.length === 0}
+      height={400}
+    >
+      {{
+        // @ts-ignore
+        bar: <Bar data={chartData} options={options} plugins={[valueLabels]} />,
+        table: <ChartTable columnas={COLUMNAS} filas={rows} />,
+      }}
+    </ChartCard>
   );
 }
-
-const styles = StyleSheet.create({
-  card: {
-    backgroundColor: Colors.surface,
-    borderRadius: Radius.md,
-    padding: Spacing.md,
-    borderWidth: 1,
-    borderColor: Colors.border,
-    flex: 1,
-    height: 400,
-  },
-  titulo: { fontSize: 14, fontWeight: '700', color: Colors.textBody },
-  subtitulo: { fontSize: 11, color: Colors.textMuted, marginTop: 2, marginBottom: 8 },
-  chartWrap: { flex: 1 },
-  muted: { fontSize: 12, color: Colors.textMuted, textAlign: 'center', marginTop: Spacing.lg },
-});

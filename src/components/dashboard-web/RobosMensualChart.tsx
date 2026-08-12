@@ -1,7 +1,6 @@
-import { StyleSheet, Text, View } from 'react-native';
-import { Line } from 'react-chartjs-2';
+import { Bar, Line } from 'react-chartjs-2';
 
-import { Colors, Radius, Spacing } from '@/constants/theme';
+import { ChartCard, ChartTable, type ChartTableColumn } from '@/components/dashboard-web/ChartCard';
 import { useRobosMensual } from '@/hooks/useDashboardGeo';
 import { useDashboardFilters } from '@/state/dashboardFilters';
 
@@ -71,36 +70,31 @@ export function RobosMensualChart() {
     },
   };
 
+  const barData = { labels: LABELS, datasets: chartData.datasets.map((d) => ({ ...d, backgroundColor: d.borderColor, borderRadius: 3 })) };
+
+  type Row = { mes: string; anterior: number | null; actual: number | null };
+  const filas: Row[] = LABELS.map((mes, i) => ({ mes, anterior: yAnterior[i], actual: yActual[i] }));
+  const columnas: ChartTableColumn<Row>[] = [
+    { header: 'Mes', render: (r) => r.mes },
+    { header: String(anio - 1), align: 'right', render: (r) => r.anterior ?? '—' },
+    { header: String(anio), align: 'right', render: (r) => r.actual ?? '—' },
+  ];
+
   return (
-    <View style={styles.card}>
-      <Text style={styles.titulo}>Robos de medidor por mes</Text>
-      <Text style={styles.subtitulo}>
-        Comparativo {anio} vs {anio - 1}
-      </Text>
-      <View style={styles.chartWrap}>
-        {isLoading ? (
-          <Text style={styles.muted}>Cargando…</Text>
-        ) : (
-          // @ts-ignore
-          <Line data={chartData} options={options} />
-        )}
-      </View>
-    </View>
+    <ChartCard
+      titulo="Robos de medidor por mes"
+      subtitulo={`Comparativo ${anio} vs ${anio - 1}`}
+      modos={['line', 'bar', 'table']}
+      cargando={isLoading}
+      height={320}
+    >
+      {{
+        // @ts-ignore
+        line: <Line data={chartData} options={options} />,
+        // @ts-ignore
+        bar: <Bar data={barData} options={options} />,
+        table: <ChartTable columnas={columnas} filas={filas} />,
+      }}
+    </ChartCard>
   );
 }
-
-const styles = StyleSheet.create({
-  card: {
-    backgroundColor: Colors.surface,
-    borderRadius: Radius.md,
-    padding: Spacing.md,
-    borderWidth: 1,
-    borderColor: Colors.border,
-    flex: 1,
-    height: 320,
-  },
-  titulo: { fontSize: 14, fontWeight: '700', color: Colors.textBody },
-  subtitulo: { fontSize: 11, color: Colors.textMuted, marginTop: 2, marginBottom: 8 },
-  chartWrap: { flex: 1 },
-  muted: { fontSize: 12, color: Colors.textMuted, textAlign: 'center', marginTop: Spacing.lg },
-});

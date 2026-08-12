@@ -1,12 +1,13 @@
 import { useQuery } from '@tanstack/react-query';
 import { useMemo, useState } from 'react';
 import { Pressable, StyleSheet, Text, View } from 'react-native';
-import { Bar } from 'react-chartjs-2';
+import { Bar, Pie } from 'react-chartjs-2';
 
 import { getDistritos, getProvincias, getSectores } from '@/api/catalogos';
 import type { GrupoRed } from '@/api/dashboardGeo';
 import { makeBarValueLabelsPlugin } from '@/components/dashboard-web/barValueLabelsPlugin';
-import { Colors, Radius, Spacing } from '@/constants/theme';
+import { ChartCard, ChartTable, type ChartTableColumn } from '@/components/dashboard-web/ChartCard';
+import { Colors, Spacing } from '@/constants/theme';
 import { useLongitudPorMaterial } from '@/hooks/useDashboardGeo';
 
 import { ensureChartRegistered } from './ChartSetup';
@@ -19,6 +20,13 @@ function metros(n: number): string {
 }
 
 const valueLabels = makeBarValueLabelsPlugin(metros);
+
+type Row = { material: string; metros: number };
+
+const COLUMNAS: ChartTableColumn<Row>[] = [
+  { header: 'Material', render: (r) => r.material },
+  { header: 'Longitud', align: 'right', render: (r) => metros(r.metros) },
+];
 
 /** Longitud de tubería por material — barra horizontal, filtrable por
  * sector/distrito/provincia y diámetro (solo agua). Muchas categorías
@@ -56,121 +64,122 @@ export function LongitudPorMaterialChart() {
     grupo, distritoId, provinciaId, sectorId, diametro: diametroNum,
   });
   const rows = [...(data ?? [])].sort((a, b) => b.metros - a.metros);
+  const colorGrupo = grupo === 'agua' ? Colors.agua : Colors.desague;
 
-  const chartData = {
+  const barData = {
     labels: rows.map((r) => r.material),
-    datasets: [
-      {
-        label: 'Metros de tubería',
-        data: rows.map((r) => r.metros),
-        backgroundColor: grupo === 'agua' ? Colors.agua : Colors.desague,
-        borderRadius: 4,
-      },
-    ],
+    datasets: [{ label: 'Metros de tubería', data: rows.map((r) => r.metros), backgroundColor: colorGrupo, borderRadius: 4 }],
   };
-
-  const options: any = {
+  const barOptions: any = {
     indexAxis: 'y',
     responsive: true,
     maintainAspectRatio: false,
     layout: { padding: { right: 48 } },
-    scales: {
-      x: { beginAtZero: true, grid: { color: '#e5e7eb' } },
-      y: { grid: { display: false } },
-    },
+    scales: { x: { beginAtZero: true, grid: { color: '#e5e7eb' } }, y: { grid: { display: false } } },
+    plugins: { legend: { display: false }, tooltip: { callbacks: { label: (ctx: any) => ` ${metros(ctx.parsed.x)}` } } },
+  };
+
+  const pieData = {
+    labels: rows.map((r) => r.material),
+    datasets: [{ data: rows.map((r) => r.metros), backgroundColor: colorGrupo, borderColor: Colors.surface, borderWidth: 2 }],
+  };
+  const pieOptions: any = {
+    responsive: true,
+    maintainAspectRatio: false,
     plugins: {
-      legend: { display: false },
-      tooltip: {
-        callbacks: {
-          label: (ctx: any) => ` ${metros(ctx.parsed.x)}`,
-        },
-      },
+      legend: { position: 'bottom' as const },
+      tooltip: { callbacks: { label: (ctx: any) => ` ${ctx.label}: ${metros(ctx.parsed)}` } },
     },
   };
 
-  return (
-    <View style={styles.card}>
-      <Text style={styles.titulo}>Longitud de red por material</Text>
-      <Text style={styles.subtitulo}>Metros de tubería instalada, por tipo de material</Text>
-
-      <View style={styles.filtros}>
-        <View style={styles.pillGroup}>
-          {(['agua', 'alcantarillado'] as const).map((g) => (
-            <Pressable
-              key={g}
-              style={[styles.pill, grupo === g && styles.pillActivo]}
-              onPress={() => setGrupo(g)}
-            >
-              <Text style={[styles.pillText, grupo === g && styles.pillTextActivo]}>
-                {g === 'agua' ? 'Agua' : 'Alcantarillado'}
-              </Text>
-            </Pressable>
-          ))}
-        </View>
-
-        <select
-          value={provinciaId ?? ''}
-          onChange={(e) => {
-            setProvinciaId(e.target.value || null);
-            setDistritoId(null);
-          }}
-          style={selectStyle as any}
-        >
-          <option value="">Todas las provincias</option>
-          {(provincias ?? []).map((p) => (
-            <option key={p.id} value={p.id}>{p.nombre}</option>
-          ))}
-        </select>
-
-        <select
-          value={distritoId ?? ''}
-          onChange={(e) => {
-            setDistritoId(e.target.value || null);
-            setSectorId(null);
-          }}
-          style={selectStyle as any}
-        >
-          <option value="">Todos los distritos</option>
-          {distritosFiltrados.map((d) => (
-            <option key={d.id} value={d.id}>{d.nombre}</option>
-          ))}
-        </select>
-
-        <select
-          value={sectorId ?? ''}
-          onChange={(e) => setSectorId(e.target.value || null)}
-          style={selectStyle as any}
-        >
-          <option value="">Todos los sectores</option>
-          {(sectores ?? []).map((s) => (
-            <option key={s.id} value={s.id}>{s.nombre}</option>
-          ))}
-        </select>
-
-        {grupo === 'agua' && (
-          <input
-            type="number"
-            placeholder="Diámetro (pulg.)"
-            value={diametro}
-            onChange={(e) => setDiametro(e.target.value)}
-            style={{ ...selectStyle, width: 130 } as any}
-            min={0}
-            step={0.5}
-          />
-        )}
+  const filtros = (
+    <View style={styles.filtros}>
+      <View style={styles.pillGroup}>
+        {(['agua', 'alcantarillado'] as const).map((g) => (
+          <Pressable
+            key={g}
+            style={[styles.pill, grupo === g && styles.pillActivo]}
+            onPress={() => setGrupo(g)}
+          >
+            <Text style={[styles.pillText, grupo === g && styles.pillTextActivo]}>
+              {g === 'agua' ? 'Agua' : 'Alcantarillado'}
+            </Text>
+          </Pressable>
+        ))}
       </View>
 
-      <View style={styles.chartWrap}>
-        {isLoading ? (
-          <Text style={styles.muted}>Cargando…</Text>
-        ) : rows.length === 0 ? (
-          <Text style={styles.muted}>Sin datos para este filtro</Text>
-        ) : (
-          // @ts-ignore
-          <Bar data={chartData} options={options} plugins={[valueLabels]} />
-        )}
-      </View>
+      <select
+        value={provinciaId ?? ''}
+        onChange={(e) => {
+          setProvinciaId(e.target.value || null);
+          setDistritoId(null);
+        }}
+        style={selectStyle as any}
+      >
+        <option value="">Todas las provincias</option>
+        {(provincias ?? []).map((p) => (
+          <option key={p.id} value={p.id}>{p.nombre}</option>
+        ))}
+      </select>
+
+      <select
+        value={distritoId ?? ''}
+        onChange={(e) => {
+          setDistritoId(e.target.value || null);
+          setSectorId(null);
+        }}
+        style={selectStyle as any}
+      >
+        <option value="">Todos los distritos</option>
+        {distritosFiltrados.map((d) => (
+          <option key={d.id} value={d.id}>{d.nombre}</option>
+        ))}
+      </select>
+
+      <select
+        value={sectorId ?? ''}
+        onChange={(e) => setSectorId(e.target.value || null)}
+        style={selectStyle as any}
+      >
+        <option value="">Todos los sectores</option>
+        {(sectores ?? []).map((s) => (
+          <option key={s.id} value={s.id}>{s.nombre}</option>
+        ))}
+      </select>
+
+      {grupo === 'agua' && (
+        <input
+          type="number"
+          placeholder="Diámetro (pulg.)"
+          value={diametro}
+          onChange={(e) => setDiametro(e.target.value)}
+          style={{ ...selectStyle, width: 130 } as any}
+          min={0}
+          step={0.5}
+        />
+      )}
     </View>
+  );
+
+  return (
+    <ChartCard
+      titulo="Longitud de red por material"
+      subtitulo="Metros de tubería instalada, por tipo de material"
+      modos={['bar', 'pie', 'table']}
+      cargando={isLoading}
+      vacio={rows.length === 0}
+      vacioMensaje="Sin datos para este filtro"
+      height={420}
+      filtros={filtros}
+    >
+      {{
+        // @ts-ignore
+        bar: <Bar data={barData} options={barOptions} plugins={[valueLabels]} />,
+        // @ts-ignore
+        pie: <Pie data={pieData} options={pieOptions} />,
+        table: <ChartTable columnas={COLUMNAS} filas={rows} />,
+      }}
+    </ChartCard>
   );
 }
 
@@ -185,17 +194,6 @@ const selectStyle = {
 };
 
 const styles = StyleSheet.create({
-  card: {
-    backgroundColor: Colors.surface,
-    borderRadius: Radius.md,
-    padding: Spacing.md,
-    borderWidth: 1,
-    borderColor: Colors.border,
-    flex: 1,
-    height: 420,
-  },
-  titulo: { fontSize: 14, fontWeight: '700', color: Colors.textBody },
-  subtitulo: { fontSize: 11, color: Colors.textMuted, marginTop: 2, marginBottom: 8 },
   filtros: { flexDirection: 'row', gap: Spacing.sm, flexWrap: 'wrap', marginBottom: Spacing.sm },
   pillGroup: {
     flexDirection: 'row',
@@ -207,6 +205,4 @@ const styles = StyleSheet.create({
   pillActivo: { backgroundColor: Colors.accent },
   pillText: { fontSize: 12, color: Colors.textMuted, fontWeight: '600' },
   pillTextActivo: { color: Colors.white },
-  chartWrap: { flex: 1 },
-  muted: { fontSize: 12, color: Colors.textMuted, textAlign: 'center', marginTop: Spacing.lg },
 });

@@ -1,7 +1,6 @@
-import { StyleSheet, Text, View } from 'react-native';
-import { Line } from 'react-chartjs-2';
+import { Bar, Line } from 'react-chartjs-2';
 
-import { Colors, Radius, Spacing } from '@/constants/theme';
+import { ChartCard, ChartTable, type ChartTableColumn } from '@/components/dashboard-web/ChartCard';
 import { useSerieMensual } from '@/hooks/useDashboardGeo';
 
 import { ensureChartRegistered } from './ChartSetup';
@@ -90,37 +89,33 @@ export function MonthlyLineChart({ mostrarProyeccion = true }: Props) {
     },
   };
 
+  const barData = { labels: chartLabels, datasets: chartData.datasets.map((d) => ({ ...d, backgroundColor: d.borderColor, borderRadius: 3 })) };
+  const barOptions: any = { ...options, interaction: undefined };
+
+  type Row = { mes: string; y2025: number | null; y2026: number | null; yPred: number | null };
+  const filas: Row[] = chartLabels.map((mes, i) => ({ mes, y2025: y2025[i], y2026: y2026[i], yPred: yPred[i] }));
+  const columnas: ChartTableColumn<Row>[] = [
+    { header: 'Mes', render: (r) => r.mes },
+    { header: '2025', align: 'right', render: (r) => r.y2025 ?? '—' },
+    { header: '2026', align: 'right', render: (r) => r.y2026 ?? '—' },
+    ...(mostrarProyeccion ? [{ header: 'Proyección', align: 'right' as const, render: (r: Row) => r.yPred ?? '—' }] : []),
+  ];
+
   return (
-    <View style={styles.card}>
-      <Text style={styles.titulo}>Incidencias por mes</Text>
-      <Text style={styles.subtitulo}>
-        Comparativo 2026 vs 2025.
-        {mostrarProyeccion && ' Línea roja = proyección próximos 2 meses (regresión lineal).'}
-      </Text>
-      <View style={styles.chartWrap}>
-        {isLoading ? (
-          <Text style={styles.muted}>Cargando…</Text>
-        ) : (
-          // @ts-ignore
-          <Line data={chartData} options={options} />
-        )}
-      </View>
-    </View>
+    <ChartCard
+      titulo="Incidencias por mes"
+      subtitulo={`Comparativo 2026 vs 2025.${mostrarProyeccion ? ' Línea roja = proyección próximos 2 meses (regresión lineal).' : ''}`}
+      modos={['line', 'bar', 'table']}
+      cargando={isLoading}
+      height={320}
+    >
+      {{
+        // @ts-ignore
+        line: <Line data={chartData} options={options} />,
+        // @ts-ignore
+        bar: <Bar data={barData} options={barOptions} />,
+        table: <ChartTable columnas={columnas} filas={filas} />,
+      }}
+    </ChartCard>
   );
 }
-
-const styles = StyleSheet.create({
-  card: {
-    backgroundColor: Colors.surface,
-    borderRadius: Radius.md,
-    padding: Spacing.md,
-    borderWidth: 1,
-    borderColor: Colors.border,
-    flex: 1,
-    height: 320,
-  },
-  titulo: { fontSize: 14, fontWeight: '700', color: Colors.textBody },
-  subtitulo: { fontSize: 11, color: Colors.textMuted, marginTop: 2, marginBottom: 8 },
-  chartWrap: { flex: 1 },
-  muted: { fontSize: 12, color: Colors.textMuted, textAlign: 'center', marginTop: Spacing.lg },
-});
