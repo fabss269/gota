@@ -41,7 +41,8 @@ export default function MapaScreen() {
   const router = useRouter();
   const isDesktop = width >= DESKTOP_BP;
 
-  const { data: incidencias = [], isLoading, isError, refetch } = useIncidentsToday();
+  const { data, isLoading, isError, refetch } = useIncidentsToday();
+  const incidencias = data?.items ?? [];
   const clusters = useMemo(() => clusterIncidents(incidencias), [incidencias]);
 
   const [selectedId, setSelectedId] = useState<string | null>(null);

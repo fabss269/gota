@@ -47,7 +47,8 @@ export default function MapaScreen() {
     mapModeButtonBottom.value = withTiming(windowHeight - sheetTopY + GAP_SOBRE_SHEET, { duration: 250 });
   };
 
-  const { data: incidencias = [], isLoading, isError, refetch } = useIncidentsToday();
+  const { data, isLoading, isError, refetch } = useIncidentsToday();
+  const incidencias = data?.items ?? [];
   const clusters = useMemo(() => clusterIncidents(incidencias), [incidencias]);
   const [clusterSeleccionado, setClusterSeleccionado] = useState<IncidentCluster | null>(null);
 

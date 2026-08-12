@@ -6,6 +6,7 @@ import { getTiposGrupo } from '@/api/catalogos';
 import type { ApiTipoGrupo } from '@/api/types';
 import { LocationDropdown } from '@/components/map/LocationDropdown';
 import { LocationTree } from '@/components/map/LocationTree';
+import { TotalIncidenciasCard } from '@/components/map/TotalIncidenciasCard';
 import { Colors } from '@/constants/theme';
 import type { Categoria, EstadoIncidencia, Prioridad } from '@/mocks/incidentsMock';
 import { useFiltersStore } from '@/state/filtersStore';
@@ -74,6 +75,8 @@ export function FiltersSidebar() {
 
   return (
     <div style={sidebar}>
+      <TotalIncidenciasCard />
+
       {/* ── FILTROS ───────────────────────────────── */}
       <div style={sectionHeaderRow}>
         <span style={sectionLabel}>FILTROS</span>

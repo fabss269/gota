@@ -4,9 +4,18 @@ import { apiFetch } from '@/api/client';
 import { toIncidencia } from '@/api/mappers';
 import type { ApiIncidenciaListResponse } from '@/api/types';
 import { useDebouncedValue } from '@/hooks/useDebouncedValue';
+import type { Incidencia } from '@/mocks/incidentsMock';
 import type { RangoFechas } from '@/state/filtersStore';
 import { useFiltersStore } from '@/state/filtersStore';
 import { useUbicacionStore } from '@/state/ubicacionStore';
+
+export type IncidentesHoyResult = {
+  items: Incidencia[];
+  // Total real del backend (IncidenciaListResponse.total) — a diferencia de
+  // `items.length`, no queda capado por pageSize=100. Usado por
+  // TotalIncidenciasCard.tsx para el KPI "Total de incidencias activas".
+  total: number;
+};
 
 // Togglear varios ójitos rápido en el árbol de UBICACIÓN (LocationTree.tsx)
 // antes disparaba un fetch por cada click — bug real 2026-08-12, auditado en
@@ -108,8 +117,10 @@ export function useIncidentsToday() {
       const response = await apiFetch<ApiIncidenciaListResponse>(`/incidencias?${params.toString()}`);
       // El mapa necesita coordenadas reales para agrupar/plotear — descartar las que
       // el catastro no pudo resolver (suministro_codigo sin match en `sig`, ver
-      // memoria del backend) en vez de plotearlas en (0,0).
-      return response.items.filter((i) => i.lat !== null && i.lon !== null).map(toIncidencia);
+      // memoria del backend) en vez de plotearlas en (0,0). `total` es el conteo
+      // real del backend (sin el descarte de arriba ni el cap de pageSize).
+      const items = response.items.filter((i) => i.lat !== null && i.lon !== null).map(toIncidencia);
+      return { items, total: response.total } satisfies IncidentesHoyResult;
     },
   });
 }
