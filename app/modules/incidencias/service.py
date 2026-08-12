@@ -240,21 +240,7 @@ class IncidenciaService:
 
     @staticmethod
     def _mapear_paso(evento) -> TrazabilidadPasoOut:
-        asignado_a = None
-        grupo = None
-        if evento.usuario is not None:
-            asignado_a = f"{evento.usuario.nombres} {evento.usuario.apellidos}"
-            if evento.area is not None:
-                asignado_a += f" · {evento.area.nombre}"
-        elif evento.area is not None:
-            grupo = evento.area.nombre
-        return TrazabilidadPasoOut(
-            estado=traducir_codigo_estado_db_a_app(evento.estado_resultante.codigo),
-            fecha=evento.fecha,
-            grupo=grupo,
-            asignadoA=asignado_a,
-            nota=evento.nota,
-        )
+        return IncidenciaService._mapear_paso_con(evento, evento.usuario, evento.area)
 
     @staticmethod
     def _parse_fecha(valor: str | None) -> date | None:
@@ -435,7 +421,65 @@ class IncidenciaService:
     async def trazabilidad(self, codigo: str) -> list[TrazabilidadPasoOut]:
         incidente = await self._get_o_404(codigo)
         eventos = await self._propia.get_trazabilidad(incidente.incidente_id)
-        return [self._mapear_paso(evento) for evento in eventos]
+        return self._colapsar_trazabilidad(eventos)
+
+    @staticmethod
+    def _colapsar_trazabilidad(eventos) -> list[TrazabilidadPasoOut]:
+        """Colapsa reasignaciones silenciosas (mismo estado, no EN_PROGRESO)
+        dentro de la fila del siguiente cambio de estado. Modelo del usuario
+        (Edgar 2026-08-12): solo EN_PROGRESO puede repetirse (cada avance es
+        un evento propio); REGISTRADO/PENDIENTE/ATENDIDO aparecen una sola
+        vez. Cuando se hace PATCH /responsable estando en REGISTRADO y
+        despues PATCH /estado a PENDIENTE, hoy la BD tiene dos eventos
+        (REGISTRADO con usuario_id, PENDIENTE sin usuario) — este metodo los
+        junta: absorbe el usuario/area de la reasignacion silenciosa y se lo
+        lleva al PENDIENTE. Es un colapso de vista, no toca la BD.
+        """
+        resultado: list[TrazabilidadPasoOut] = []
+        carryover_usuario = None
+        carryover_area = None
+        prev_estado = None
+
+        for evento in eventos:
+            estado_actual = traducir_codigo_estado_db_a_app(evento.estado_resultante.codigo)
+            es_reasignacion_silenciosa = (
+                estado_actual == prev_estado and estado_actual != "EN_PROGRESO"
+            )
+            if es_reasignacion_silenciosa:
+                if evento.usuario is not None:
+                    carryover_usuario = evento.usuario
+                if evento.area is not None:
+                    carryover_area = evento.area
+                continue
+
+            usuario_efectivo = evento.usuario or carryover_usuario
+            area_efectiva = evento.area or carryover_area
+            resultado.append(
+                IncidenciaService._mapear_paso_con(evento, usuario_efectivo, area_efectiva)
+            )
+            prev_estado = estado_actual
+            carryover_usuario = None
+            carryover_area = None
+
+        return resultado
+
+    @staticmethod
+    def _mapear_paso_con(evento, usuario, area) -> TrazabilidadPasoOut:
+        asignado_a = None
+        grupo = None
+        if usuario is not None:
+            asignado_a = f"{usuario.nombres} {usuario.apellidos}"
+            if area is not None:
+                asignado_a += f" · {area.nombre}"
+        elif area is not None:
+            grupo = area.nombre
+        return TrazabilidadPasoOut(
+            estado=traducir_codigo_estado_db_a_app(evento.estado_resultante.codigo),
+            fecha=evento.fecha,
+            grupo=grupo,
+            asignadoA=asignado_a,
+            nota=evento.nota,
+        )
 
     async def predio(self, codigo: str) -> list[PredioReclamoOut]:
         incidente = await self._get_o_404(codigo)
