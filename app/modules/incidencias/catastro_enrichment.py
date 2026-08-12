@@ -99,14 +99,32 @@ class CatastroEnrichmentService:
         reiniciado o vaciado dejaba el filtro de sector devolviendo 0 resultados
         aunque la BD tuviera todo bien). Sin JOIN cross-schema (specs/00 §1): el
         resultado se usa como `WHERE suministro_codigo = ANY(...)` en la BD propia,
-        en `service.py`."""
+        en `service.py`.
+
+        Aplica la política de sector "cajaagua primero, fallback cajadesague"
+        (ver [[project-gota-sector-policy]] y `resolver_predio` arriba). Sin esa
+        política, un `UNION` plano dejaría suministros ambiguos (~2953 en SIG
+        aparecen con sector distinto en agua vs desagüe) apareciendo en dos
+        sectores a la vez — bug observado 2026-08-11: el suministro 01680664
+        salía en el filtro Sector 05 (su cajadesague.sectorid=9) aunque su
+        sector canónico es 03 (cajaagua.sectorid=1).
+        """
         if not sector_ids:
             return []
         stmt = text(
             """
-            SELECT inscripcion FROM sig.cajaagua WHERE sectorid = ANY(:sector_ids) AND inscripcion <> :sentinel
-            UNION
-            SELECT inscripcion FROM sig.cajadesague WHERE sectorid = ANY(:sector_ids) AND inscripcion <> :sentinel
+            WITH sector_por_suministro AS (
+                SELECT DISTINCT ON (inscripcion) inscripcion, sectorid
+                FROM (
+                    SELECT inscripcion, sectorid, 1 AS prio FROM sig.cajaagua
+                    WHERE inscripcion IS NOT NULL AND inscripcion <> :sentinel
+                    UNION ALL
+                    SELECT inscripcion, sectorid, 2 AS prio FROM sig.cajadesague
+                    WHERE inscripcion IS NOT NULL AND inscripcion <> :sentinel
+                ) t
+                ORDER BY inscripcion, prio, sectorid
+            )
+            SELECT inscripcion FROM sector_por_suministro WHERE sectorid = ANY(:sector_ids)
             """
         )
         result = await self._session.execute(stmt, {"sector_ids": sector_ids, "sentinel": _SENTINEL_INSCRIPCION})
@@ -117,14 +135,23 @@ class CatastroEnrichmentService:
         contraria y para TODOS los sectores de una — usado por el dashboard
         (`prioridadPorSector`) para agrupar incidentes por sector sin hacer un
         query a `sig` por sector (antes N queries a Redis, uno por sector, con el
-        mismo problema de índice-vacío-si-no-se-usó-antes)."""
+        mismo problema de índice-vacío-si-no-se-usó-antes).
+
+        Aplica la política "cajaagua primero, fallback cajadesague" — sin ella
+        un `UNION` plano dejaría un mismo suministro apareciendo en dos
+        sectores y el `dict[]` ganaría uno al azar (no determinístico).
+        """
         stmt = text(
             """
-            SELECT inscripcion, sectorid FROM sig.cajaagua
-            WHERE inscripcion <> :sentinel AND sectorid IS NOT NULL
-            UNION
-            SELECT inscripcion, sectorid FROM sig.cajadesague
-            WHERE inscripcion <> :sentinel AND sectorid IS NOT NULL
+            SELECT DISTINCT ON (inscripcion) inscripcion, sectorid
+            FROM (
+                SELECT inscripcion, sectorid, 1 AS prio FROM sig.cajaagua
+                WHERE inscripcion IS NOT NULL AND inscripcion <> :sentinel AND sectorid IS NOT NULL
+                UNION ALL
+                SELECT inscripcion, sectorid, 2 AS prio FROM sig.cajadesague
+                WHERE inscripcion IS NOT NULL AND inscripcion <> :sentinel AND sectorid IS NOT NULL
+            ) t
+            ORDER BY inscripcion, prio, sectorid
             """
         )
         result = await self._session.execute(stmt, {"sentinel": _SENTINEL_INSCRIPCION})
