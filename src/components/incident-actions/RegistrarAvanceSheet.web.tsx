@@ -5,6 +5,7 @@ import { View } from 'react-native';
 import { TecnicoOptionsList } from '@/components/incident-actions/TecnicoOptionsList';
 import { ConfirmDialog } from '@/components/shared/ConfirmDialog';
 import { Colors } from '@/constants/theme';
+import { useCambiarEstado } from '@/hooks/useCambiarEstado';
 import { useReasignarResponsable } from '@/hooks/useReasignarResponsable';
 import { useRegistrarAvance } from '@/hooks/useRegistrarAvance';
 import { useTransicionesValidas } from '@/hooks/useTransicionesValidas';
@@ -68,7 +69,14 @@ export function RegistrarAvanceSheet({
   );
   const transicionesDisponibles = transicion == null ? transicionesValidas : [];
   const transicionEfectiva = transicion ?? transicionInterna;
+  // Transiciones sin formulario (ej. CREADO→PENDIENTE) no tienen un motivo válido
+  // que mapee a ellas (MOTIVO_ESTADO del backend solo produce EN_PROGRESO/ATENDIDO)
+  // — pedir un motivo igual y mandarlo por /avances rompía con 409 (transición
+  // inválida) porque el estado resultante del motivo nunca coincidía con la
+  // transición realmente elegida. Bug real 2026-08-12, reportado por Edgar.
+  const requiereMotivo = transicionEfectiva?.requiereFormulario ?? true;
   const registrarAvance = useRegistrarAvance();
+  const cambiarEstado = useCambiarEstado();
   const reasignarResponsable = useReasignarResponsable();
 
   const hayCambiosSinGuardar = !!(motivo || nota.trim() || transicionInterna || equipo || area || tecnico);
@@ -119,7 +127,17 @@ export function RegistrarAvanceSheet({
     (motivo === 'REASIGNAR_TECNICO' && !tecnico);
 
   const handleConfirm = () => {
-    if (!motivo || !transicionEfectiva || faltaCampoDependiente) return;
+    if (!transicionEfectiva) return;
+
+    if (!requiereMotivo) {
+      cambiarEstado.mutate(
+        { id: incidenciaId, estado: transicionEfectiva.hacia },
+        { onSuccess: () => { resetState(); onRegistrado(); } }
+      );
+      return;
+    }
+
+    if (!motivo || faltaCampoDependiente) return;
 
     const notaFinal = [
       motivo === 'REQUIERE_EQUIPO' && equipo ? `Equipo requerido: ${equipo}.` : null,
@@ -143,7 +161,10 @@ export function RegistrarAvanceSheet({
     );
   };
 
-  const deshabilitarConfirmar = !motivo || !transicionEfectiva || faltaCampoDependiente || registrarAvance.isPending;
+  const deshabilitarConfirmar = !transicionEfectiva
+    || (requiereMotivo && (!motivo || faltaCampoDependiente))
+    || registrarAvance.isPending
+    || cambiarEstado.isPending;
 
   return (
     <>
@@ -176,51 +197,62 @@ export function RegistrarAvanceSheet({
               </>
             )}
 
-            <span style={sectionLabel}>¿QUÉ PASÓ?</span>
-            <div style={grid}>
-              {MOTIVOS_AVANCE.map((m) => (
-                <Chip key={m.value} label={m.label} active={motivo === m.value} onClick={() => setMotivo(m.value)} />
-              ))}
-            </div>
-
-            {motivo === 'REQUIERE_EQUIPO' && (
+            {requiereMotivo ? (
               <>
-                <span style={sectionLabel}>EQUIPO</span>
+                <span style={sectionLabel}>¿QUÉ PASÓ?</span>
                 <div style={grid}>
-                  {EQUIPO_OPTIONS.map((opt) => (
-                    <Chip key={opt} label={opt} active={equipo === opt} onClick={() => setEquipo(opt)} />
+                  {MOTIVOS_AVANCE.map((m) => (
+                    <Chip key={m.value} label={m.label} active={motivo === m.value} onClick={() => setMotivo(m.value)} />
                   ))}
                 </div>
-              </>
-            )}
 
-            {motivo === 'DERIVAR_OTRA_AREA' && (
-              <>
-                <span style={sectionLabel}>ÁREA</span>
-                <div style={grid}>
-                  {AREA_OPTIONS.map((opt) => (
-                    <Chip key={opt} label={opt} active={area === opt} onClick={() => setArea(opt)} />
-                  ))}
-                </div>
-              </>
-            )}
+                {motivo === 'REQUIERE_EQUIPO' && (
+                  <>
+                    <span style={sectionLabel}>EQUIPO</span>
+                    <div style={grid}>
+                      {EQUIPO_OPTIONS.map((opt) => (
+                        <Chip key={opt} label={opt} active={equipo === opt} onClick={() => setEquipo(opt)} />
+                      ))}
+                    </div>
+                  </>
+                )}
 
-            {motivo === 'REASIGNAR_TECNICO' && (
-              <>
-                <span style={sectionLabel}>REASIGNAR A</span>
-                <View>
-                  <TecnicoOptionsList selectedId={tecnico?.id ?? tecnicoActualId} onSelect={setTecnico} />
-                </View>
-              </>
-            )}
+                {motivo === 'DERIVAR_OTRA_AREA' && (
+                  <>
+                    <span style={sectionLabel}>ÁREA</span>
+                    <div style={grid}>
+                      {AREA_OPTIONS.map((opt) => (
+                        <Chip key={opt} label={opt} active={area === opt} onClick={() => setArea(opt)} />
+                      ))}
+                    </div>
+                  </>
+                )}
 
-            <span style={sectionLabel}>NOTA (OPCIONAL)</span>
-            <textarea
-              value={nota}
-              onChange={(e) => setNota(e.target.value)}
-              placeholder="Solo si hace falta un detalle extra…"
-              style={notaBox}
-            />
+                {motivo === 'REASIGNAR_TECNICO' && (
+                  <>
+                    <span style={sectionLabel}>REASIGNAR A</span>
+                    <View>
+                      <TecnicoOptionsList selectedId={tecnico?.id ?? tecnicoActualId} onSelect={setTecnico} />
+                    </View>
+                  </>
+                )}
+
+                <span style={sectionLabel}>NOTA (OPCIONAL)</span>
+                <textarea
+                  value={nota}
+                  onChange={(e) => setNota(e.target.value)}
+                  placeholder="Solo si hace falta un detalle extra…"
+                  style={notaBox}
+                />
+              </>
+            ) : (
+              transicionEfectiva && (
+                <p style={confirmMsg}>
+                  Se marcará esta incidencia como <strong>{ESTADO_LABEL[transicionEfectiva.hacia]}</strong>. No requiere
+                  detalle adicional.
+                </p>
+              )
+            )}
           </div>
 
           <div style={buttonsRow}>
@@ -233,7 +265,11 @@ export function RegistrarAvanceSheet({
               onClick={handleConfirm}
               disabled={deshabilitarConfirmar}
             >
-              {registrarAvance.isPending ? 'Guardando…' : 'Registrar avance'}
+              {registrarAvance.isPending || cambiarEstado.isPending
+                ? 'Guardando…'
+                : requiereMotivo
+                  ? 'Registrar avance'
+                  : 'Confirmar'}
             </button>
           </div>
         </div>
@@ -340,6 +376,11 @@ const chip: CSSProperties = {
 
 const chipActive: CSSProperties = {
   backgroundColor: Colors.accent, borderColor: Colors.accent, color: '#FFFFFF',
+};
+
+const confirmMsg: CSSProperties = {
+  fontSize: 13, color: Colors.textBody, lineHeight: 1.5,
+  marginTop: 14, marginBottom: 4,
 };
 
 const notaBox: CSSProperties = {
