@@ -357,6 +357,21 @@ class PropiaIncidenciaRepository:
         filas = await self._session.execute(select(Incidente.suministro_codigo, Incidente.creado_en))
         return list(filas.all())
 
+    async def listar_suministros_distintos(self) -> list[str]:
+        """`suministro_codigo` distintos entre TODOS los incidentes — bounded por el
+        tamaño de `gota.incidente` (miles, no cientos de miles). Usado por
+        `IncidenciaService.listar()` como "universo" para acotar
+        `catastro.listar_suministros_por_sector()` antes de filtrar incidentes por
+        sector — bug real 2026-08-12, auditado en vivo: togglear una provincia
+        grande (Chiclayo, 42 sectores) resuelve ~119k suministro_codigos en `sig`,
+        y `suministro_codigo = ANY(<119k>)` contra las ~17k filas de
+        `gota.incidente` tardaba ~805ms POR EJECUCIÓN (corre dos veces: count +
+        select). Intersectando primero contra este universo (~11.5k, la mayoría
+        de sectores no reduce mucho el universo en sí, pero SÍ acota el array final
+        a los suministros que realmente importan) baja esa misma consulta a ~44ms."""
+        result = await self._session.execute(select(Incidente.suministro_codigo).distinct())
+        return [row[0] for row in result]
+
     async def get_prioridad_real(self, incidente_id: uuid.UUID) -> int | None:
         """Prioridad real del incidente, calculada por el módulo de alertas
         (`incidente_alerta_regla`, hoy vacía — sin módulo de alertas implementado no

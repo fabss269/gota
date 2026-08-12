@@ -90,7 +90,9 @@ class CatastroEnrichmentService:
 
         return None
 
-    async def listar_suministros_por_sector(self, sector_ids: list[int]) -> list[str]:
+    async def listar_suministros_por_sector(
+        self, sector_ids: list[int], universo: list[str] | None = None
+    ) -> list[str]:
         """Códigos de suministro (== `inscripcion` en sig.cajaagua/cajadesague) de
         los sectores dados — usado para filtrar `GET /incidencias?sectorId=`/
         `distritoId=` directo contra la BD, sin depender de Redis (decisión de
@@ -101,33 +103,37 @@ class CatastroEnrichmentService:
         resultado se usa como `WHERE suministro_codigo = ANY(...)` en la BD propia,
         en `service.py`.
 
-        Aplica la política de sector "cajaagua primero, fallback cajadesague"
-        (ver [[project-gota-sector-policy]] y `resolver_predio` arriba). Sin esa
-        política, un `UNION` plano dejaría suministros ambiguos (~2953 en SIG
-        aparecen con sector distinto en agua vs desagüe) apareciendo en dos
-        sectores a la vez — bug observado 2026-08-11: el suministro 01680664
-        salía en el filtro Sector 05 (su cajadesague.sectorid=9) aunque su
-        sector canónico es 03 (cajaagua.sectorid=1).
+        Lee de `sig.suministro_sector_resuelto` (vista materializada, ver
+        sql/materializar_suministro_sector.sql) en vez de calcular el `DISTINCT ON`
+        cajaagua/cajadesague en cada request — bug real 2026-08-12, auditado en
+        vivo: togglear un sector grande (una provincia entera, ~42 sectores)
+        tardaba 3.6s; el `DISTINCT ON` sobre las ~285k filas de cajaagua+cajadesague
+        combinadas costaba ~1.3s SIEMPRE (el filtro por sectorid no se puede
+        empujar antes del dedup, así que da igual pedir 1 sector o 42 — siempre
+        escanea+ordena la tabla completa). Precalculado en la vista: mismo caso
+        baja a ~27ms (47x). La vista ya aplica la política "cajaagua primero,
+        fallback cajadesague" (ver [[project-gota-sector-policy]] y
+        `resolver_predio` arriba) al construirse — acá es un filtro directo.
+
+        `universo` (opcional, ver `PropiaIncidenciaRepository.listar_suministros_distintos`)
+        acota el resultado a los suministro_codigos que realmente aparecen en
+        `gota.incidente` — sin esto, una provincia grande devuelve ~119k códigos
+        (la mayoría de los cuales nunca tuvieron un incidente), y el caller
+        termina filtrando `gota.incidente` (~17k filas) con un array de 119k
+        elementos: ~805ms por ejecución, medido en vivo. Con `universo` acotando
+        acá primero, ese mismo filtro baja a ~44ms (18x).
         """
         if not sector_ids:
             return []
-        stmt = text(
-            """
-            WITH sector_por_suministro AS (
-                SELECT DISTINCT ON (inscripcion) inscripcion, sectorid
-                FROM (
-                    SELECT inscripcion, sectorid, 1 AS prio FROM sig.cajaagua
-                    WHERE inscripcion IS NOT NULL AND inscripcion <> :sentinel
-                    UNION ALL
-                    SELECT inscripcion, sectorid, 2 AS prio FROM sig.cajadesague
-                    WHERE inscripcion IS NOT NULL AND inscripcion <> :sentinel
-                ) t
-                ORDER BY inscripcion, prio, sectorid
-            )
-            SELECT inscripcion FROM sector_por_suministro WHERE sectorid = ANY(:sector_ids)
-            """
-        )
-        result = await self._session.execute(stmt, {"sector_ids": sector_ids, "sentinel": _SENTINEL_INSCRIPCION})
+        if universo is not None and not universo:
+            return []
+        condiciones = ["sectorid = ANY(:sector_ids)"]
+        params: dict[str, object] = {"sector_ids": sector_ids}
+        if universo is not None:
+            condiciones.append("inscripcion = ANY(:universo)")
+            params["universo"] = universo
+        stmt = text(f"SELECT inscripcion FROM sig.suministro_sector_resuelto WHERE {' AND '.join(condiciones)}")
+        result = await self._session.execute(stmt, params)
         return [row[0] for row in result if row[0]]
 
     async def mapa_suministro_a_sector(self) -> dict[str, int]:
@@ -137,24 +143,12 @@ class CatastroEnrichmentService:
         query a `sig` por sector (antes N queries a Redis, uno por sector, con el
         mismo problema de índice-vacío-si-no-se-usó-antes).
 
-        Aplica la política "cajaagua primero, fallback cajadesague" — sin ella
-        un `UNION` plano dejaría un mismo suministro apareciendo en dos
-        sectores y el `dict[]` ganaría uno al azar (no determinístico).
+        Lee de `sig.suministro_sector_resuelto` (ver `listar_suministros_por_sector`
+        arriba) — mismo motivo de performance, este método siempre pedía la tabla
+        completa así que era el caso MÁS costoso del `DISTINCT ON` en vivo.
         """
-        stmt = text(
-            """
-            SELECT DISTINCT ON (inscripcion) inscripcion, sectorid
-            FROM (
-                SELECT inscripcion, sectorid, 1 AS prio FROM sig.cajaagua
-                WHERE inscripcion IS NOT NULL AND inscripcion <> :sentinel AND sectorid IS NOT NULL
-                UNION ALL
-                SELECT inscripcion, sectorid, 2 AS prio FROM sig.cajadesague
-                WHERE inscripcion IS NOT NULL AND inscripcion <> :sentinel AND sectorid IS NOT NULL
-            ) t
-            ORDER BY inscripcion, prio, sectorid
-            """
-        )
-        result = await self._session.execute(stmt, {"sentinel": _SENTINEL_INSCRIPCION})
+        stmt = text("SELECT inscripcion, sectorid FROM sig.suministro_sector_resuelto")
+        result = await self._session.execute(stmt)
         return {row.inscripcion: row.sectorid for row in result}
 
     async def resolver_catastro_cercano(self, lat: float, lon: float, categoria: str) -> CatastroCercano:

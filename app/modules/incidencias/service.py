@@ -282,7 +282,16 @@ class IncidenciaService:
             if filtros.distritoId:
                 sectores = await self._sig_catalogo.listar_sectores(filtros.distritoId)
                 sector_ids.update(s["id"] for s in sectores)
-            suministro_codigos = await self._catastro.listar_suministros_por_sector([int(s) for s in sector_ids])
+            # Acota a los suministro_codigos que realmente aparecen en algún
+            # incidente (bounded por el tamaño de gota.incidente, ~11k) antes de
+            # resolver por sector — bug real 2026-08-12, auditado en vivo: sin
+            # esto, una provincia grande resuelve ~119k códigos (la mayoría sin
+            # ningún incidente) y el filtro final contra incidente tarda ~805ms
+            # por ejecución en vez de ~44ms. Ver listar_suministros_por_sector.
+            universo = await self._propia.listar_suministros_distintos()
+            suministro_codigos = await self._catastro.listar_suministros_por_sector(
+                [int(s) for s in sector_ids], universo=universo
+            )
             if not suministro_codigos:
                 return IncidenciaListResponse(items=[], page=filtros.page, pageSize=filtros.pageSize, total=0)
 
