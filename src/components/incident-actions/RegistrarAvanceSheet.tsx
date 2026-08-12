@@ -8,7 +8,6 @@ import {
   AREA_OPTIONS,
   EQUIPO_OPTIONS,
   MOTIVOS_AVANCE,
-  getTransicionesDisponibles,
   type MotivoAvance,
   type TransicionEstado,
 } from '@/mocks/estadoWorkflowMock';
@@ -16,6 +15,7 @@ import type { EstadoIncidencia } from '@/mocks/incidentsMock';
 import type { Usuario } from '@/mocks/usuariosMock';
 import { useRegistrarAvance } from '@/hooks/useRegistrarAvance';
 import { useReasignarResponsable } from '@/hooks/useReasignarResponsable';
+import { useTransicionesValidas } from '@/hooks/useTransicionesValidas';
 import { useThemeColors } from '@/state/themeStore';
 
 const ESTADO_LABEL: Record<EstadoIncidencia, string> = {
@@ -73,10 +73,11 @@ export function RegistrarAvanceSheet({
   // Transición elegida internamente cuando el prop `transicion` viene null (caso
   // del DetailPanel actual, que ya no tiene botón "Cambiar estado" separado).
   const [transicionInterna, setTransicionInterna] = useState<TransicionEstado | null>(null);
-  const transicionesDisponibles = useMemo(
-    () => (transicion == null && estadoActual ? getTransicionesDisponibles(estadoActual) : []),
-    [transicion, estadoActual],
+  const { data: transicionesValidas = [] } = useTransicionesValidas(
+    transicion == null ? incidenciaId : undefined,
+    estadoActual,
   );
+  const transicionesDisponibles = transicion == null ? transicionesValidas : [];
   const transicionEfectiva = transicion ?? transicionInterna;
   const registrarAvance = useRegistrarAvance();
   const reasignarResponsable = useReasignarResponsable();

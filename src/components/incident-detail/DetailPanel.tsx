@@ -23,7 +23,7 @@ const ESTADO_LABEL: Record<string, string> = {
 // Zoom al que hacemos flyTo desde "Ver en el mapa" — nivel media manzana.
 const ZOOM_VER_EN_MAPA = 19;
 
-type ActiveSheet = 'avance' | 'responsable' | null;
+type ActiveSheet = 'avance' | null;
 type Props = { incidenciaId: string; onClose: () => void };
 
 /** Panel lateral derecho de detalle de incidencia — layout web desktop. */
@@ -144,11 +144,11 @@ export function DetailPanel({ incidenciaId, onClose }: Props) {
             <Ionicons name="grid-outline" size={11} color={Colors.accent} />
             <span>{incidencia.sector}</span>
           </div>
-          <button type="button" style={reassignBtn} onClick={() => setActiveSheet('responsable')}>
-            <Ionicons name="person-circle-outline" size={16} color={Colors.textBody} />
-            <span>{incidencia.tecnicoAsignado?.nombre ?? 'Sin asignar'}</span>
-            <Ionicons name="chevron-forward" size={12} color={Colors.textMuted} />
-          </button>
+          <SeleccionarResponsableSheet
+            incidenciaId={incidencia.id}
+            tecnicoActualId={incidencia.tecnicoAsignado?.id}
+            tecnicoActualNombre={incidencia.tecnicoAsignado?.nombre ?? 'Sin asignar'}
+          />
         </div>
       </div>
 
@@ -203,13 +203,6 @@ export function DetailPanel({ incidenciaId, onClose }: Props) {
         onClose={() => setActiveSheet(null)}
         onRegistrado={() => setActiveSheet(null)}
       />
-      <SeleccionarResponsableSheet
-        visible={activeSheet === 'responsable'}
-        incidenciaId={incidencia.id}
-        tecnicoActualId={incidencia.tecnicoAsignado?.id}
-        onClose={() => setActiveSheet(null)}
-        onReasignado={() => setActiveSheet(null)}
-      />
     </div>
   );
 }
@@ -218,7 +211,8 @@ export function DetailPanel({ incidenciaId, onClose }: Props) {
 
 function PredioMensaje({ incidencia }: { incidencia: IncidenciaDetalle }) {
   const noReincidente = incidencia.predio.noReincidente;
-  const cantidad = incidencia.predio.historico.length;
+  const historico = incidencia.predio.historico;
+  const cantidad = historico.length;
   return (
     <div style={{ padding: '14px 16px' }}>
       {noReincidente ? (
@@ -229,10 +223,48 @@ function PredioMensaje({ incidencia }: { incidencia: IncidenciaDetalle }) {
       ) : (
         <div style={predioReinc}>
           <Ionicons name="alert-circle-outline" size={16} color={Colors.statusAlerta} style={{ flexShrink: 0, marginTop: 2 }} />
-          <span>
-            <strong>Predio reincidente:</strong> {cantidad} reclamo{cantidad !== 1 ? 's' : ''} anterior{cantidad !== 1 ? 'es' : ''} registrado{cantidad !== 1 ? 's' : ''}
+          <span style={{ flex: 1 }}>
+            <strong>Predio reincidente:</strong> {cantidad} incidencia{cantidad !== 1 ? 's' : ''} anterior{cantidad !== 1 ? 'es' : ''} registrada{cantidad !== 1 ? 's' : ''}
           </span>
+          <PredioInfoPopover historico={historico} />
         </div>
+      )}
+    </div>
+  );
+}
+
+// Ícono de info + popover pequeño anclado al ícono (no modal centrado) — mismo
+// shell (wrapper relative + backdrop fixed para cerrar al click afuera + panel
+// absolute) que `LocationDropdown.tsx`, adaptado a los estilos de este panel.
+function PredioInfoPopover({ historico }: { historico: IncidenciaDetalle['predio']['historico'] }) {
+  const [abierto, setAbierto] = useState(false);
+  return (
+    <div style={predioInfoWrapper}>
+      <button
+        type="button"
+        style={predioInfoBtn}
+        onClick={() => setAbierto((v) => !v)}
+        title="Ver incidencias anteriores"
+        aria-label="Ver incidencias anteriores"
+      >
+        <Ionicons name="information-circle-outline" size={16} color={Colors.statusAlerta} />
+      </button>
+      {abierto && (
+        <>
+          <div style={predioPopoverBackdrop} onClick={() => setAbierto(false)} />
+          <div style={predioPopoverPanel}>
+            {historico.length === 0 ? (
+              <div style={predioPopoverVacio}>Sin incidencias registradas.</div>
+            ) : (
+              historico.map((h) => (
+                <div key={h.id} style={predioPopoverItem}>
+                  <span style={predioPopoverFecha}>{separarFechaHora(h.fecha).fecha}</span>
+                  <span style={predioPopoverDetalle}>{h.detalleTicket ?? 'Sin detalle registrado.'}</span>
+                </div>
+              ))
+            )}
+          </div>
+        </>
       )}
     </div>
   );
@@ -384,15 +416,6 @@ const estadoBadge: CSSProperties = {
   padding: '4px 10px', fontSize: 11, fontWeight: 700,
 };
 
-const reassignBtn: CSSProperties = {
-  display: 'inline-flex', alignItems: 'center', gap: 6,
-  background: 'none',
-  border: `1px solid ${Colors.border}`,
-  borderRadius: 20,
-  padding: '4px 10px 4px 6px', fontSize: 12, color: Colors.textBody,
-  cursor: 'pointer',
-};
-
 const detalleTextoStyle: CSSProperties = {
   fontSize: 12.5, color: Colors.textBody, lineHeight: 1.45,
   backgroundColor: '#F8F9FA',
@@ -443,4 +466,41 @@ const predioReinc: CSSProperties = {
   display: 'flex', alignItems: 'flex-start', gap: 8,
   fontSize: 13, color: Colors.textBody, lineHeight: 1.4,
   padding: '10px 12px', backgroundColor: '#FFF8E1', borderRadius: 6,
+};
+
+const predioInfoWrapper: CSSProperties = {
+  position: 'relative', flexShrink: 0,
+};
+
+const predioInfoBtn: CSSProperties = {
+  background: 'none', border: 'none', cursor: 'pointer', padding: 2,
+  display: 'flex', alignItems: 'center', justifyContent: 'center',
+};
+
+const predioPopoverBackdrop: CSSProperties = {
+  position: 'fixed', inset: 0, zIndex: 19,
+};
+
+const predioPopoverPanel: CSSProperties = {
+  position: 'absolute', top: 'calc(100% + 4px)', right: 0, zIndex: 20,
+  width: 260, maxHeight: 240, overflowY: 'auto',
+  backgroundColor: '#FFFFFF', borderRadius: 8,
+  boxShadow: '0 4px 16px rgba(0,0,0,0.2)', border: `1px solid ${Colors.border}`,
+  padding: 6,
+};
+
+const predioPopoverItem: CSSProperties = {
+  padding: '6px 6px', borderBottom: `1px solid ${Colors.border}`,
+};
+
+const predioPopoverFecha: CSSProperties = {
+  display: 'block', fontSize: 10.5, fontWeight: 700, color: Colors.textMuted, marginBottom: 2,
+};
+
+const predioPopoverDetalle: CSSProperties = {
+  display: 'block', fontSize: 12, color: Colors.textBody, lineHeight: 1.35,
+};
+
+const predioPopoverVacio: CSSProperties = {
+  fontSize: 12, color: Colors.textMuted, padding: 8,
 };

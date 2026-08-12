@@ -68,7 +68,7 @@ export type ApiTrazabilidadPaso = {
   nota: string | null;
 };
 
-export type ApiPredioReclamo = { id: string; tipo: string; fecha: string };
+export type ApiPredioReclamo = { id: string; tipo: string; fecha: string; detalleTicket: string | null };
 
 export type ApiUsuario = { id: string; nombre: string; rol: string; sector: string | null };
 

@@ -28,7 +28,7 @@ function toTrazabilidadPaso(p: ApiTrazabilidadPaso): TrazabilidadPaso {
 }
 
 function toReclamoPredio(p: ApiPredioReclamo): ReclamoPredio {
-  return { id: p.id, tipo: p.tipo, fecha: p.fecha };
+  return { id: p.id, tipo: p.tipo, fecha: p.fecha, detalleTicket: p.detalleTicket };
 }
 
 /**

@@ -62,7 +62,7 @@ export function DetalleTab({ incidencia }: Props) {
         <InfoRow
           styles={styles}
           label="Predio"
-          value={`${incidencia.predio.noReincidente ? 'No reincidente' : 'Reincidente'} · ${incidencia.predio.quejasUltimos6Meses} quejas en 6 meses`}
+          value={`${incidencia.predio.noReincidente ? 'No reincidente' : 'Reincidente'} · ${incidencia.predio.quejasUltimos6Meses} incidencias en 6 meses`}
         />
         <InfoRow
           styles={styles}

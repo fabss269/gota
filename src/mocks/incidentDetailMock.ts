@@ -12,7 +12,7 @@ export type TrazabilidadPaso = {
 };
 
 export type ReclamoAgrupado = { id: string; fecha: string };
-export type ReclamoPredio = { id: string; tipo: string; fecha: string };
+export type ReclamoPredio = { id: string; tipo: string; fecha: string; detalleTicket: string | null };
 export type IncidenciaRelacionada = { id: string; tipo: string; direccion: string; sector: string; estado: EstadoIncidencia };
 
 export type IncidenciaDetalle = Incidencia & {
@@ -135,6 +135,7 @@ export function getIncidentDetail(id: string): IncidenciaDetalle | undefined {
       id: `EPS-${((seed + i * 29) % 300).toString().padStart(5, '0')}`,
       tipo: base.tipo,
       fecha: fecha.toISOString(),
+      detalleTicket: pick(DESCRIPCIONES[base.categoria], seed + i + 11),
     };
   });
   const predio = {
