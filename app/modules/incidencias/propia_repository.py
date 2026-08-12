@@ -233,19 +233,40 @@ class PropiaIncidenciaRepository:
         )
         return list(await self._session.scalars(stmt))
 
-    async def get_predio_reclamos(self, incidente_id: uuid.UUID) -> list[tuple[Reclamo, Incidente]]:
-        """Reclamos históricos del mismo predio — mismo `dni` que el reclamo actual del
-        incidente (specs/04, la única heurística disponible con el esquema real). Trae
-        también el `Incidente` de cada reclamo histórico (para el `tipo` de
-        `PredioReclamoOut`, que sale del `tipo_atencion` de ESE incidente, no del actual)."""
-        actual = await self.get_ultimo_reclamo(incidente_id)
-        if actual is None or actual.dni is None:
-            return []
+    async def get_predio_reclamos(
+        self, suministro_codigo: str, excluir_incidente_id: uuid.UUID
+    ) -> list[tuple[Reclamo, Incidente]]:
+        """Incidencias históricas del mismo predio — matchea por
+        `Incidente.suministro_codigo` (el predio real, mismo campo que
+        `catastro_enrichment.py`/`dashboard_geo.suministros_reincidentes` usan
+        correctamente). Antes matcheaba por `Reclamo.dni` (la persona que reclama, no
+        el predio) y no deduplicaba por incidente — bug real 2026-08-12, auditado por
+        Edgar: contaba filas de `reclamo`, no incidencias distintas (un incidente
+        puede tener varios reclamos colapsados).
+
+        Un `incidente_id` histórico aporta UNA sola fila acá — su `reclamo` más
+        reciente (vía `ROW_NUMBER()` particionado por `incidente_id`), para que el
+        conteo resultante sea de incidencias, no de reclamos."""
+        reciente_por_incidente = (
+            select(
+                Reclamo.reclamo_id,
+                func.row_number()
+                .over(partition_by=Reclamo.incidente_id, order_by=Reclamo.fecha_registro.desc())
+                .label("orden_reciente"),
+            )
+            .join(Incidente, Reclamo.incidente_id == Incidente.incidente_id)
+            .where(
+                Incidente.suministro_codigo == suministro_codigo,
+                Incidente.incidente_id != excluir_incidente_id,
+            )
+            .subquery()
+        )
         stmt = (
             select(Reclamo, Incidente)
             .join(Incidente, Reclamo.incidente_id == Incidente.incidente_id)
             .join(Incidente.tipo_atencion)
-            .where(Reclamo.dni == actual.dni, Reclamo.incidente_id != incidente_id)
+            .join(reciente_por_incidente, reciente_por_incidente.c.reclamo_id == Reclamo.reclamo_id)
+            .where(reciente_por_incidente.c.orden_reciente == 1)
             .order_by(Reclamo.fecha_registro.desc())
         )
         result = await self._session.execute(stmt)

@@ -383,9 +383,9 @@ class IncidenciaService:
                 ][: settings.quejas_max_relacionadas],
             )
 
-        historicos = await self._propia.get_predio_reclamos(incidente.incidente_id)
-        limite_6m = _now() - timedelta(days=182)
-        quejas_6m = sum(1 for reclamo, _inc in historicos if reclamo.fecha_registro >= limite_6m)
+        historicos = await self._propia.get_predio_reclamos(incidente.suministro_codigo, incidente.incidente_id)
+        limite_ventana = _now() - timedelta(days=settings.predio_reincidente_ventana_dias)
+        quejas_6m = sum(1 for reclamo, _inc in historicos if reclamo.fecha_registro >= limite_ventana)
 
         return IncidenciaDetalleOut(
             id=incidente.codigo,
@@ -438,10 +438,20 @@ class IncidenciaService:
 
     async def predio(self, codigo: str) -> list[PredioReclamoOut]:
         incidente = await self._get_o_404(codigo)
-        historicos = await self._propia.get_predio_reclamos(incidente.incidente_id)
+        historicos = await self._propia.get_predio_reclamos(incidente.suministro_codigo, incidente.incidente_id)
+        # Misma ventana que el booleano/conteo en `detalle()` — antes esta lista no
+        # tenía ventana (todo el histórico) mientras el conteo sí, mostrando números
+        # inconsistentes entre ambos endpoints para el mismo incidente.
+        limite_ventana = _now() - timedelta(days=settings.predio_reincidente_ventana_dias)
         return [
-            PredioReclamoOut(id=inc.codigo, tipo=inc.tipo_atencion.nombre, fecha=reclamo.fecha_registro)
+            PredioReclamoOut(
+                id=inc.codigo,
+                tipo=inc.tipo_atencion.nombre,
+                fecha=reclamo.fecha_registro,
+                detalleTicket=reclamo.detalle_del_ticket,
+            )
             for reclamo, inc in historicos
+            if reclamo.fecha_registro >= limite_ventana
         ]
 
     async def transiciones_validas(self, codigo: str) -> list[TransicionOut]:

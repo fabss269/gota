@@ -41,6 +41,13 @@ class Settings(BaseSettings):
     # (quejasAgrupadas/foco, ahora por causa raíz de grafo — ver app/modules/grafo).
     quejas_max_relacionadas: int = 10
 
+    # Ventana de tiempo (días) para "predio reincidente" — cuántos días hacia atrás
+    # se cuentan incidencias previas del mismo predio (mismo `suministro_codigo`) al
+    # calcular `PredioOut.quejasUltimos6Meses`/`GET /incidencias/{codigo}/predio`.
+    # Antes hardcodeada a 182 en incidencias/service.py con dos criterios distintos
+    # (el booleano SÍ aplicaba ventana, la lista completa NO) — fix 2026-08-12.
+    predio_reincidente_ventana_dias: int = 182
+
     # ------------------------------------------------------------------------
     # Ingest DANA (2026-08-04) — hoy apunta a dana_mock/ (simulación, mientras DANA
     # no nos da acceso a su API real). Cuando lo hagan, solo cambia esta URL.

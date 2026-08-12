@@ -97,6 +97,7 @@ class PredioReclamoOut(BaseModel):
     id: str
     tipo: str
     fecha: datetime
+    detalleTicket: str | None
 
 
 class TransicionOut(BaseModel):
