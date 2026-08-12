@@ -13,6 +13,7 @@ from app.modules.incidencias.propia_repository import (
     PRIORIDAD_DEFAULT_UMBRAL,
     UMBRALES_DIAS_PRIORIDAD,
     PropiaIncidenciaRepository,
+    traducir_codigo_estado_db_a_app,
 )
 from app.modules.incidencias.schemas import (
     AvanceRequest,
@@ -107,7 +108,7 @@ class IncidenciaService:
         set_kwargs: dict[str, str | bool] = {}
         if estado_codigo is None:
             estado_row = await self._propia.get_estado_actual(incidente.incidente_id)
-            estado_codigo = estado_row.codigo if estado_row else "CREADO"
+            estado_codigo = traducir_codigo_estado_db_a_app(estado_row.codigo) if estado_row else "CREADO"
             estado_id = estado_row.estado_id if estado_row else self._mapa_estados_inv.get("CREADO")
             if estado_id is not None:
                 set_kwargs["estado_actual_id"] = str(estado_id)
@@ -177,7 +178,7 @@ class IncidenciaService:
         async def _resolver_gota() -> None:
             for incidente in pendientes_estado:
                 estado_row = await self._propia.get_estado_actual(incidente.incidente_id)
-                estado_codigo = estado_row.codigo if estado_row else "CREADO"
+                estado_codigo = traducir_codigo_estado_db_a_app(estado_row.codigo) if estado_row else "CREADO"
                 estado_id = estado_row.estado_id if estado_row else self._mapa_estados_inv.get("CREADO")
                 estados[incidente.incidente_id] = estado_codigo
                 if estado_id is not None:
@@ -248,7 +249,7 @@ class IncidenciaService:
         elif evento.area is not None:
             grupo = evento.area.nombre
         return TrazabilidadPasoOut(
-            estado=evento.estado_resultante.codigo,
+            estado=traducir_codigo_estado_db_a_app(evento.estado_resultante.codigo),
             fecha=evento.fecha,
             grupo=grupo,
             asignadoA=asignado_a,

@@ -28,6 +28,22 @@ UMBRALES_DIAS_PRIORIDAD: dict[str, tuple[int, int]] = {
 }
 PRIORIDAD_DEFAULT_UMBRAL = (18, 32)  # fallback para grupos futuros del catálogo
 
+# `gota.catalogo_estado` tiene la fila del estado terminal como 'FINALIZADO'
+# (heredado de scripts/tickets_loader.py, que puebla `estado_incidente_evento`
+# directo contra ese código) — el resto del sistema (transiciones.py, el tipo
+# `EstadoIncidencia` del frontend, toda la UI) usa 'ATENDIDO' en todas partes.
+# Bug real 2026-08-12, auditado en vivo (Edgar): registrar_avance()/
+# cambiar_estado() tiraban KeyError/filtraban vacío al toparse con el código
+# real de la BD. Se traduce en los únicos puntos de contacto con la tabla
+# cruda (mapa_estados, resolver_estado_id(s)) para que 'FINALIZADO' nunca se
+# filtre al resto de la app ni el resto de la app tenga que conocerlo.
+_CODIGO_ESTADO_DB_A_APP = {"FINALIZADO": "ATENDIDO"}
+_CODIGO_ESTADO_APP_A_DB = {v: k for k, v in _CODIGO_ESTADO_DB_A_APP.items()}
+
+
+def traducir_codigo_estado_db_a_app(codigo: str) -> str:
+    return _CODIGO_ESTADO_DB_A_APP.get(codigo, codigo)
+
 
 def _prioridad_codigo_expr():
     """Expresión SQL que calcula la prioridad de una incidencia al vuelo.
@@ -301,20 +317,22 @@ class PropiaIncidenciaRepository:
         """`catalogo_estado` tiene 4 filas — traerlo entero por request es más simple
         que cachearlo, mismo criterio que `modules/catalogos` para catálogos chicos."""
         filas = await self._session.execute(select(CatalogoEstado.estado_id, CatalogoEstado.codigo))
-        return dict(filas.all())
+        return {estado_id: traducir_codigo_estado_db_a_app(codigo) for estado_id, codigo in filas.all()}
 
     async def mapa_prioridades(self) -> dict[int, str]:
         filas = await self._session.execute(select(CatalogoPrioridad.prioridad_id, CatalogoPrioridad.codigo))
         return dict(filas.all())
 
     async def resolver_estado_id(self, codigo: str) -> int | None:
+        codigo_db = _CODIGO_ESTADO_APP_A_DB.get(codigo, codigo)
         return await self._session.scalar(
-            select(CatalogoEstado.estado_id).where(CatalogoEstado.codigo == codigo)
+            select(CatalogoEstado.estado_id).where(CatalogoEstado.codigo == codigo_db)
         )
 
     async def resolver_estado_ids(self, codigos: list[str]) -> list[int]:
+        codigos_db = [_CODIGO_ESTADO_APP_A_DB.get(c, c) for c in codigos]
         filas = await self._session.scalars(
-            select(CatalogoEstado.estado_id).where(CatalogoEstado.codigo.in_(codigos))
+            select(CatalogoEstado.estado_id).where(CatalogoEstado.codigo.in_(codigos_db))
         )
         return list(filas)
 
