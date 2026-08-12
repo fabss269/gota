@@ -403,7 +403,9 @@ class IncidenciaService:
                     medioRecepcion=ultimo_reclamo.medio_recepcion.nombre,
                     descripcion=ultimo_reclamo.problema,
                     detalleTicket=ultimo_reclamo.detalle_del_ticket,
-                    esRobo=bool(ultimo_reclamo.es_robo),
+                    # es_robo se movió de reclamo → incidente (migración 2026-08-11):
+                    # es una propiedad del incidente, no del reclamo individual.
+                    esRobo=bool(incidente.es_robo),
                 )
                 if ultimo_reclamo
                 else None

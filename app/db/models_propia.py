@@ -120,6 +120,10 @@ class Incidente(Base):
     # Columnas del backup real de Fabiana (2026-08-07) — no existían en el DDL
     # original, resuelto/no resuelto se decide por fecha_solucion IS NULL.
     fecha_solucion: Mapped[datetime | None]
+    # Movido desde reclamo (migración 2026-08-11): es una propiedad del
+    # incidente, no del reclamo individual — un incidente = 1 medidor robado
+    # (o no), no puede variar entre reclamos del mismo incidente.
+    es_robo: Mapped[bool] = mapped_column(server_default=text("false"))
 
     tipo_atencion: Mapped[CatalogoTipoAtencion] = relationship(lazy="joined")
 
@@ -134,7 +138,6 @@ class Reclamo(Base):
     persona: Mapped[str]
     direccion_detalle: Mapped[str | None]
     detalle_del_ticket: Mapped[str | None]
-    es_robo: Mapped[bool | None]
     problema: Mapped[str | None]
     fecha_registro: Mapped[datetime]
     medio_recepcion_id: Mapped[int] = mapped_column(

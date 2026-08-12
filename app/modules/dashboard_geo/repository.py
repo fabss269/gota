@@ -92,8 +92,8 @@ class DashboardGeoRepository:
                         (
                           SELECT COUNT(*)
                           FROM gota.mv_incidente_enriquecido mv2
-                          JOIN gota.reclamo r ON r.incidente_id = mv2.incidente_id
-                          WHERE r.es_robo = true
+                          JOIN gota.incidente i ON i.incidente_id = mv2.incidente_id
+                          WHERE i.es_robo = true
                             AND mv2.creado_en >= :desde
                             AND mv2.creado_en <  :hasta
                             {gsql.replace('grupo', 'mv2.grupo')}
@@ -154,8 +154,8 @@ class DashboardGeoRepository:
                     f"""
                     SELECT date_trunc(:bucket, mv.creado_en)::date AS x, COUNT(*)::float AS y
                     FROM gota.mv_incidente_enriquecido mv
-                    JOIN gota.reclamo r ON r.incidente_id = mv.incidente_id
-                    WHERE r.es_robo = true
+                    JOIN gota.incidente i ON i.incidente_id = mv.incidente_id
+                    WHERE i.es_robo = true
                       AND mv.creado_en >= :desde AND mv.creado_en < :hasta
                       {gsql.replace('grupo', 'mv.grupo')}
                       {ssql.replace('sectorid', 'mv.sectorid')}
@@ -348,8 +348,8 @@ class DashboardGeoRepository:
                         TO_CHAR(date_trunc('month', mv.creado_en), 'YYYY-MM') AS x,
                         COUNT(*)::float AS y
                     FROM gota.mv_incidente_enriquecido mv
-                    JOIN gota.reclamo r ON r.incidente_id = mv.incidente_id
-                    WHERE r.es_robo = true
+                    JOIN gota.incidente i ON i.incidente_id = mv.incidente_id
+                    WHERE i.es_robo = true
                     GROUP BY x ORDER BY x
                     """
                 )
@@ -444,8 +444,8 @@ class DashboardGeoRepository:
                         (array_agg(mv.sectorid ORDER BY r.fecha_registro DESC))[1] AS sectorid,
                         MODE() WITHIN GROUP (ORDER BY mv.tipo_atencion) AS tipo_dominante
                     FROM gota.mv_incidente_enriquecido mv
-                    JOIN gota.reclamo r ON r.incidente_id = mv.incidente_id
-                    WHERE r.es_robo = true
+                    JOIN gota.incidente i ON i.incidente_id = mv.incidente_id
+                    WHERE i.es_robo = true
                       AND mv.creado_en >= now() - (:meses * interval '1 month')
                       AND mv.suministro_codigo IS NOT NULL
                       AND mv.suministro_codigo != '99999999'
@@ -650,9 +650,9 @@ class DashboardGeoRepository:
                     """
                     SELECT d.distritoid, d.distrito, COUNT(*) AS n_robos
                     FROM gota.mv_incidente_enriquecido mv
-                    JOIN gota.reclamo r ON r.incidente_id = mv.incidente_id
+                    JOIN gota.incidente i ON i.incidente_id = mv.incidente_id
                     LEFT JOIN sig.distritos d ON d.distritoid = mv.sig_distritoid
-                    WHERE r.es_robo = true
+                    WHERE i.es_robo = true
                     GROUP BY d.distritoid, d.distrito
                     ORDER BY n_robos DESC
                     LIMIT :limite
