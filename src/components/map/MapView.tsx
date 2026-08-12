@@ -15,6 +15,7 @@ import {
   SECTOR_COLOR_LAYER_IDS,
   SECTOR_LAYER_IDS,
   colorForSectorId,
+  unionBbox,
 } from '@/components/map/mapLayers';
 import { useDebouncedValue } from '@/hooks/useDebouncedValue';
 import { useCapasStore } from '@/state/capasStore';
@@ -139,8 +140,11 @@ export function EpselMapView({ clusters, onPressCluster }: Props) {
 
   const capasVisibles = useCapasStore((state) => state.capasVisibles);
   const sectores = useUbicacionStore((state) => state.sectores);
+  const distritos = useUbicacionStore((state) => state.distritos);
   const sectoresVisiblesRaw = useUbicacionStore((state) => state.sectoresVisibles);
+  const distritosSinSectorVisiblesRaw = useUbicacionStore((state) => state.distritosSinSectorVisibles);
   const sectoresVisibles = useDebouncedValue(sectoresVisiblesRaw, DEBOUNCE_UBICACION_MS);
+  const distritosSinSectorVisibles = useDebouncedValue(distritosSinSectorVisiblesRaw, DEBOUNCE_UBICACION_MS);
 
   const effectiveStyle = useMemo(() => {
     if (!baseStyle) return null;
@@ -150,15 +154,33 @@ export function EpselMapView({ clusters, onPressCluster }: Props) {
   const center: [number, number] =
     clusters.length > 0 ? [clusters[0].lon, clusters[0].lat] : DEFAULT_CENTER;
 
-  // Buscador (dirección/suministro) — mismo store que la versión web. El
-  // encuadre por Provincia/Distrito/Sector ahora es trabajo exclusivo de la
-  // lupa de cada fila en LocationTree.tsx (rediseño 2026-08-12) — ya no hay un
-  // efecto reactivo que mueva la cámara sola al togglear un ojito.
+  // Buscador (dirección/suministro) — mismo store que la versión web.
   const flyTarget = useMapSearchStore((state) => state.flyTarget);
   useEffect(() => {
     if (!flyTarget) return;
     cameraRef.current?.flyTo({ center: [flyTarget.lon, flyTarget.lat], zoom: flyTarget.zoom, duration: 1000 });
   }, [flyTarget]);
+
+  // Togglear el ojito (UBICACIÓN, vía UbicacionPicker.tsx en móvil) también mueve
+  // la cámara — mismo comportamiento restaurado en MapView.web.tsx 2026-08-12.
+  // Con varios sectores/distritos-sin-sector visibles a la vez, encuadra la
+  // unión de sus bbox.
+  const lastAutoZoomKeyRef = useRef<string | null>(null);
+  useEffect(() => {
+    const sectoresConBbox = sectores.filter((s) => sectoresVisibles.has(s.id) && s.bbox);
+    const distritosConBbox = distritos.filter((d) => distritosSinSectorVisibles.has(d.id) && d.bbox);
+    if (sectoresConBbox.length === 0 && distritosConBbox.length === 0) return;
+
+    const key = `${[...sectoresVisibles].sort().join(',')}|${[...distritosSinSectorVisibles].sort().join(',')}`;
+    if (key === lastAutoZoomKeyRef.current) return;
+    lastAutoZoomKeyRef.current = key;
+
+    const bbox = unionBbox([...sectoresConBbox, ...distritosConBbox].map((x) => x.bbox));
+    cameraRef.current?.fitBounds([bbox.minLon, bbox.minLat, bbox.maxLon, bbox.maxLat], {
+      padding: { top: 48, right: 48, bottom: 48, left: 48 },
+      duration: 800,
+    });
+  }, [sectores, distritos, sectoresVisibles, distritosSinSectorVisibles]);
 
   // Sin variante oscura del basemap demo y sin filtro CSS disponible en nativo (a
   // diferencia de MapView.web.tsx, que sí puede invertir el canvas) — un scrim

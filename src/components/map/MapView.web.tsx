@@ -24,6 +24,7 @@ import {
   SIMULACION_ISOLATE_LAYERS,
   SIMULACION_OCULTAR_EN_VISTA,
   colorForSectorId,
+  unionBbox,
   type ElementoRedTipo,
 } from '@/components/map/mapLayers';
 import { SimulacionBorderOverlay } from '@/components/map/SimulacionBorderOverlay.web';
@@ -270,13 +271,16 @@ export function EpselMapView({ clusters, onPressCluster, onElementClick, element
   }, [capasVisibles]);
 
   const sectores = useUbicacionStore((state) => state.sectores);
+  const distritos = useUbicacionStore((state) => state.distritos);
   const sectoresVisiblesRaw = useUbicacionStore((state) => state.sectoresVisibles);
+  const distritosSinSectorVisiblesRaw = useUbicacionStore((state) => state.distritosSinSectorVisibles);
   // Togglear varios ójitos rápido antes repintaba el mapa completo (colorMatch +
   // ~14 setFilter) por cada click — bug real 2026-08-12, auditado en vivo (se
   // sentía "congelado"). Debounced acá, mismo delay que el fetch en
   // useIncidentsToday.ts — los íconos del árbol siguen respondiendo al
   // instante porque leen el store directo, sin pasar por acá.
   const sectoresVisibles = useDebouncedValue(sectoresVisiblesRaw, DEBOUNCE_UBICACION_MS);
+  const distritosSinSectorVisibles = useDebouncedValue(distritosSinSectorVisiblesRaw, DEBOUNCE_UBICACION_MS);
 
   // Rediseño 2026-08-12 (árbol tipo Figma): el "ojito" de cada fila YA cascadeó
   // al togglear (ver ubicacionStore.toggleDistritoVisible/toggleProvinciaVisible),
@@ -363,6 +367,29 @@ export function EpselMapView({ clusters, onPressCluster, onElementClick, element
     };
   }, [sectoresVisibles]);
 
+  // El ojito también mueve la cámara (comportamiento restaurado 2026-08-12 —
+  // se había perdido al separar ojito/lupa, la lupa quedaba redundante y se
+  // quitó). Con varios sectores/distritos-sin-sector visibles a la vez,
+  // encuadra la unión de sus bbox — mismo criterio y mismos valores de
+  // padding/maxZoom que tenía la versión previa al split (recuperable vía
+  // `git show 94e7eae~1:src/components/map/MapView.web.tsx`), solo que ahora
+  // no hace falta "nivel más específico gana": el store ya cascadea todo a
+  // hojas (sectoresVisibles/distritosSinSectorVisibles), no hay niveles
+  // superpuestos que desempatar.
+  const lastAutoZoomKeyRef = useRef<string | null>(null);
+  useEffect(() => {
+    const sectoresConBbox = sectores.filter((s) => sectoresVisibles.has(s.id) && s.bbox);
+    const distritosConBbox = distritos.filter((d) => distritosSinSectorVisibles.has(d.id) && d.bbox);
+    if (sectoresConBbox.length === 0 && distritosConBbox.length === 0) return;
+
+    const key = `${[...sectoresVisibles].sort().join(',')}|${[...distritosSinSectorVisibles].sort().join(',')}`;
+    if (key === lastAutoZoomKeyRef.current) return;
+    lastAutoZoomKeyRef.current = key;
+
+    const bbox = unionBbox([...sectoresConBbox, ...distritosConBbox].map((x) => x.bbox));
+    useMapSearchStore.getState().flyToBounds(bbox);
+  }, [sectores, distritos, sectoresVisibles, distritosSinSectorVisibles]);
+
   const flyTarget = useMapSearchStore((state) => state.flyTarget);
   const flyBoundsTarget = useMapSearchStore((state) => state.flyBoundsTarget);
   const pin = useMapSearchStore((state) => state.pin);
@@ -382,9 +409,8 @@ export function EpselMapView({ clusters, onPressCluster, onElementClick, element
     };
   }, [flyTarget, setFlying]);
 
-  // 🔍 lupa de cada fila de sector (FiltersSidebar/LocationDropdown) — solo mueve
-  // la cámara al bbox del sector, sin plantar pin, sin encender el loader del
-  // buscador y sin tocar sectorActivo/sectorPreview (no filtra ni fetchea nada).
+  // Consumidor del bbox calculado por el efecto de arriba (ojito) — solo mueve
+  // la cámara, sin plantar pin ni encender el loader del buscador.
   useEffect(() => {
     const map = mapRef.current;
     if (!map || !flyBoundsTarget) return;

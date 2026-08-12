@@ -1,7 +1,7 @@
 import { MaterialCommunityIcons } from '@expo/vector-icons';
 import { useState, type CSSProperties } from 'react';
 
-import type { ApiBbox, ApiDistrito, ApiProvincia, ApiSector } from '@/api/types';
+import type { ApiDistrito, ApiProvincia, ApiSector } from '@/api/types';
 import {
   distritosSinSectorDeProvincia,
   estadoVisibilidad,
@@ -9,7 +9,6 @@ import {
   sectoresDeProvincia,
 } from '@/components/map/mapLayers';
 import { DISTRITO_DEFAULT, PROVINCIA_DEFAULT, useUbicacionStore } from '@/state/ubicacionStore';
-import { useMapSearchStore } from '@/state/mapSearchStore';
 
 type Visibilidad = 'on' | 'off' | 'mixed';
 
@@ -19,10 +18,11 @@ type Visibilidad = 'on' | 'off' | 'mixed';
  * - Expand/collapse (cuadradito +/-) — solo navegación, no filtra.
  * - Ojito — ES el filtro real: prende/apaga y pinta ese nivel; en Provincia/
  *   Distrito cascada a TODOS sus descendientes (como la visibilidad de un grupo
- *   de capas en Figma).
- * - Lupa — solo mueve la cámara al bbox del nivel, nunca toca el filtro.
+ *   de capas en Figma). También mueve la cámara (mismo comportamiento previo al
+ *   split ojito/lupa, restaurado 2026-08-12 — la lupa quedaba redundante) — ese
+ *   auto-zoom vive en `MapView.web.tsx`/`MapView.tsx`, mirando estos mismos sets.
  *
- * Autocontenido: lee `useUbicacionStore`/`useMapSearchStore` directo, sin props.
+ * Autocontenido: lee `useUbicacionStore` directo, sin props.
  */
 export function LocationTree() {
   const provincias = useUbicacionStore((s) => s.provincias);
@@ -33,7 +33,6 @@ export function LocationTree() {
   const toggleSectorVisible = useUbicacionStore((s) => s.toggleSectorVisible);
   const toggleDistritoVisible = useUbicacionStore((s) => s.toggleDistritoVisible);
   const toggleProvinciaVisible = useUbicacionStore((s) => s.toggleProvinciaVisible);
-  const flyToBounds = useMapSearchStore((s) => s.flyToBounds);
 
   // Sembrado con la ascendencia del default (Provincia/Distrito de Chiclayo) para
   // que el sector 28 se vea sin clicks extra, igual que el comportamiento previo.
@@ -64,11 +63,8 @@ export function LocationTree() {
           expandido={expandido}
           onToggleExpandido={toggleExpandido}
           onToggleOjo={() => toggleProvinciaVisible(provincia.id)}
-          onZoom={() => flyToBounds(provincia.bbox)}
           onToggleOjoDistrito={toggleDistritoVisible}
           onToggleOjoSector={toggleSectorVisible}
-          onZoomDistrito={(bbox) => flyToBounds(bbox)}
-          onZoomSector={(bbox) => flyToBounds(bbox)}
         />
       ))}
     </div>
@@ -87,11 +83,8 @@ function ProvinciaFila({
   expandido,
   onToggleExpandido,
   onToggleOjo,
-  onZoom,
   onToggleOjoDistrito,
   onToggleOjoSector,
-  onZoomDistrito,
-  onZoomSector,
 }: {
   provincia: ApiProvincia;
   distritos: ApiDistrito[];
@@ -102,11 +95,8 @@ function ProvinciaFila({
   expandido: Set<string>;
   onToggleExpandido: (key: string) => void;
   onToggleOjo: () => void;
-  onZoom: () => void;
   onToggleOjoDistrito: (id: string) => void;
   onToggleOjoSector: (id: string) => void;
-  onZoomDistrito: (bbox: ApiBbox) => void;
-  onZoomSector: (bbox: ApiBbox) => void;
 }) {
   const key = `prov:${provincia.id}`;
   const abierta = expandido.has(key);
@@ -127,7 +117,6 @@ function ProvinciaFila({
         visibilidad={visibilidad}
         onToggleExpandir={() => onToggleExpandido(key)}
         onToggleOjo={onToggleOjo}
-        onZoom={onZoom}
       />
       {abierta && (
         <div style={hijos}>
@@ -141,9 +130,7 @@ function ProvinciaFila({
               expandido={expandido}
               onToggleExpandido={onToggleExpandido}
               onToggleOjo={() => onToggleOjoDistrito(distrito.id)}
-              onZoom={() => onZoomDistrito(distrito.bbox)}
               onToggleOjoSector={onToggleOjoSector}
-              onZoomSector={onZoomSector}
             />
           ))}
         </div>
@@ -162,9 +149,7 @@ function DistritoFila({
   expandido,
   onToggleExpandido,
   onToggleOjo,
-  onZoom,
   onToggleOjoSector,
-  onZoomSector,
 }: {
   distrito: ApiDistrito;
   sectores: ApiSector[];
@@ -173,9 +158,7 @@ function DistritoFila({
   expandido: Set<string>;
   onToggleExpandido: (key: string) => void;
   onToggleOjo: () => void;
-  onZoom: () => void;
   onToggleOjoSector: (id: string) => void;
-  onZoomSector: (bbox: ApiBbox) => void;
 }) {
   const key = `dist:${distrito.id}`;
   const abierta = expandido.has(key);
@@ -198,7 +181,6 @@ function DistritoFila({
         visibilidad={visibilidad}
         onToggleExpandir={() => onToggleExpandido(key)}
         onToggleOjo={onToggleOjo}
-        onZoom={onZoom}
       />
       {abierta && tieneHijos && (
         <div style={hijos}>
@@ -212,7 +194,6 @@ function DistritoFila({
               visibilidad={sectoresVisibles.has(sector.id) ? 'on' : 'off'}
               onToggleExpandir={() => {}}
               onToggleOjo={() => onToggleOjoSector(sector.id)}
-              onZoom={() => onZoomSector(sector.bbox)}
             />
           ))}
         </div>
@@ -231,7 +212,6 @@ function FilaBase({
   visibilidad,
   onToggleExpandir,
   onToggleOjo,
-  onZoom,
 }: {
   nivel: 0 | 1 | 2;
   nombre: string;
@@ -240,7 +220,6 @@ function FilaBase({
   visibilidad: Visibilidad;
   onToggleExpandir: () => void;
   onToggleOjo: () => void;
-  onZoom: () => void;
 }) {
   const ojoIcono = visibilidad === 'on' ? 'eye' : visibilidad === 'mixed' ? 'eye-outline' : 'eye-off-outline';
 
@@ -281,15 +260,6 @@ function FilaBase({
             size={14}
             color={visibilidad !== 'off' ? 'var(--map-accent)' : 'var(--map-text-muted)'}
           />
-        </button>
-        <button
-          type="button"
-          style={iconBtn}
-          onClick={onZoom}
-          title={`Acercar a ${nombre}`}
-          aria-label={`Acercar a ${nombre}`}
-        >
-          <MaterialCommunityIcons name="magnify" size={14} color="var(--map-text-muted)" />
         </button>
       </span>
     </div>
