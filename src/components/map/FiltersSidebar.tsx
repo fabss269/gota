@@ -212,9 +212,13 @@ function GrupoPill({
 
 // ── Estilos ───────────────────────────────────────────────
 
+// Ancho subido de 220→268 (pedido de Edgar 2026-08-12): los nombres de sector
+// ("Chiclayo - Sector 06") se cortaban en el árbol de UBICACIÓN — ver también
+// los tamaños reducidos en LocationTree.tsx, ambos ajustes juntos para que
+// entre todo sin que el sidebar quede demasiado ancho.
 const sidebar: CSSProperties = {
-  width: 220,
-  minWidth: 220,
+  width: 268,
+  minWidth: 268,
   height: '100%',
   overflowY: 'auto',
   backgroundColor: 'var(--map-surface)',

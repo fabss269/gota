@@ -245,7 +245,7 @@ function FilaBase({
   const ojoIcono = visibilidad === 'on' ? 'eye' : visibilidad === 'mixed' ? 'eye-outline' : 'eye-off-outline';
 
   return (
-    <div style={{ ...fila, paddingLeft: nivel * 16 }}>
+    <div style={{ ...fila, paddingLeft: nivel * 12 }}>
       <button
         type="button"
         style={expandible ? expandirBtn : expandirBtnOculto}
@@ -258,7 +258,7 @@ function FilaBase({
         {expandible && (
           <MaterialCommunityIcons
             name={abierta ? 'minus-box-outline' : 'plus-box-outline'}
-            size={14}
+            size={13}
             color="var(--map-text-muted)"
           />
         )}
@@ -278,7 +278,7 @@ function FilaBase({
         >
           <MaterialCommunityIcons
             name={ojoIcono}
-            size={15}
+            size={14}
             color={visibilidad !== 'off' ? 'var(--map-accent)' : 'var(--map-text-muted)'}
           />
         </button>
@@ -289,7 +289,7 @@ function FilaBase({
           title={`Acercar a ${nombre}`}
           aria-label={`Acercar a ${nombre}`}
         >
-          <MaterialCommunityIcons name="magnify" size={15} color="var(--map-text-muted)" />
+          <MaterialCommunityIcons name="magnify" size={14} color="var(--map-text-muted)" />
         </button>
       </span>
     </div>
@@ -307,13 +307,13 @@ const hijos: CSSProperties = {
   display: 'flex',
   flexDirection: 'column',
   borderLeft: '1.5px solid var(--map-border)',
-  marginLeft: 6,
+  marginLeft: 5,
 };
 
 const fila: CSSProperties = {
   display: 'flex',
   alignItems: 'center',
-  gap: 4,
+  gap: 3,
   paddingTop: 3,
   paddingBottom: 3,
 };
@@ -322,8 +322,8 @@ const expandirBtn: CSSProperties = {
   display: 'inline-flex',
   alignItems: 'center',
   justifyContent: 'center',
-  width: 16,
-  height: 16,
+  width: 14,
+  height: 14,
   flexShrink: 0,
   border: 'none',
   background: 'none',
@@ -349,7 +349,7 @@ const nombreBtn: CSSProperties = {
 };
 
 const nombreTexto: CSSProperties = {
-  fontSize: 11.5,
+  fontSize: 11,
   fontWeight: 600,
   color: 'var(--map-text)',
   overflow: 'hidden',
@@ -360,7 +360,7 @@ const nombreTexto: CSSProperties = {
 const nombreTextoHoja: CSSProperties = {
   ...nombreTexto,
   fontWeight: 400,
-  fontSize: 11,
+  fontSize: 10.5,
   color: 'var(--map-text-muted)',
 };
 
@@ -375,8 +375,8 @@ const iconBtn: CSSProperties = {
   display: 'inline-flex',
   alignItems: 'center',
   justifyContent: 'center',
-  width: 22,
-  height: 22,
+  width: 20,
+  height: 20,
   border: 'none',
   borderRadius: 5,
   background: 'none',

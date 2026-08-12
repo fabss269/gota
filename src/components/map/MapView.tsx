@@ -16,6 +16,7 @@ import {
   SECTOR_LAYER_IDS,
   colorForSectorId,
 } from '@/components/map/mapLayers';
+import { useDebouncedValue } from '@/hooks/useDebouncedValue';
 import { useCapasStore } from '@/state/capasStore';
 import { useMapSearchStore } from '@/state/mapSearchStore';
 import { useThemeStore } from '@/state/themeStore';
@@ -28,6 +29,11 @@ const DEFAULT_CENTER: [number, number] = [-79.8409, -6.7714];
 // Mismo estilo que la versión web (ver MapView.web.tsx) — sin API key, ver Spec 03 /
 // specs/00-auditoria-diseno.md.
 const MAP_STYLE_URL = process.env.EXPO_PUBLIC_MAP_STYLE_URL ?? 'https://demotiles.maplibre.org/style.json';
+
+// Mismo delay que useIncidentsToday.ts/MapView.web.tsx — togglear varios
+// ójitos rápido antes recalculaba el estilo completo del mapa por cada click
+// (bug real 2026-08-12, auditado en vivo).
+const DEBOUNCE_UBICACION_MS = 300;
 
 // Reverse-map de CAPA_LAYER_IDS: por cada layerId del style.json, a qué CapaKey
 // pertenece — para togglear layout.visibility layer por layer.
@@ -135,7 +141,8 @@ export function EpselMapView({ clusters, onPressCluster }: Props) {
 
   const capasVisibles = useCapasStore((state) => state.capasVisibles);
   const sectores = useUbicacionStore((state) => state.sectores);
-  const sectoresVisibles = useUbicacionStore((state) => state.sectoresVisibles);
+  const sectoresVisiblesRaw = useUbicacionStore((state) => state.sectoresVisibles);
+  const sectoresVisibles = useDebouncedValue(sectoresVisiblesRaw, DEBOUNCE_UBICACION_MS);
 
   const effectiveStyle = useMemo(() => {
     if (!baseStyle) return null;

@@ -28,6 +28,7 @@ import {
 } from '@/components/map/mapLayers';
 import { SimulacionBorderOverlay } from '@/components/map/SimulacionBorderOverlay.web';
 import { SimulacionControl } from '@/components/map/SimulacionControl.web';
+import { useDebouncedValue } from '@/hooks/useDebouncedValue';
 import { useBasemapStore } from '@/state/basemapStore';
 import { type CapaKey, useCapasStore } from '@/state/capasStore';
 import { useMapSearchStore } from '@/state/mapSearchStore';
@@ -95,6 +96,10 @@ const DEFAULT_CENTER: [number, number] = [-79.8409, -6.7714];
 
 // Mismo estilo demo público que la versión nativa (ver MapView.tsx).
 const MAP_STYLE_URL = process.env.EXPO_PUBLIC_MAP_STYLE_URL ?? 'https://demotiles.maplibre.org/style.json';
+
+// Mismo delay que useIncidentsToday.ts — ver el comentario de useDebouncedValue
+// más abajo para el porqué (bug real 2026-08-12, auditado en vivo).
+const DEBOUNCE_UBICACION_MS = 300;
 
 // Cursor de "esto va a fallar" durante la fase de elegir elemento en modo simulación
 // (sim.activo && !sim.modoVista) — SVG armado a mano (no un emoji), círculo rojo con
@@ -265,7 +270,13 @@ export function EpselMapView({ clusters, onPressCluster, onElementClick, element
   }, [capasVisibles]);
 
   const sectores = useUbicacionStore((state) => state.sectores);
-  const sectoresVisibles = useUbicacionStore((state) => state.sectoresVisibles);
+  const sectoresVisiblesRaw = useUbicacionStore((state) => state.sectoresVisibles);
+  // Togglear varios ójitos rápido antes repintaba el mapa completo (colorMatch +
+  // ~14 setFilter) por cada click — bug real 2026-08-12, auditado en vivo (se
+  // sentía "congelado"). Debounced acá, mismo delay que el fetch en
+  // useIncidentsToday.ts — los íconos del árbol siguen respondiendo al
+  // instante porque leen el store directo, sin pasar por acá.
+  const sectoresVisibles = useDebouncedValue(sectoresVisiblesRaw, DEBOUNCE_UBICACION_MS);
 
   // Rediseño 2026-08-12 (árbol tipo Figma): el "ojito" de cada fila YA cascadeó
   // al togglear (ver ubicacionStore.toggleDistritoVisible/toggleProvinciaVisible),
@@ -296,7 +307,7 @@ export function EpselMapView({ clusters, onPressCluster, onElementClick, element
         }
       }
 
-      const idsActivos = [...useUbicacionStore.getState().sectoresVisibles].map(Number);
+      const idsActivos = [...sectoresVisibles].map(Number);
       const filtro: maplibregl.FilterSpecification = ['in', ['get', 'sectorid'], ['literal', idsActivos]];
       for (const layerId of SECTOR_LAYER_IDS) {
         if (JSON.stringify(map.getFilter(layerId) ?? null) !== JSON.stringify(filtro)) {
@@ -321,7 +332,7 @@ export function EpselMapView({ clusters, onPressCluster, onElementClick, element
     if (!map) return;
 
     const applyCatastroSectorFilter = () => {
-      const idsActivos = [...useUbicacionStore.getState().sectoresVisibles].map(Number);
+      const idsActivos = [...sectoresVisibles].map(Number);
       const sectorFilter: maplibregl.FilterSpecification = ['in', ['get', 'sectorid'], ['literal', idsActivos]];
 
       for (const { id, baseFilter } of CATASTRO_SECTOR_FILTER_LAYERS) {

@@ -3,9 +3,17 @@ import { useQuery } from '@tanstack/react-query';
 import { apiFetch } from '@/api/client';
 import { toIncidencia } from '@/api/mappers';
 import type { ApiIncidenciaListResponse } from '@/api/types';
+import { useDebouncedValue } from '@/hooks/useDebouncedValue';
 import type { RangoFechas } from '@/state/filtersStore';
 import { useFiltersStore } from '@/state/filtersStore';
 import { useUbicacionStore } from '@/state/ubicacionStore';
+
+// Togglear varios ójitos rápido en el árbol de UBICACIÓN (LocationTree.tsx)
+// antes disparaba un fetch por cada click — bug real 2026-08-12, auditado en
+// vivo (se sentía "congelado"). 300ms de pausa entre el último click y el
+// fetch real es imperceptible para un click normal pero absorbe una racha de
+// varios clicks seguidos en uno solo.
+const DEBOUNCE_UBICACION_MS = 300;
 
 /** `rangoFechas` (preset del filtro) -> parámetros de fecha que espera el backend
  * (API.md § 3: fecha=hoy es un atajo especial; fechaDesde/fechaHasta son fechas
@@ -48,8 +56,17 @@ export function useIncidentsToday() {
   const fechaDesde = useFiltersStore((s) => s.fechaDesde);
   const fechaHasta = useFiltersStore((s) => s.fechaHasta);
   const soloNoResueltas = useFiltersStore((s) => s.soloNoResueltas);
-  const sectoresVisibles = useUbicacionStore((s) => s.sectoresVisibles);
-  const distritosSinSectorVisibles = useUbicacionStore((s) => s.distritosSinSectorVisibles);
+  const sectoresVisiblesRaw = useUbicacionStore((s) => s.sectoresVisibles);
+  const distritosSinSectorVisiblesRaw = useUbicacionStore((s) => s.distritosSinSectorVisibles);
+  const sectoresVisibles = useDebouncedValue(sectoresVisiblesRaw, DEBOUNCE_UBICACION_MS);
+  const distritosSinSectorVisibles = useDebouncedValue(distritosSinSectorVisiblesRaw, DEBOUNCE_UBICACION_MS);
+
+  // Nada visible en UBICACIÓN = no mostrar nada (pedido de Edgar 2026-08-12,
+  // consistente con la metáfora de capas: apagar todas las capas deja el
+  // canvas vacío, no vuelve a mostrar todo sin filtrar). Antes esto mandaba
+  // la request sin sectorId/distritoId, que el backend interpreta como "sin
+  // acotar" — se salta el fetch entero en vez de pedir de más y descartar.
+  const hayAlgoVisible = sectoresVisibles.size > 0 || distritosSinSectorVisibles.size > 0;
 
   return useQuery({
     queryKey: [
@@ -65,6 +82,7 @@ export function useIncidentsToday() {
       [...sectoresVisibles],
       [...distritosSinSectorVisibles],
     ],
+    enabled: hayAlgoVisible,
     queryFn: async () => {
       const params = new URLSearchParams({
         categoria: categorias.join(','),
