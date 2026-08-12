@@ -14,10 +14,14 @@ type Props = {
   estado: EstadoIncidencia;
   onClose: () => void;
   onAbrirAvance: (transicion: TransicionEstado) => void;
+  /** EN_PROGRESO→ATENDIDO ("Finalizar" en el diagrama de estados de Edgar
+   * 2026-08-12) — antes era un `Alert.alert` sin nota, ahora abre
+   * `CulminarAtencionDialog` (misma nota opcional que ya tiene la versión web). */
+  onAbrirCulminar: () => void;
 };
 
 /** Overlay - Cambiar Estado (Spec 07, RF-07.1, RF-07.2). */
-export function CambiarEstadoSheet({ visible, incidenciaId, estado, onClose, onAbrirAvance }: Props) {
+export function CambiarEstadoSheet({ visible, incidenciaId, estado, onClose, onAbrirAvance, onAbrirCulminar }: Props) {
   const t = useThemeColors();
   const styles = useMemo(() => makeStyles(t), [t]);
   const ESTADO_COLOR: Record<EstadoIncidencia, string> = {
@@ -53,7 +57,12 @@ export function CambiarEstadoSheet({ visible, incidenciaId, estado, onClose, onA
       onAbrirAvance(transicion);
       return;
     }
-    Alert.alert('Marcar como atendido', '¿Confirmas que esta incidencia fue atendida?', [
+    if (transicion.desde === 'EN_PROGRESO' && transicion.hacia === 'ATENDIDO') {
+      onClose();
+      onAbrirCulminar();
+      return;
+    }
+    Alert.alert('Cambiar estado', `¿Confirmas el cambio a ${transicion.hacia.replace('_', ' ')}?`, [
       { text: 'Cancelar', style: 'cancel' },
       {
         text: 'Confirmar',

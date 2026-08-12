@@ -5,17 +5,20 @@ export type MotivoAvance =
   | 'DERIVAR_OTRA_AREA'
   | 'REASIGNAR_TECNICO'
   | 'EN_ESPERA'
-  | 'NO_SE_PUDO_ATENDER';
+  | 'SE_RESOLVIO';
 
 /** RF-07.3 (docs/API.md § 5 `POST /incidencias/{id}/avances`, campo `motivo`).
- * "Cuadrilla en sitio" y "Se resolvió" se quitaron del catálogo (ajuste de UI
- * 2026-07-23, confirmado con Edgar) — ya no son opciones válidas de motivo. */
+ * "Cuadrilla en sitio" y "No se pudo atender" se quitaron del catálogo de chips
+ * (rediseño 2026-08-12, confirmado con Edgar vía diagrama de estados: en
+ * EN_PROGRESO solo hay 4 motivos posibles, todos son un self-loop a
+ * EN_PROGRESO). `SE_RESOLVIO` NO aparece acá — es el motivo implícito que usa
+ * `CulminarAtencionDialog` para la transición EN_PROGRESO→ATENDIDO ("Finalizar"
+ * en el diagrama), el usuario nunca lo elige como chip. */
 export const MOTIVOS_AVANCE: { value: MotivoAvance; label: string }[] = [
   { value: 'REQUIERE_EQUIPO', label: 'Requiere equipo' },
   { value: 'DERIVAR_OTRA_AREA', label: 'Derivar a otra área' },
   { value: 'REASIGNAR_TECNICO', label: 'Reasignar técnico' },
   { value: 'EN_ESPERA', label: 'En espera' },
-  { value: 'NO_SE_PUDO_ATENDER', label: 'No se pudo atender' },
 ];
 
 /** Opciones del selector anidado cuando motivo === 'REQUIERE_EQUIPO'. */

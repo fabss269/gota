@@ -4,6 +4,7 @@ import { Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 
 import { CambiarEstadoSheet } from '@/components/incident-actions/CambiarEstadoSheet';
+import { CulminarAtencionDialog } from '@/components/incident-actions/CulminarAtencionDialog';
 import { RegistrarAvanceSheet } from '@/components/incident-actions/RegistrarAvanceSheet';
 import { SeleccionarResponsableSheet } from '@/components/incident-actions/SeleccionarResponsableSheet';
 import { DetalleTab } from '@/components/incident-detail/DetalleTab';
@@ -18,7 +19,7 @@ import { useIncidentDetail } from '@/hooks/useIncidentDetail';
 import type { TransicionEstado } from '@/mocks/estadoWorkflowMock';
 import { useThemeColors } from '@/state/themeStore';
 
-type ActiveSheet = 'estado' | 'avance' | 'responsable' | null;
+type ActiveSheet = 'estado' | 'avance' | 'responsable' | 'culminar' | null;
 
 /** Detalle de Incidencia (Spec 06) — modal ruteado, accesible desde Mapa y Lista. */
 export default function IncidenciaDetalleScreen() {
@@ -77,16 +78,26 @@ export default function IncidenciaDetalleScreen() {
               setPendingTransicion(transicion);
               setActiveSheet('avance');
             }}
+            onAbrirCulminar={() => setActiveSheet('culminar')}
           />
-          <RegistrarAvanceSheet
-            visible={activeSheet === 'avance'}
+          <CulminarAtencionDialog
+            visible={activeSheet === 'culminar'}
             incidenciaId={incidencia.id}
             incidenciaLabel={`${incidencia.tipo}  ·  ${incidencia.direccion}`}
-            transicion={pendingTransicion}
-            tecnicoActualId={incidencia.tecnicoAsignado?.id}
             onClose={() => setActiveSheet(null)}
-            onRegistrado={() => setActiveSheet(null)}
+            onCulminado={() => setActiveSheet(null)}
           />
+          {pendingTransicion && (
+            <RegistrarAvanceSheet
+              visible={activeSheet === 'avance'}
+              incidenciaId={incidencia.id}
+              incidenciaLabel={`${incidencia.tipo}  ·  ${incidencia.direccion}`}
+              transicion={pendingTransicion}
+              tecnicoActualId={incidencia.tecnicoAsignado?.id}
+              onClose={() => setActiveSheet(null)}
+              onRegistrado={() => setActiveSheet(null)}
+            />
+          )}
           <SeleccionarResponsableSheet
             visible={activeSheet === 'responsable'}
             incidenciaId={incidencia.id}

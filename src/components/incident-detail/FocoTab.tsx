@@ -8,7 +8,7 @@ import type { IncidenciaDetalle } from '@/mocks/incidentDetailMock';
 import { useThemeColors } from '@/state/themeStore';
 
 const ESTADO_LABEL: Record<EstadoIncidencia, string> = {
-  CREADO: 'Creado',
+  CREADO: 'Registrado',
   PENDIENTE: 'Pendiente',
   EN_PROGRESO: 'En progreso',
   ATENDIDO: 'Atendido',

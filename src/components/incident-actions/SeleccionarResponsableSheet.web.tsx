@@ -2,6 +2,7 @@ import { Ionicons } from '@expo/vector-icons';
 import { useMemo, useState, type CSSProperties } from 'react';
 
 import { Colors } from '@/constants/theme';
+import { useCambiarEstado } from '@/hooks/useCambiarEstado';
 import { useReasignarResponsable } from '@/hooks/useReasignarResponsable';
 import { useUsuarios } from '@/hooks/useUsuarios';
 import type { Usuario } from '@/mocks/usuariosMock';
@@ -16,6 +17,15 @@ type Props = {
   tecnicoActualId?: string;
   tecnicoActualNombre: string;
   onReasignado?: () => void;
+  /** 'pill' (default) — chip compacto con el técnico actual, para el header.
+   * 'primary' — botón grande de ancho completo con label fijo "Asignar a
+   * usuario", para el CTA principal del footer cuando la incidencia está
+   * Registrada (todavía sin técnico). */
+  variant?: 'pill' | 'primary';
+  /** Registrado→Pendiente (diagrama de estados de Edgar 2026-08-12): asignar
+   * un técnico desde el CTA principal también avanza el estado — a
+   * diferencia del pill del header, que solo reasigna sin tocar el estado. */
+  avanzarAPendienteTrasAsignar?: boolean;
 };
 
 function normalizar(texto: string): string {
@@ -41,11 +51,14 @@ export function SeleccionarResponsableSheet({
   tecnicoActualId,
   tecnicoActualNombre,
   onReasignado,
+  variant = 'pill',
+  avanzarAPendienteTrasAsignar = false,
 }: Props) {
   const [abierto, setAbierto] = useState(false);
   const [busqueda, setBusqueda] = useState('');
   const { data: usuarios = [], isLoading } = useUsuarios();
   const reasignar = useReasignarResponsable();
+  const cambiarEstado = useCambiarEstado();
 
   const filtrados = useMemo(() => {
     const q = normalizar(busqueda);
@@ -63,6 +76,9 @@ export function SeleccionarResponsableSheet({
       { id: incidenciaId, usuario },
       {
         onSuccess: () => {
+          if (avanzarAPendienteTrasAsignar) {
+            cambiarEstado.mutate({ id: incidenciaId, estado: 'PENDIENTE' });
+          }
           onReasignado?.();
           cerrar();
         },
@@ -72,15 +88,25 @@ export function SeleccionarResponsableSheet({
 
   return (
     <div style={wrapper}>
-      <button type="button" style={triggerBtn} onClick={() => setAbierto((v) => !v)}>
-        <Ionicons name="person-circle-outline" size={16} color={Colors.textBody} />
-        <span>{tecnicoActualNombre}</span>
-        <Ionicons name="chevron-forward" size={12} color={Colors.textMuted} />
+      <button
+        type="button"
+        style={variant === 'primary' ? primaryTriggerBtn : triggerBtn}
+        onClick={() => setAbierto((v) => !v)}
+      >
+        {variant === 'primary' ? (
+          <span>Asignar a usuario</span>
+        ) : (
+          <>
+            <Ionicons name="person-circle-outline" size={16} color={Colors.textBody} />
+            <span>{tecnicoActualNombre}</span>
+            <Ionicons name="chevron-forward" size={12} color={Colors.textMuted} />
+          </>
+        )}
       </button>
       {abierto && (
         <>
           <div style={backdrop} onClick={cerrar} />
-          <div style={panel}>
+          <div style={variant === 'primary' ? panelFullWidth : panel}>
             <div style={searchRow}>
               <Ionicons name="search-outline" size={14} color={Colors.textMuted} />
               <input
@@ -139,6 +165,12 @@ const triggerBtn: CSSProperties = {
   cursor: 'pointer',
 };
 
+const primaryTriggerBtn: CSSProperties = {
+  width: '100%', padding: '11px', borderRadius: 999, border: 'none',
+  backgroundColor: Colors.accent, color: '#FFFFFF', fontSize: 13, fontWeight: 700,
+  cursor: 'pointer',
+};
+
 const backdrop: CSSProperties = { position: 'fixed', inset: 0, zIndex: 19 };
 
 const panel: CSSProperties = {
@@ -147,6 +179,15 @@ const panel: CSSProperties = {
   backgroundColor: '#FFFFFF', borderRadius: 8,
   boxShadow: '0 4px 16px rgba(0,0,0,0.2)', border: `1px solid ${Colors.border}`,
   overflow: 'hidden',
+};
+
+const panelFullWidth: CSSProperties = {
+  ...panel,
+  left: 0,
+  right: 0,
+  width: 'auto',
+  bottom: 'calc(100% + 4px)',
+  top: 'auto',
 };
 
 const searchRow: CSSProperties = {

@@ -10,7 +10,7 @@ const PRIORIDAD_COLOR: Record<Prioridad, string> = {
 };
 
 const ESTADO_LABEL: Record<EstadoIncidencia, string> = {
-  CREADO: 'Creado',
+  CREADO: 'Registrado',
   PENDIENTE: 'Pendiente',
   EN_PROGRESO: 'En progreso',
   ATENDIDO: 'Atendido',
@@ -23,7 +23,7 @@ type Props = {
 
 /** Fila de la Lista de Incidencias (Spec 05, RF-05.4). */
 export function IncidentListItem({ incidencia, onPress }: Props) {
-  // RF-05.4: el punto gris es exclusivo del estado "Creado" (sin asignar aún),
+  // RF-05.4: el punto gris es exclusivo del estado "Registrado" (sin asignar aún),
   // independiente de la prioridad — mismo criterio que RF-07 usa para "sin asignar".
   const dotColor = incidencia.estado === 'CREADO' ? Colors.textMuted : PRIORIDAD_COLOR[incidencia.prioridad];
   const estadoLabel = ESTADO_LABEL[incidencia.estado];

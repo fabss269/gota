@@ -11,32 +11,23 @@ import {
   type MotivoAvance,
   type TransicionEstado,
 } from '@/mocks/estadoWorkflowMock';
-import type { EstadoIncidencia } from '@/mocks/incidentsMock';
 import type { Usuario } from '@/mocks/usuariosMock';
-import { useCambiarEstado } from '@/hooks/useCambiarEstado';
 import { useRegistrarAvance } from '@/hooks/useRegistrarAvance';
 import { useReasignarResponsable } from '@/hooks/useReasignarResponsable';
-import { useTransicionesValidas } from '@/hooks/useTransicionesValidas';
 import { useThemeColors } from '@/state/themeStore';
-
-const ESTADO_LABEL: Record<EstadoIncidencia, string> = {
-  CREADO: 'Creado',
-  PENDIENTE: 'Pendiente',
-  EN_PROGRESO: 'En progreso',
-  ATENDIDO: 'Atendido',
-};
 
 type Props = {
   visible: boolean;
   incidenciaId: string;
   incidenciaLabel: string;
-  /** Si viene `null`, el sheet muestra un selector de transición al inicio
-   * (usando `estadoActual`). Si viene con valor, se usa esa transición fija
-   * (flujo original desde CambiarEstadoSheet). */
-  transicion: TransicionEstado | null;
-  /** Requerido cuando `transicion` es null — se usa para calcular qué
-   * transiciones ofrecer en el selector interno. */
-  estadoActual?: EstadoIncidencia;
+  /** Siempre el self-loop EN_PROGRESO→EN_PROGRESO — "Registrar avance" nunca
+   * cambia de estado, solo deja constancia de qué pasó (ver diagrama de
+   * estados de Edgar 2026-08-12: Registrado→Pendiente y Pendiente→En progreso
+   * son transiciones simples sin formulario, manejadas directo con
+   * `useCambiarEstado`; "Finalizar"→Atendido vive en `CulminarAtencionDialog`).
+   * No hay selector de "siguiente estado" acá porque ya no hace falta — el
+   * caller siempre sabe qué transición es. */
+  transicion: TransicionEstado;
   tecnicoActualId?: string;
   onClose: () => void;
   onRegistrado: () => void;
@@ -59,7 +50,6 @@ export function RegistrarAvanceSheet({
   incidenciaId,
   incidenciaLabel,
   transicion,
-  estadoActual,
   tecnicoActualId,
   onClose,
   onRegistrado,
@@ -71,23 +61,7 @@ export function RegistrarAvanceSheet({
   const [area, setArea] = useState<string | null>(null);
   const [tecnico, setTecnico] = useState<Usuario | null>(null);
   const [nota, setNota] = useState('');
-  // Transición elegida internamente cuando el prop `transicion` viene null (caso
-  // del DetailPanel actual, que ya no tiene botón "Cambiar estado" separado).
-  const [transicionInterna, setTransicionInterna] = useState<TransicionEstado | null>(null);
-  const { data: transicionesValidas = [] } = useTransicionesValidas(
-    transicion == null ? incidenciaId : undefined,
-    estadoActual,
-  );
-  const transicionesDisponibles = transicion == null ? transicionesValidas : [];
-  const transicionEfectiva = transicion ?? transicionInterna;
-  // Transiciones sin formulario (ej. CREADO→PENDIENTE) no tienen un motivo válido
-  // que mapee a ellas (MOTIVO_ESTADO del backend solo produce EN_PROGRESO/ATENDIDO)
-  // — pedir un motivo igual y mandarlo por /avances rompía con 409 (transición
-  // inválida) porque el estado resultante del motivo nunca coincidía con la
-  // transición realmente elegida. Bug real 2026-08-12, reportado por Edgar.
-  const requiereMotivo = transicionEfectiva?.requiereFormulario ?? true;
   const registrarAvance = useRegistrarAvance();
-  const cambiarEstado = useCambiarEstado();
   const reasignarResponsable = useReasignarResponsable();
 
   // Mismo fix de animación que CambiarEstadoSheet: el backdrop solo aparece (fade), la
@@ -112,7 +86,6 @@ export function RegistrarAvanceSheet({
     setArea(null);
     setTecnico(null);
     setNota('');
-    setTransicionInterna(null);
     onClose();
   };
 
@@ -122,16 +95,6 @@ export function RegistrarAvanceSheet({
     (motivo === 'REASIGNAR_TECNICO' && !tecnico);
 
   const handleConfirm = () => {
-    if (!transicionEfectiva) return;
-
-    if (!requiereMotivo) {
-      cambiarEstado.mutate(
-        { id: incidenciaId, estado: transicionEfectiva.hacia },
-        { onSuccess: () => { resetAndClose(); onRegistrado(); } },
-      );
-      return;
-    }
-
     if (!motivo || faltaCampoDependiente) return;
 
     const notaFinal = [
@@ -143,7 +106,7 @@ export function RegistrarAvanceSheet({
       .join(' ');
 
     registrarAvance.mutate(
-      { id: incidenciaId, motivo, nota: notaFinal, siguienteEstado: transicionEfectiva.hacia },
+      { id: incidenciaId, motivo, nota: notaFinal, siguienteEstado: transicion.hacia },
       {
         onSuccess: () => {
           if (motivo === 'REASIGNAR_TECNICO' && tecnico) {
@@ -171,110 +134,69 @@ export function RegistrarAvanceSheet({
               </View>
               <Text style={styles.subtitle}>{incidenciaLabel}</Text>
 
-              {/* Selector de estado destino — solo cuando el sheet se abre sin
-                  transición ya elegida (flujo directo desde DetailPanel). */}
-              {transicion == null && transicionesDisponibles.length > 0 && (
-                <>
-                  <Text style={styles.sectionLabel}>SIGUIENTE ESTADO</Text>
-                  <View style={styles.grid}>
-                    {transicionesDisponibles.map((tx) => (
-                      <Chip
-                        styles={styles}
-                        key={`${tx.desde}-${tx.hacia}`}
-                        label={ESTADO_LABEL[tx.hacia]}
-                        active={transicionInterna?.hacia === tx.hacia}
-                        onPress={() => setTransicionInterna(tx)}
-                      />
-                    ))}
-                  </View>
-                </>
-              )}
-
-              {requiereMotivo ? (
-                <>
-                  <Text style={styles.sectionLabel}>¿QUÉ PASÓ?</Text>
-                  <View style={styles.grid}>
-                    {MOTIVOS_AVANCE.map((m) => (
-                      <Chip
-                        styles={styles}
-                        key={m.value}
-                        label={m.label}
-                        active={motivo === m.value}
-                        onPress={() => setMotivo(m.value)}
-                      />
-                    ))}
-                  </View>
-
-                  {motivo === 'REQUIERE_EQUIPO' && (
-                    <>
-                      <Text style={styles.sectionLabel}>¿Qué pasó?</Text>
-                      <View style={styles.grid}>
-                        {EQUIPO_OPTIONS.map((opt) => (
-                          <Chip styles={styles} key={opt} label={opt} active={equipo === opt} onPress={() => setEquipo(opt)} />
-                        ))}
-                      </View>
-                    </>
-                  )}
-
-                  {motivo === 'DERIVAR_OTRA_AREA' && (
-                    <>
-                      <Text style={styles.sectionLabel}>Área:</Text>
-                      <View style={styles.grid}>
-                        {AREA_OPTIONS.map((opt) => (
-                          <Chip styles={styles} key={opt} label={opt} active={area === opt} onPress={() => setArea(opt)} />
-                        ))}
-                      </View>
-                    </>
-                  )}
-
-                  {motivo === 'REASIGNAR_TECNICO' && (
-                    <>
-                      <Text style={styles.sectionLabel}>REASIGNAR A</Text>
-                      <TecnicoOptionsList selectedId={tecnico?.id ?? tecnicoActualId} onSelect={setTecnico} />
-                    </>
-                  )}
-
-                  <Text style={styles.sectionLabel}>NOTA (OPCIONAL)</Text>
-                  <TextInput
-                    value={nota}
-                    onChangeText={setNota}
-                    placeholder="Solo si hace falta un detalle extra..."
-                    placeholderTextColor={t.textMuted}
-                    style={styles.notaBox}
-                    multiline
+              <Text style={styles.sectionLabel}>¿QUÉ PASÓ?</Text>
+              <View style={styles.grid}>
+                {MOTIVOS_AVANCE.map((m) => (
+                  <Chip
+                    styles={styles}
+                    key={m.value}
+                    label={m.label}
+                    active={motivo === m.value}
+                    onPress={() => setMotivo(m.value)}
                   />
+                ))}
+              </View>
+
+              {motivo === 'REQUIERE_EQUIPO' && (
+                <>
+                  <Text style={styles.sectionLabel}>¿Qué pasó?</Text>
+                  <View style={styles.grid}>
+                    {EQUIPO_OPTIONS.map((opt) => (
+                      <Chip styles={styles} key={opt} label={opt} active={equipo === opt} onPress={() => setEquipo(opt)} />
+                    ))}
+                  </View>
                 </>
-              ) : (
-                transicionEfectiva && (
-                  <Text style={styles.confirmMsg}>
-                    Se marcará esta incidencia como {ESTADO_LABEL[transicionEfectiva.hacia]}. No requiere detalle adicional.
-                  </Text>
-                )
               )}
+
+              {motivo === 'DERIVAR_OTRA_AREA' && (
+                <>
+                  <Text style={styles.sectionLabel}>Área:</Text>
+                  <View style={styles.grid}>
+                    {AREA_OPTIONS.map((opt) => (
+                      <Chip styles={styles} key={opt} label={opt} active={area === opt} onPress={() => setArea(opt)} />
+                    ))}
+                  </View>
+                </>
+              )}
+
+              {motivo === 'REASIGNAR_TECNICO' && (
+                <>
+                  <Text style={styles.sectionLabel}>REASIGNAR A</Text>
+                  <TecnicoOptionsList selectedId={tecnico?.id ?? tecnicoActualId} onSelect={setTecnico} />
+                </>
+              )}
+
+              <Text style={styles.sectionLabel}>NOTA (OPCIONAL)</Text>
+              <TextInput
+                value={nota}
+                onChangeText={setNota}
+                placeholder="Solo si hace falta un detalle extra..."
+                placeholderTextColor={t.textMuted}
+                style={styles.notaBox}
+                multiline
+              />
 
               <View style={styles.buttonsRow}>
                 <Pressable style={styles.cancelBtn} onPress={resetAndClose}>
                   <Text style={styles.cancelLabel}>Cancelar</Text>
                 </Pressable>
                 <Pressable
-                  style={[
-                    styles.confirmBtn,
-                    (!transicionEfectiva || (requiereMotivo && (!motivo || faltaCampoDependiente))) && styles.confirmBtnDisabled,
-                  ]}
+                  style={[styles.confirmBtn, (!motivo || faltaCampoDependiente) && styles.confirmBtnDisabled]}
                   onPress={handleConfirm}
-                  disabled={
-                    !transicionEfectiva ||
-                    (requiereMotivo && (!motivo || faltaCampoDependiente)) ||
-                    registrarAvance.isPending ||
-                    cambiarEstado.isPending
-                  }
+                  disabled={!motivo || faltaCampoDependiente || registrarAvance.isPending}
                 >
                   <Text style={styles.confirmLabel}>
-                    {registrarAvance.isPending || cambiarEstado.isPending
-                      ? 'Guardando…'
-                      : requiereMotivo
-                        ? 'Registrar avance'
-                        : 'Confirmar'}
+                    {registrarAvance.isPending ? 'Guardando…' : 'Registrar avance'}
                   </Text>
                 </Pressable>
               </View>
@@ -342,7 +264,6 @@ function makeStyles(t: ColorPalette) {
     chipActive: { backgroundColor: t.accent, borderColor: t.accent },
     chipLabel: { fontSize: 11, fontWeight: '600', color: t.textBody },
     chipLabelActive: { color: t.white },
-    confirmMsg: { fontSize: 13, color: t.textBody, lineHeight: 18, marginTop: Spacing.sm },
     notaBox: {
       borderWidth: 1,
       borderColor: t.border,

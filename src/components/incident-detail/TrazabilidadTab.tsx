@@ -7,7 +7,7 @@ import { useThemeColors } from '@/state/themeStore';
 import { formatFechaHora } from '@/utils/formatFecha';
 
 const ESTADO_LABEL: Record<TrazabilidadPaso['estado'], string> = {
-  CREADO: 'CREADO',
+  CREADO: 'REGISTRADO',
   PENDIENTE: 'PENDIENTE',
   EN_PROGRESO: 'EN PROGRESO',
   ATENDIDO: 'ATENDIDO',

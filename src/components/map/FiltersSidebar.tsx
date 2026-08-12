@@ -23,7 +23,7 @@ const PRIORIDADES: { codigo: Prioridad; nombre: string; color: string }[] = [
 // existe un catálogo real de estados todavía (docs/API.md § 2), así que se
 // hardcodea igual que allá.
 const ESTADO_OPTIONS: { value: EstadoIncidencia; label: string }[] = [
-  { value: 'CREADO', label: 'Creado' },
+  { value: 'CREADO', label: 'Registrado' },
   { value: 'PENDIENTE', label: 'Pendiente' },
   { value: 'EN_PROGRESO', label: 'En progreso' },
   { value: 'ATENDIDO', label: 'Atendido' },

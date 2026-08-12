@@ -3,18 +3,22 @@ import type { CSSProperties, ReactNode } from 'react';
 import { useState } from 'react';
 import { View } from 'react-native';
 
+import { CulminarAtencionDialog } from '@/components/incident-actions/CulminarAtencionDialog';
 import { RegistrarAvanceSheet } from '@/components/incident-actions/RegistrarAvanceSheet';
 import { SeleccionarResponsableSheet } from '@/components/incident-actions/SeleccionarResponsableSheet';
 import { FocoTab } from '@/components/incident-detail/FocoTab';
 import { TrazabilidadTab } from '@/components/incident-detail/TrazabilidadTab';
+import { ConfirmDialog } from '@/components/shared/ConfirmDialog';
 import { SkeletonBlock } from '@/components/shared/Skeleton';
 import { Colors } from '@/constants/theme';
+import { useCambiarEstado } from '@/hooks/useCambiarEstado';
 import { useIncidentDetail } from '@/hooks/useIncidentDetail';
+import type { TransicionEstado } from '@/mocks/estadoWorkflowMock';
 import type { IncidenciaDetalle } from '@/mocks/incidentDetailMock';
 import { useMapSearchStore } from '@/state/mapSearchStore';
 
 const ESTADO_LABEL: Record<string, string> = {
-  CREADO: 'Creado',
+  CREADO: 'Registrado',
   PENDIENTE: 'Pendiente',
   EN_PROGRESO: 'En progreso',
   ATENDIDO: 'Atendido',
@@ -23,13 +27,21 @@ const ESTADO_LABEL: Record<string, string> = {
 // Zoom al que hacemos flyTo desde "Ver en el mapa" — nivel media manzana.
 const ZOOM_VER_EN_MAPA = 19;
 
-type ActiveSheet = 'avance' | null;
+// "Registrar avance" (EN_PROGRESO) siempre es el mismo self-loop — no hay
+// nada que elegir, el estado destino ya se sabe (diagrama de estados de
+// Edgar 2026-08-12).
+const TRANSICION_REGISTRAR_AVANCE: TransicionEstado = {
+  desde: 'EN_PROGRESO', hacia: 'EN_PROGRESO', label: 'Registrar avance', requiereFormulario: true,
+};
+
+type ActiveSheet = 'avance' | 'culminar' | 'empezar' | null;
 type Props = { incidenciaId: string; onClose: () => void };
 
 /** Panel lateral derecho de detalle de incidencia — layout web desktop. */
 export function DetailPanel({ incidenciaId, onClose }: Props) {
   const [activeSheet, setActiveSheet] = useState<ActiveSheet>(null);
   const { data: incidencia, isLoading, isError } = useIncidentDetail(incidenciaId);
+  const cambiarEstado = useCambiarEstado();
 
   if (isLoading) {
     return (
@@ -144,11 +156,13 @@ export function DetailPanel({ incidenciaId, onClose }: Props) {
             <Ionicons name="grid-outline" size={11} color={Colors.accent} />
             <span>{incidencia.sector}</span>
           </div>
-          <SeleccionarResponsableSheet
-            incidenciaId={incidencia.id}
-            tecnicoActualId={incidencia.tecnicoAsignado?.id}
-            tecnicoActualNombre={incidencia.tecnicoAsignado?.nombre ?? 'Sin asignar'}
-          />
+          {incidencia.estado !== 'CREADO' && (
+            <SeleccionarResponsableSheet
+              incidenciaId={incidencia.id}
+              tecnicoActualId={incidencia.tecnicoAsignado?.id}
+              tecnicoActualNombre={incidencia.tecnicoAsignado?.nombre ?? 'Sin asignar'}
+            />
+          )}
         </div>
       </div>
 
@@ -186,22 +200,77 @@ export function DetailPanel({ incidenciaId, onClose }: Props) {
         <PredioMensaje incidencia={incidencia} />
       </div>
 
-      {/* ── Acción única al fondo ─────────────────── */}
+      {/* ── Acción(es) al fondo — dirigidas por estado, ver diagrama de
+          estados de Edgar 2026-08-12: Registrado→Pendiente (asignar),
+          Pendiente→En progreso (empezar, confirmación simple), En progreso
+          se queda en sí mismo (registrar avance) o pasa a Atendido
+          (culminar), Atendido es terminal. ─────────────────── */}
       <div style={footer}>
-        <button type="button" style={btnPrimary} onClick={() => setActiveSheet('avance')}>
-          Registrar avance
-        </button>
+        {incidencia.estado === 'CREADO' && (
+          <SeleccionarResponsableSheet
+            incidenciaId={incidencia.id}
+            tecnicoActualId={incidencia.tecnicoAsignado?.id}
+            tecnicoActualNombre="Asignar a usuario"
+            variant="primary"
+            avanzarAPendienteTrasAsignar
+          />
+        )}
+        {incidencia.estado === 'PENDIENTE' && (
+          <button type="button" style={btnPrimary} onClick={() => setActiveSheet('empezar')}>
+            Empezar atención
+          </button>
+        )}
+        {incidencia.estado === 'EN_PROGRESO' && (
+          <div style={footerRow}>
+            <button type="button" style={btnSecondary} onClick={() => setActiveSheet('avance')}>
+              Registrar avance
+            </button>
+            <button type="button" style={btnCulminar} onClick={() => setActiveSheet('culminar')}>
+              Culminar atención
+            </button>
+          </div>
+        )}
+        {incidencia.estado === 'ATENDIDO' && (
+          <div style={atendidoMsg}>
+            <Ionicons name="checkmark-circle" size={16} color={Colors.statusATiempo} />
+            <span>Incidencia atendida</span>
+          </div>
+        )}
       </div>
 
-      <RegistrarAvanceSheet
-        visible={activeSheet === 'avance'}
+      {incidencia.estado === 'EN_PROGRESO' && (
+        <RegistrarAvanceSheet
+          visible={activeSheet === 'avance'}
+          incidenciaId={incidencia.id}
+          incidenciaLabel={`${incidencia.tipo}  ·  ${incidencia.direccion}`}
+          transicion={TRANSICION_REGISTRAR_AVANCE}
+          tecnicoActualId={incidencia.tecnicoAsignado?.id}
+          onClose={() => setActiveSheet(null)}
+          onRegistrado={() => setActiveSheet(null)}
+        />
+      )}
+
+      <CulminarAtencionDialog
+        visible={activeSheet === 'culminar'}
         incidenciaId={incidencia.id}
         incidenciaLabel={`${incidencia.tipo}  ·  ${incidencia.direccion}`}
-        transicion={null}
-        estadoActual={incidencia.estado}
-        tecnicoActualId={incidencia.tecnicoAsignado?.id}
         onClose={() => setActiveSheet(null)}
-        onRegistrado={() => setActiveSheet(null)}
+        onCulminado={() => setActiveSheet(null)}
+      />
+
+      <ConfirmDialog
+        open={activeSheet === 'empezar'}
+        title="Empezar atención"
+        message="¿Confirmas que quieres comenzar la atención de esta incidencia?"
+        confirmLabel="Empezar atención"
+        loading={cambiarEstado.isPending}
+        onConfirm={() =>
+          cambiarEstado.mutate(
+            { id: incidencia.id, estado: 'EN_PROGRESO' },
+            { onSuccess: () => setActiveSheet(null) }
+          )
+        }
+        onCancel={() => setActiveSheet(null)}
       />
     </div>
   );
@@ -454,6 +523,25 @@ const btnPrimary: CSSProperties = {
   color: 'white', border: 'none', borderRadius: 8,
   padding: '12px', fontSize: 14, fontWeight: 700,
   cursor: 'pointer', width: '100%',
+};
+
+const footerRow: CSSProperties = { display: 'flex', gap: 8 };
+
+const btnSecondary: CSSProperties = {
+  flex: 1, backgroundColor: '#FFFFFF', color: Colors.accent,
+  border: `1.5px solid ${Colors.accent}`, borderRadius: 8,
+  padding: '12px', fontSize: 13, fontWeight: 700, cursor: 'pointer',
+};
+
+const btnCulminar: CSSProperties = {
+  flex: 1, backgroundColor: Colors.statusATiempo, color: '#FFFFFF',
+  border: 'none', borderRadius: 8,
+  padding: '12px', fontSize: 13, fontWeight: 700, cursor: 'pointer',
+};
+
+const atendidoMsg: CSSProperties = {
+  display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 6,
+  fontSize: 13, fontWeight: 600, color: Colors.statusATiempo, padding: '4px 0',
 };
 
 const predioNoReinc: CSSProperties = {
