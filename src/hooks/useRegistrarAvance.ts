@@ -7,23 +7,24 @@ import type { EstadoIncidencia } from '@/mocks/incidentsMock';
 type Params = { id: string; motivo: MotivoAvance; nota: string; siguienteEstado: EstadoIncidencia };
 
 /**
- * Registrar avance (Spec 07, RF-07.3 a RF-07.6). El backend expone dos endpoints
- * separados (docs/API.md § 5): `POST /incidencias/{id}/avances` (la nota categorizada)
- * y `PATCH /incidencias/{id}/estado` (el cambio de estado) — la UI los presenta como
- * una sola acción (RF-07.1/07.2), así que se encadenan aquí.
+ * Registrar avance (Spec 07, RF-07.3 a RF-07.6). Un solo POST a
+ * `/incidencias/{id}/avances` — el backend deriva el estado destino del
+ * `motivo` (MOTIVO_ESTADO en app/modules/incidencias/transiciones.py) y ya
+ * inserta el evento con el estado correcto. `siguienteEstado` sigue en Params
+ * para que el caller pueda mostrarlo optimista en la UI, pero NO se manda al
+ * backend: la segunda llamada a PATCH /estado que existía antes duplicaba
+ * eventos (dos EN_PROGRESO por avance) y en "Culminar" (SE_RESOLVIO→ATENDIDO)
+ * devolvía 409 porque el estado ya había cambiado a ATENDIDO en el primer
+ * POST y ATENDIDO→ATENDIDO no es transición válida.
  */
 export function useRegistrarAvance() {
   const queryClient = useQueryClient();
 
   return useMutation({
-    mutationFn: async ({ id, motivo, nota, siguienteEstado }: Params) => {
+    mutationFn: async ({ id, motivo, nota }: Params) => {
       await apiFetch(`/incidencias/${id}/avances`, {
         method: 'POST',
         body: JSON.stringify({ motivo, nota: nota.trim() || undefined }),
-      });
-      await apiFetch(`/incidencias/${id}/estado`, {
-        method: 'PATCH',
-        body: JSON.stringify({ estado: siguienteEstado }),
       });
     },
     onSuccess: (_data, variables) => {
