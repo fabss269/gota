@@ -1,15 +1,14 @@
 import { Ionicons, MaterialCommunityIcons } from '@expo/vector-icons';
 import { useQuery } from '@tanstack/react-query';
-import { useEffect, type CSSProperties, type ReactNode } from 'react';
+import { useEffect, type CSSProperties } from 'react';
 
 import { getTiposGrupo } from '@/api/catalogos';
 import type { ApiTipoGrupo } from '@/api/types';
 import { LocationDropdown } from '@/components/map/LocationDropdown';
+import { LocationTree } from '@/components/map/LocationTree';
 import { Colors } from '@/constants/theme';
 import type { Categoria, EstadoIncidencia, Prioridad } from '@/mocks/incidentsMock';
-import { useCapasStore, type CapaKey } from '@/state/capasStore';
 import { useFiltersStore } from '@/state/filtersStore';
-import { useMapSearchStore } from '@/state/mapSearchStore';
 import { useUbicacionStore } from '@/state/ubicacionStore';
 
 // Colores del semáforo de prioridad — mismos tokens que el resto del proyecto.
@@ -65,44 +64,13 @@ export function FiltersSidebar() {
     // Catálogo casi estático — evita refetch en cada mount del sidebar.
     staleTime: 60 * 60 * 1000,
   });
-  const { capasVisibles, aplicarCapas } = useCapasStore();
-  const {
-    provincias,
-    distritos,
-    sectores,
-    cargando: ubicacionCargando,
-    provinciaActiva,
-    distritoActivo,
-    sectorActivo,
-    cargar: cargarUbicacion,
-    seleccionarProvincia,
-    seleccionarDistrito,
-    seleccionarSector,
-    previsualizarSector,
-  } = useUbicacionStore();
-  const flyToBounds = useMapSearchStore((s) => s.flyToBounds);
+  const provincias = useUbicacionStore((s) => s.provincias);
+  const ubicacionCargando = useUbicacionStore((s) => s.cargando);
+  const cargarUbicacion = useUbicacionStore((s) => s.cargar);
 
   useEffect(() => {
     cargarUbicacion();
   }, [cargarUbicacion]);
-
-  const isCapa = (key: CapaKey) => capasVisibles.has(key);
-
-  const toggleCapa = (key: CapaKey) => {
-    const next = new Set(capasVisibles);
-    if (next.has(key)) { next.delete(key); } else { next.add(key); }
-    aplicarCapas(next);
-  };
-
-  const distritosDeLaProvincia = distritos.filter((d) => d.provinciaId === provinciaActiva);
-  const sectoresDelDistrito = sectores.filter((s) => s.distritoId === distritoActivo);
-
-  // 🔍 lupa de la fila de Sector — solo mueve la cámara (mapSearchStore), nunca
-  // toca sectorActivo/sectorPreview ni dispara fetch.
-  const handleZoomSector = (sectorId: string) => {
-    const sector = sectores.find((s) => s.id === sectorId);
-    if (sector?.bbox) flyToBounds(sector.bbox);
-  };
 
   return (
     <div style={sidebar}>
@@ -133,7 +101,10 @@ export function FiltersSidebar() {
         ))}
       </div>
 
-      {/* Prioridad — semáforo verde/amarillo/rojo, mínimo 1 activo (store lo protege) */}
+      {/* Prioridad — semáforo verde/amarillo/rojo, mínimo 1 activo (store lo protege).
+          Círculo relleno = activo (se está mostrando); círculo hueco con borde de
+          color = inactivo — más parecido a un check real que a "atenuado" (antes
+          era opacidad baja, se sentía ambiguo entre "apagado" y "deshabilitado"). */}
       <div style={grupoSectionLabel}>PRIORIDAD</div>
       <div style={prioridadRow}>
         {PRIORIDADES.map((p) => {
@@ -145,8 +116,8 @@ export function FiltersSidebar() {
               onClick={() => togglePrioridad(p.codigo)}
               style={{
                 ...prioridadDot,
-                backgroundColor: p.color,
-                opacity: activo ? 1 : 0.28,
+                backgroundColor: activo ? p.color : 'transparent',
+                border: `2px solid ${p.color}`,
               }}
               aria-pressed={activo}
               aria-label={p.nombre}
@@ -195,47 +166,10 @@ export function FiltersSidebar() {
         <span style={sectionLabel}>UBICACIÓN</span>
       </div>
 
-      <CapaRow
-        label="Resaltar sector en el mapa"
-        value={isCapa('resaltar_sector')}
-        onChange={() => toggleCapa('resaltar_sector')}
-      />
-
       {ubicacionCargando && provincias.length === 0 ? (
         <div style={{ fontSize: 12, color: 'var(--map-text-muted)', padding: '2px 0 4px' }}>Cargando…</div>
       ) : (
-        <>
-          <div style={fieldLabel}>Provincia</div>
-          <LocationDropdown
-            options={provincias.map((p) => ({ id: p.id, nombre: p.nombre }))}
-            value={provinciaActiva}
-            onSelect={seleccionarProvincia}
-            placeholder="Todas las provincias"
-            clearLabel="Todas"
-          />
-
-          <div style={fieldLabel}>Distrito</div>
-          <LocationDropdown
-            options={distritosDeLaProvincia.map((d) => ({ id: d.id, nombre: d.nombre }))}
-            value={distritoActivo}
-            onSelect={seleccionarDistrito}
-            placeholder="Todos los distritos"
-            clearLabel="Todos"
-            disabled={!provinciaActiva}
-          />
-
-          <div style={fieldLabel}>Sector</div>
-          <LocationDropdown
-            options={sectoresDelDistrito.map((s) => ({ id: s.id, nombre: s.nombre }))}
-            value={sectorActivo}
-            onSelect={seleccionarSector}
-            placeholder="Todos los sectores"
-            clearLabel="Todos"
-            disabled={!distritoActivo}
-            onPreview={previsualizarSector}
-            onZoom={handleZoomSector}
-          />
-        </>
+        <LocationTree />
       )}
     </div>
   );
@@ -263,72 +197,16 @@ function GrupoPill({
       title={grupo.nombre}
     >
       {icon.family === 'ionicons' ? (
-        <Ionicons name={icon.name} size={14} color={iconColor} />
+        <Ionicons name={icon.name} size={13} color={iconColor} />
       ) : (
-        <MaterialCommunityIcons name={icon.name} size={14} color={iconColor} />
+        <MaterialCommunityIcons name={icon.name} size={13} color={iconColor} />
       )}
       <span>{grupo.nombre}</span>
+      {/* Checkmark cuando está activo — refuerza "esto se está mostrando" sin
+          depender solo del color de fondo (mismo click de siempre, solo feedback
+          visual más claro). */}
+      {activo && <MaterialCommunityIcons name="check" size={13} color="#FFFFFF" />}
     </button>
-  );
-}
-
-function CapaRow({
-  icon,
-  label,
-  value,
-  onChange,
-}: {
-  icon?: ReactNode;
-  label: string;
-  value: boolean;
-  onChange: () => void;
-}) {
-  return (
-    <div style={capaRow}>
-      <div style={{ display: 'flex', alignItems: 'center', gap: 8, flex: 1 }}>
-        {icon !== undefined && (
-          <div style={{ width: 22, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
-            {icon}
-          </div>
-        )}
-        <span style={{ fontSize: 12, color: 'var(--map-text)' }}>{label}</span>
-      </div>
-      <Toggle value={value} onChange={onChange} />
-    </div>
-  );
-}
-
-function Toggle({ value, onChange }: { value: boolean; onChange: () => void }) {
-  return (
-    <div
-      role="switch"
-      aria-checked={value}
-      onClick={onChange}
-      style={{
-        width: 36,
-        height: 20,
-        borderRadius: 10,
-        backgroundColor: value ? 'var(--map-accent)' : 'var(--map-border)',
-        cursor: 'pointer',
-        position: 'relative',
-        flexShrink: 0,
-        transition: 'background-color 150ms',
-      }}
-    >
-      <div
-        style={{
-          width: 16,
-          height: 16,
-          borderRadius: 8,
-          backgroundColor: 'var(--map-surface)',
-          position: 'absolute',
-          top: 2,
-          left: value ? 18 : 2,
-          transition: 'left 150ms',
-          boxShadow: '0 1px 2px rgba(0,0,0,0.25)',
-        }}
-      />
-    </div>
   );
 }
 
@@ -355,7 +233,7 @@ const sectionHeaderRow: CSSProperties = {
 };
 
 const sectionLabel: CSSProperties = {
-  fontSize: 10,
+  fontSize: 9.5,
   fontWeight: '700',
   color: 'var(--map-text-muted)',
   letterSpacing: 0.8,
@@ -366,19 +244,12 @@ const ubicacionHeader: CSSProperties = {
 };
 
 const grupoSectionLabel: CSSProperties = {
-  fontSize: 10,
+  fontSize: 9.5,
   fontWeight: 700,
   color: 'var(--map-text-muted)',
   letterSpacing: 0.8,
   marginTop: 8,
   marginBottom: 8,
-};
-
-const fieldLabel: CSSProperties = {
-  fontSize: 11,
-  color: 'var(--map-text-muted)',
-  marginTop: 8,
-  marginBottom: 4,
 };
 
 const grupoRow: CSSProperties = {
@@ -395,16 +266,15 @@ const prioridadRow: CSSProperties = {
 };
 
 const prioridadDot: CSSProperties = {
-  width: 24,
-  height: 24,
-  minWidth: 24,
-  minHeight: 24,
-  borderRadius: 6,
-  border: 'none',
+  width: 22,
+  height: 22,
+  minWidth: 22,
+  minHeight: 22,
+  borderRadius: '50%',
   padding: 0,
   boxSizing: 'border-box',
   cursor: 'pointer',
-  transition: 'opacity 150ms',
+  transition: 'background-color 150ms',
   flexShrink: 0,
 };
 
@@ -438,8 +308,8 @@ const grupoPillBase: CSSProperties = {
   alignItems: 'center',
   justifyContent: 'center',
   gap: 6,
-  padding: '7px 10px',
-  fontSize: 13,
+  padding: '6px 9px',
+  fontSize: 12,
   fontWeight: 600,
   borderRadius: 8,
   cursor: 'pointer',
@@ -477,13 +347,4 @@ const divider: CSSProperties = {
   height: 1,
   backgroundColor: 'var(--map-border)',
   margin: '12px 0',
-};
-
-const capaRow: CSSProperties = {
-  display: 'flex',
-  alignItems: 'center',
-  justifyContent: 'space-between',
-  paddingTop: 7,
-  paddingBottom: 7,
-  borderBottom: '1px solid var(--map-surface-alt)',
 };

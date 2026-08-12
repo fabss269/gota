@@ -48,8 +48,8 @@ export function useIncidentsToday() {
   const fechaDesde = useFiltersStore((s) => s.fechaDesde);
   const fechaHasta = useFiltersStore((s) => s.fechaHasta);
   const soloNoResueltas = useFiltersStore((s) => s.soloNoResueltas);
-  const distritoActivo = useUbicacionStore((s) => s.distritoActivo);
-  const sectorActivo = useUbicacionStore((s) => s.sectorActivo);
+  const sectoresVisibles = useUbicacionStore((s) => s.sectoresVisibles);
+  const distritosSinSectorVisibles = useUbicacionStore((s) => s.distritosSinSectorVisibles);
 
   return useQuery({
     queryKey: [
@@ -62,8 +62,8 @@ export function useIncidentsToday() {
       fechaDesde,
       fechaHasta,
       soloNoResueltas,
-      distritoActivo,
-      sectorActivo,
+      [...sectoresVisibles],
+      [...distritosSinSectorVisibles],
     ],
     queryFn: async () => {
       const params = new URLSearchParams({
@@ -75,14 +75,16 @@ export function useIncidentsToday() {
       if (tipoAtencion) params.set('tipoAtencionId', tipoAtencion);
       if (estado) params.set('estado', estado);
       if (soloNoResueltas) params.set('resuelto', 'false');
-      // Sector manda sobre distrito si hay ambos (más específico) — mismo criterio
-      // que ya usa MapView.web.tsx para centrar la cámara. Ambos son selección
-      // única ahora (rediseño 2026-08-11, ver ubicacionStore.ts) — ya no hace
-      // falta desambiguar un Set a un solo valor.
-      if (sectorActivo) {
-        params.set('sectorId', sectorActivo);
-      } else if (distritoActivo) {
-        params.set('distritoId', distritoActivo);
+      // El ojito de cada fila de UBICACIÓN (LocationTree.tsx) YA cascadeó al
+      // togglear — sectoresVisibles viene resuelto, se manda tal cual. Fallback a
+      // distritoId solo para distritos sin sectores propios (no se pueden
+      // representar como sectorId); si hay más de uno visible a la vez, el
+      // backend solo acepta un distritoId, se toma el primero (limitación ya
+      // existente, no es una regresión de este cambio).
+      if (sectoresVisibles.size > 0) {
+        params.set('sectorId', [...sectoresVisibles].join(','));
+      } else if (distritosSinSectorVisibles.size > 0) {
+        params.set('distritoId', [...distritosSinSectorVisibles][0]);
       }
 
       const response = await apiFetch<ApiIncidenciaListResponse>(`/incidencias?${params.toString()}`);

@@ -36,9 +36,9 @@ export const CAPA_KEY_POR_LAYER_ID: Partial<Record<string, CapaKey>> = Object.fr
   Object.entries(CAPA_LAYER_IDS).flatMap(([capa, layers]) => layers.map((l) => [l, capa as CapaKey]))
 );
 
-// Capas de catastro filtrables por sectorid cuando hay algo activo en UBICACIÓN
-// (ver sectorIdsEfectivos() más abajo, cascadea sector→distrito→provincia).
-// alcantarillado-primaria/secundaria ya traen su
+// Capas de catastro filtrables por sectorid cuando hay algo visible en UBICACIÓN
+// (ver ubicacionStore.sectoresVisibles, ya resuelto vía los helpers de cascada
+// más abajo). alcantarillado-primaria/secundaria ya traen su
 // propio filtro base (primaria true/false) que hay que preservar combinándolo con el
 // de sector.
 export const CATASTRO_SECTOR_FILTER_LAYERS: { id: string; baseFilter?: MapExpression }[] = [
@@ -124,38 +124,56 @@ export function colorForSectorId(sectorId: string): string {
   return `hsl(${hue.toFixed(0)}, 75%, 45%)`;
 }
 
-// Calcula los `sectorid` efectivos a pintar/filtrar cascadeando
-// sector→distrito→provincia (mismo criterio que ya usaba el fitBounds de cámara,
-// ver MapView.web.tsx/MapView.tsx) — bug real 2026-08-11: applySectorHighlight/
-// applyCatastroSectorFilter (y su equivalente buildEffectiveStyle en nativo) solo
-// miraban sectorActivo, así que con un distrito/provincia activo pero SIN sector
-// elegido, no caían a ningún nivel: el catastro se mostraba sin acotar (o el
-// resaltado no pintaba nada). No pide nada nuevo al backend — sectores/distritos ya
-// están cargados en ubicacionStore, con distritoId/provinciaId listos para filtrar.
+// ── Árbol de UBICACIÓN (rediseño 2026-08-12, estilo panel de capas de Figma) ──
 //
-// El "ojito" (sectorPreview) NO pasa por acá: quien pinta el contorno del sector
-// (SECTOR_LAYER_IDS) lo une aparte a este resultado; el filtro de catastro
-// (CATASTRO_SECTOR_FILTER_LAYERS) nunca debe incluirlo — el preview solo muestra
-// dónde está el sector, no carga su red completa sin que sea el filtro activo.
-export function sectorIdsEfectivos(args: {
-  sectores: { id: string; distritoId: string }[];
-  distritos: { id: string; provinciaId: string }[];
-  provinciaActiva: string | null;
-  distritoActivo: string | null;
-  sectorActivo: string | null;
-}): number[] {
-  const { sectores, distritos, provinciaActiva, distritoActivo, sectorActivo } = args;
-  if (sectorActivo) return [Number(sectorActivo)];
-  if (distritoActivo) {
-    return sectores.filter((s) => s.distritoId === distritoActivo).map((s) => Number(s.id));
-  }
-  if (provinciaActiva) {
-    const idsDistritosDeLaProvincia = new Set(
-      distritos.filter((d) => d.provinciaId === provinciaActiva).map((d) => d.id)
-    );
-    return sectores.filter((s) => idsDistritosDeLaProvincia.has(s.distritoId)).map((s) => Number(s.id));
-  }
-  return [];
+// El "ojito" de cada fila (LocationTree.tsx) es ahora el filtro real (ya no hay
+// preview separado de filtro activo): prender el ojo de una Provincia/Distrito
+// cascadea y prende el de TODOS sus descendientes; apagarlo apaga todos los de
+// abajo. `ubicacionStore.ts` guarda el resultado ya resuelto en
+// `sectoresVisibles` (Set) — estos helpers son los que usa tanto el store para
+// cascadear al togglear, como el árbol para saber qué ícono de ojo pintar en
+// cada fila de Provincia/Distrito (on/off/mixed).
+
+export function sectoresDeDistrito(
+  sectores: { id: string; distritoId: string }[],
+  distritoId: string
+): string[] {
+  return sectores.filter((s) => s.distritoId === distritoId).map((s) => s.id);
+}
+
+export function sectoresDeProvincia(
+  sectores: { id: string; distritoId: string }[],
+  distritos: { id: string; provinciaId: string }[],
+  provinciaId: string
+): string[] {
+  const idsDistritosDeLaProvincia = new Set(
+    distritos.filter((d) => d.provinciaId === provinciaId).map((d) => d.id)
+  );
+  return sectores.filter((s) => idsDistritosDeLaProvincia.has(s.distritoId)).map((s) => s.id);
+}
+
+// La mayoría de los distritos no tiene ningún sector propio (catastro comercial
+// parcial) — esos no se pueden representar en `sectoresVisibles`, así que el
+// store los guarda aparte en `distritosSinSectorVisibles`. Esta función devuelve,
+// para una provincia dada, qué distritos de esos "sin sector" tiene.
+export function distritosSinSectorDeProvincia(
+  distritos: { id: string; provinciaId: string }[],
+  sectores: { id: string; distritoId: string }[],
+  provinciaId: string
+): string[] {
+  const idsConSector = new Set(sectores.map((s) => s.distritoId));
+  return distritos.filter((d) => d.provinciaId === provinciaId && !idsConSector.has(d.id)).map((d) => d.id);
+}
+
+// Tri-estado para el ícono de ojo de una fila Provincia/Distrito: 'on' si TODOS
+// sus ids relevantes están visibles, 'off' si NINGUNO, 'mixed' si algunos sí y
+// otros no (como el ícono de "visibilidad parcial" de un grupo de capas en Figma).
+export function estadoVisibilidad(idsRelevantes: string[], visibles: Set<string>): 'on' | 'off' | 'mixed' {
+  if (idsRelevantes.length === 0) return 'off';
+  const visiblesCount = idsRelevantes.filter((id) => visibles.has(id)).length;
+  if (visiblesCount === 0) return 'off';
+  if (visiblesCount === idsRelevantes.length) return 'on';
+  return 'mixed';
 }
 
 export function unionBbox(boxes: ApiBbox[]): ApiBbox {

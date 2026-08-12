@@ -8,7 +8,6 @@ import {
 import { useEffect, useMemo, useRef, useState } from 'react';
 import { StyleSheet, View } from 'react-native';
 
-import type { ApiBbox } from '@/api/types';
 import { IncidentMarker } from '@/components/map/IncidentMarker';
 import {
   CAPA_LAYER_IDS,
@@ -16,7 +15,6 @@ import {
   SECTOR_COLOR_LAYER_IDS,
   SECTOR_LAYER_IDS,
   colorForSectorId,
-  sectorIdsEfectivos,
 } from '@/components/map/mapLayers';
 import { useCapasStore } from '@/state/capasStore';
 import { useMapSearchStore } from '@/state/mapSearchStore';
@@ -57,24 +55,13 @@ function buildEffectiveStyle(
   baseStyle: StyleJson,
   capasVisibles: Set<string>,
   sectores: { id: string; distritoId: string }[],
-  distritos: { id: string; provinciaId: string }[],
-  provinciaActiva: string | null,
-  distritoActivo: string | null,
-  sectorActivo: string | null,
-  sectorPreview: string | null
+  sectoresVisibles: Set<string>
 ): StyleJson {
-  // Cascada sector→distrito→provincia (mismo bug/fix que la versión web — ver
-  // sectorIdsEfectivos en mapLayers.ts): sin esto, con solo un distrito/provincia
-  // activo (sin sector elegido) el catastro se mostraba sin acotar.
-  const idsCascada = sectorIdsEfectivos({ sectores, distritos, provinciaActiva, distritoActivo, sectorActivo });
-  const resaltarActivo = capasVisibles.has('resaltar_sector');
-  const idsResaltadoCascada = resaltarActivo ? idsCascada : [];
-  // El "ojito" (sectorPreview) se une SOLO al resaltado, nunca al filtro de
-  // catastro (sectorFilter más abajo) — previsualizar un sector no debe cargar su
-  // red completa sin que sea el filtro realmente activo.
-  const idsResaltado = sectorPreview
-    ? [...new Set([...idsResaltadoCascada, Number(sectorPreview)])]
-    : idsResaltadoCascada;
+  // Rediseño 2026-08-12 (árbol tipo Figma): el ojito de cada fila ya cascadeó al
+  // togglear (ver ubicacionStore.toggleDistritoVisible/toggleProvinciaVisible),
+  // así que acá `sectoresVisibles` viene resuelto — pinta Y filtra a la vez, ya
+  // no hay "resaltar_sector" como toggle separado ni preview sin filtrar.
+  const idsActivos = [...sectoresVisibles].map(Number);
 
   const colorMatch: unknown[] = ['match', ['get', 'sectorid']];
   for (const sector of sectores) {
@@ -83,8 +70,7 @@ function buildEffectiveStyle(
   colorMatch.push('#9E9E9E');
 
   const catastroFilterById = new Map(CATASTRO_SECTOR_FILTER_LAYERS.map((l) => [l.id, l.baseFilter]));
-  const sectorFilter = ['in', ['get', 'sectorid'], ['literal', idsCascada]];
-  const resaltadoFilter = ['in', ['get', 'sectorid'], ['literal', idsResaltado]];
+  const sectorFilter = ['in', ['get', 'sectorid'], ['literal', idsActivos]];
   const colorLayerProp = new Map(SECTOR_COLOR_LAYER_IDS);
 
   const layers = (baseStyle.layers ?? []).map((layer): StyleLayer => {
@@ -97,7 +83,7 @@ function buildEffectiveStyle(
     }
 
     if (SECTOR_LAYER_IDS.includes(layer.id)) {
-      next = { ...next, filter: resaltadoFilter };
+      next = { ...next, filter: sectorFilter };
       const paintProp = colorLayerProp.get(layer.id);
       if (paintProp) {
         next = { ...next, paint: { ...next.paint, [paintProp]: colorMatch } };
@@ -105,7 +91,7 @@ function buildEffectiveStyle(
     } else if (catastroFilterById.has(layer.id)) {
       const baseFilter = catastroFilterById.get(layer.id);
       const filter =
-        idsCascada.length === 0
+        idsActivos.length === 0
           ? (baseFilter ?? null)
           : baseFilter
             ? ['all', baseFilter, sectorFilter]
@@ -149,67 +135,20 @@ export function EpselMapView({ clusters, onPressCluster }: Props) {
 
   const capasVisibles = useCapasStore((state) => state.capasVisibles);
   const sectores = useUbicacionStore((state) => state.sectores);
-  const distritos = useUbicacionStore((state) => state.distritos);
-  const provinciaActiva = useUbicacionStore((state) => state.provinciaActiva);
-  const distritoActivo = useUbicacionStore((state) => state.distritoActivo);
-  const sectorActivo = useUbicacionStore((state) => state.sectorActivo);
-  const sectorPreview = useUbicacionStore((state) => state.sectorPreview);
+  const sectoresVisibles = useUbicacionStore((state) => state.sectoresVisibles);
 
   const effectiveStyle = useMemo(() => {
     if (!baseStyle) return null;
-    return buildEffectiveStyle(
-      baseStyle,
-      capasVisibles,
-      sectores,
-      distritos,
-      provinciaActiva,
-      distritoActivo,
-      sectorActivo,
-      sectorPreview
-    );
-  }, [baseStyle, capasVisibles, sectores, distritos, provinciaActiva, distritoActivo, sectorActivo, sectorPreview]);
+    return buildEffectiveStyle(baseStyle, capasVisibles, sectores, sectoresVisibles);
+  }, [baseStyle, capasVisibles, sectores, sectoresVisibles]);
 
   const center: [number, number] =
     clusters.length > 0 ? [clusters[0].lon, clusters[0].lat] : DEFAULT_CENTER;
 
-  // Auto-encuadre de cámara por el nivel más específico con algo activo en UBICACIÓN
-  // (sector > distrito > provincia) — mismo criterio que MapView.web.tsx. Selección
-  // única en cada nivel (rediseño 2026-08-11), ya no hace falta unionBbox.
-  const provincias = useUbicacionStore((state) => state.provincias);
-  const lastBoundsKeyRef = useRef<string | null>(null);
-
-  useEffect(() => {
-    const state = useUbicacionStore.getState();
-    let activo: { id: string; bbox: ApiBbox } | undefined;
-    let nivel: string;
-
-    if (state.sectorActivo) {
-      activo = state.sectores.find((s) => s.id === state.sectorActivo);
-      nivel = 'sector';
-    } else if (state.distritoActivo) {
-      activo = state.distritos.find((d) => d.id === state.distritoActivo);
-      nivel = 'distrito';
-    } else if (state.provinciaActiva) {
-      activo = state.provincias.find((p) => p.id === state.provinciaActiva);
-      nivel = 'provincia';
-    } else {
-      return;
-    }
-
-    if (!activo?.bbox) return;
-
-    const key = `${nivel}:${activo.id}`;
-    if (key === lastBoundsKeyRef.current) return;
-    lastBoundsKeyRef.current = key;
-
-    const bbox = activo.bbox;
-    cameraRef.current?.fitBounds([bbox.minLon, bbox.minLat, bbox.maxLon, bbox.maxLat], {
-      padding: { top: 48, left: 48, bottom: 48, right: 48 },
-      duration: 800,
-    });
-  }, [provincias, distritos, sectores, provinciaActiva, distritoActivo, sectorActivo]);
-
-  // Buscador (dirección/suministro) — mismo store que la versión web.
+  // Buscador (dirección/suministro) — mismo store que la versión web. El
+  // encuadre por Provincia/Distrito/Sector ahora es trabajo exclusivo de la
+  // lupa de cada fila en LocationTree.tsx (rediseño 2026-08-12) — ya no hay un
+  // efecto reactivo que mueva la cámara sola al togglear un ojito.
   const flyTarget = useMapSearchStore((state) => state.flyTarget);
   useEffect(() => {
     if (!flyTarget) return;
