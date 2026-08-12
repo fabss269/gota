@@ -46,6 +46,10 @@ export const CATASTRO_SECTOR_FILTER_LAYERS: { id: string; baseFilter?: MapExpres
   { id: 'lotes-fill' },
   { id: 'lotes-outline' },
   { id: 'agua-red' },
+  // Bug real 2026-08-11: esta capa quedó afuera de la lista, así que nunca se
+  // filtraba por sector — se veían diámetros de tramos fuera del sector activo
+  // aunque la línea (agua-red) sí estuviera correctamente oculta.
+  { id: 'agua-red-diametro-label' },
   { id: 'cajaaguaconexion-line' },
   { id: 'cajaagua-circle' },
   { id: 'accesorios-circle' },
