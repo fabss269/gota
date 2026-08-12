@@ -1,27 +1,34 @@
-import { useEffect, useRef, useState, type CSSProperties, type ReactNode } from 'react';
+import { Ionicons, MaterialCommunityIcons } from '@expo/vector-icons';
+import { useQuery } from '@tanstack/react-query';
+import { useEffect, useState, type CSSProperties, type ReactNode } from 'react';
 
-import type { ApiDistrito, ApiSector } from '@/api/types';
-import type { EstadoIncidencia, Prioridad } from '@/mocks/incidentsMock';
+import { getTiposGrupo } from '@/api/catalogos';
+import type { ApiDistrito, ApiSector, ApiTipoGrupo } from '@/api/types';
+import { Colors } from '@/constants/theme';
+import type { Categoria, Prioridad } from '@/mocks/incidentsMock';
 import { useCapasStore, type CapaKey } from '@/state/capasStore';
 import { useFiltersStore } from '@/state/filtersStore';
 import { useUbicacionStore } from '@/state/ubicacionStore';
 
-import { ThemeToggleButton } from './ThemeToggleButton.web';
-
-const TIPO_OPTIONS = [
-  'Atoro en colector',
-  'Fuga en vereda',
-  'Fuga de agua',
-  'Falta de agua',
+// Colores del semáforo de prioridad — mismos tokens que el resto del proyecto.
+const PRIORIDADES: { codigo: Prioridad; nombre: string; color: string }[] = [
+  { codigo: 'a_tiempo', nombre: 'A tiempo', color: Colors.statusATiempo },
+  { codigo: 'alerta',   nombre: 'Alerta',   color: Colors.statusAlerta },
+  { codigo: 'critica',  nombre: 'Crítica',  color: Colors.statusCritica },
 ];
 
-const ESTADO_OPTIONS: { value: EstadoIncidencia | ''; label: string }[] = [
-  { value: '', label: 'Todos' },
-  { value: 'CREADO', label: 'Creado' },
-  { value: 'PENDIENTE', label: 'Pendiente' },
-  { value: 'EN_PROGRESO', label: 'En progreso' },
-  { value: 'ATENDIDO', label: 'Atendido' },
-];
+// Íconos por código de grupo. Se cae a un default seguro si el catálogo trae
+// grupos futuros que aún no tienen ícono asignado. Soporta dos familias porque
+// Ionicons no tiene un ícono decente para desagüe (tubería/alcantarillado).
+type IconDef =
+  | { family: 'ionicons'; name: keyof typeof Ionicons.glyphMap }
+  | { family: 'material-community'; name: keyof typeof MaterialCommunityIcons.glyphMap };
+
+const ICONO_POR_GRUPO: Record<string, IconDef> = {
+  agua: { family: 'ionicons', name: 'water' },
+  desague: { family: 'material-community', name: 'pipe' },
+};
+const ICONO_DEFAULT: IconDef = { family: 'ionicons', name: 'apps-outline' };
 
 /**
  * Sidebar fija izquierda del layout web del mapa — Filtros + Ubicación.
@@ -29,17 +36,17 @@ const ESTADO_OPTIONS: { value: EstadoIncidencia | ''; label: string }[] = [
  * ver CatastroFloatingPanel.
  */
 export function FiltersSidebar() {
-  const {
-    tipoAtencion,
-    setTipoAtencion,
-    estado,
-    setEstado,
-    prioridades,
-    setPrioridades,
-    soloNoResueltas,
-    setSoloNoResueltas,
-    reset,
-  } = useFiltersStore();
+  const reset = useFiltersStore((s) => s.reset);
+  const categorias = useFiltersStore((s) => s.categorias);
+  const toggleCategoria = useFiltersStore((s) => s.toggleCategoria);
+  const prioridades = useFiltersStore((s) => s.prioridades);
+  const togglePrioridad = useFiltersStore((s) => s.togglePrioridad);
+  const { data: tiposGrupo = [] } = useQuery({
+    queryKey: ['tipos-grupo'],
+    queryFn: getTiposGrupo,
+    // Catálogo casi estático — evita refetch en cada mount del sidebar.
+    staleTime: 60 * 60 * 1000,
+  });
   const { capasVisibles, aplicarCapas } = useCapasStore();
   const {
     provincias,
@@ -59,21 +66,6 @@ export function FiltersSidebar() {
     cargarUbicacion();
   }, [cargarUbicacion]);
 
-  const [ubicacionAbierta, setUbicacionAbierta] = useState(true);
-
-  const prioridadValue =
-    prioridades.length === 3 ? 'todas'
-    : prioridades.length === 1 ? prioridades[0]
-    : 'todas';
-
-  const handlePrioridad = (value: string) => {
-    if (value === 'todas') {
-      setPrioridades(['a_tiempo', 'alerta', 'critica']);
-    } else {
-      setPrioridades([value as Prioridad]);
-    }
-  };
-
   const isCapa = (key: CapaKey) => capasVisibles.has(key);
 
   const toggleCapa = (key: CapaKey) => {
@@ -87,61 +79,59 @@ export function FiltersSidebar() {
       {/* ── FILTROS ───────────────────────────────── */}
       <div style={sectionHeaderRow}>
         <span style={sectionLabel}>FILTROS</span>
-        <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
-          <button style={clearBtn} onClick={reset}>Limpiar</button>
-          <ThemeToggleButton />
-        </div>
+        <button
+          type="button"
+          style={clearBtn}
+          onClick={reset}
+          title="Limpiar filtros"
+          aria-label="Limpiar filtros"
+        >
+          <MaterialCommunityIcons name="broom" size={16} color="var(--map-text-muted)" />
+        </button>
       </div>
 
-      <CapaRow
-        label="Solo no resueltas"
-        value={soloNoResueltas}
-        onChange={() => setSoloNoResueltas(!soloNoResueltas)}
-      />
+      {/* Grupo de incidencia — pills toggle, mínimo 1 activo (el store lo protege) */}
+      <div style={grupoSectionLabel}>GRUPO DE INCIDENCIA</div>
+      <div style={grupoRow}>
+        {tiposGrupo.map((g) => (
+          <GrupoPill
+            key={g.id}
+            grupo={g}
+            activo={categorias.includes(g.codigo as Categoria)}
+            onToggle={() => toggleCategoria(g.codigo as Categoria)}
+          />
+        ))}
+      </div>
 
-      <FilterField label="Tipo de incidencia">
-        <Dropdown
-          value={tipoAtencion ?? ''}
-          options={[{ value: '', label: 'Todos' }, ...TIPO_OPTIONS.map((t) => ({ value: t, label: t }))]}
-          onChange={(v) => setTipoAtencion(v || null)}
-        />
-      </FilterField>
-
-      <FilterField label="Estado">
-        <Dropdown
-          value={estado ?? ''}
-          options={ESTADO_OPTIONS}
-          onChange={(v) => setEstado((v as EstadoIncidencia) || null)}
-        />
-      </FilterField>
-
-      <FilterField label="Prioridad">
-        <Dropdown
-          value={prioridadValue}
-          options={[
-            { value: 'todas', label: 'Todas' },
-            { value: 'critica', label: 'Crítica' },
-            { value: 'alerta', label: 'Alerta' },
-            { value: 'a_tiempo', label: 'A tiempo' },
-          ]}
-          onChange={handlePrioridad}
-        />
-      </FilterField>
+      {/* Prioridad — semáforo verde/amarillo/rojo, mínimo 1 activo (store lo protege) */}
+      <div style={grupoSectionLabel}>PRIORIDAD</div>
+      <div style={prioridadRow}>
+        {PRIORIDADES.map((p) => {
+          const activo = prioridades.includes(p.codigo);
+          return (
+            <button
+              key={p.codigo}
+              type="button"
+              onClick={() => togglePrioridad(p.codigo)}
+              style={{
+                ...prioridadDot,
+                backgroundColor: p.color,
+                opacity: activo ? 1 : 0.28,
+              }}
+              aria-pressed={activo}
+              aria-label={p.nombre}
+              title={p.nombre}
+            />
+          );
+        })}
+      </div>
 
       <div style={divider} />
 
       {/* ── UBICACIÓN ─────────────────────────────── */}
-      <button
-        type="button"
-        style={collapsibleHeaderRow}
-        onClick={() => setUbicacionAbierta((v) => !v)}
-        aria-expanded={ubicacionAbierta}
-      >
+      <div style={ubicacionHeader}>
         <span style={sectionLabel}>UBICACIÓN</span>
-        <span style={{ ...chevron, transform: ubicacionAbierta ? 'rotate(0deg)' : 'rotate(-90deg)' }}>
-          ▾
-        </span>
-      </button>
+      </div>
 
       <CapaRow
         label="Resaltar sector en el mapa"
@@ -149,92 +139,56 @@ export function FiltersSidebar() {
         onChange={() => toggleCapa('resaltar_sector')}
       />
 
-      {ubicacionAbierta &&
-        (ubicacionCargando && provincias.length === 0 ? (
-          <div style={{ fontSize: 12, color: 'var(--map-text-muted)', padding: '2px 0 4px' }}>Cargando…</div>
-        ) : (
-          provincias.map((provincia) => (
-            <ProvinciaGroup
-              key={provincia.id}
-              nombre={provincia.nombre}
-              activa={provinciasActivas.has(provincia.id)}
-              onToggle={() => toggleProvincia(provincia.id)}
-              distritos={distritos.filter((d) => d.provinciaId === provincia.id)}
-              distritosActivos={distritosActivos}
-              onToggleDistrito={toggleDistrito}
-              sectores={sectores}
-              sectoresActivos={sectoresActivos}
-              onToggleSector={toggleSector}
-            />
-          ))
-        ))}
+      {ubicacionCargando && provincias.length === 0 ? (
+        <div style={{ fontSize: 12, color: 'var(--map-text-muted)', padding: '2px 0 4px' }}>Cargando…</div>
+      ) : (
+        provincias.map((provincia) => (
+          <ProvinciaGroup
+            key={provincia.id}
+            nombre={provincia.nombre}
+            activa={provinciasActivas.has(provincia.id)}
+            onToggle={() => toggleProvincia(provincia.id)}
+            distritos={distritos.filter((d) => d.provinciaId === provincia.id)}
+            distritosActivos={distritosActivos}
+            onToggleDistrito={toggleDistrito}
+            sectores={sectores}
+            sectoresActivos={sectoresActivos}
+            onToggleSector={toggleSector}
+          />
+        ))
+      )}
     </div>
   );
 }
 
 // ── Sub-componentes ───────────────────────────────────────
 
-function FilterField({ label, children }: { label: string; children: ReactNode }) {
-  return (
-    <div style={{ marginBottom: 10 }}>
-      <div style={fieldLabel}>{label}</div>
-      {children}
-    </div>
-  );
-}
-
-// Dropdown propio en vez de <select> nativo: el <select> del navegador no daba
-// garantías de abrir de forma consistente (reporte de Edgar) y además un <select>
-// nativo no se puede themear en modo oscuro de forma confiable entre navegadores
-// — este popover sí, y además queda visualmente consistente con el resto del panel.
-function Dropdown({
-  value,
-  options,
-  onChange,
+function GrupoPill({
+  grupo,
+  activo,
+  onToggle,
 }: {
-  value: string;
-  options: { value: string; label: string }[];
-  onChange: (value: string) => void;
+  grupo: ApiTipoGrupo;
+  activo: boolean;
+  onToggle: () => void;
 }) {
-  const [abierto, setAbierto] = useState(false);
-  const ref = useRef<HTMLDivElement>(null);
-
-  useEffect(() => {
-    if (!abierto) return;
-    const onClickFuera = (e: MouseEvent) => {
-      if (ref.current && !ref.current.contains(e.target as Node)) setAbierto(false);
-    };
-    document.addEventListener('mousedown', onClickFuera);
-    return () => document.removeEventListener('mousedown', onClickFuera);
-  }, [abierto]);
-
-  const seleccionado = options.find((o) => o.value === value);
-
+  const icon = ICONO_POR_GRUPO[grupo.codigo] ?? ICONO_DEFAULT;
+  const iconColor = activo ? '#FFFFFF' : 'var(--map-text)';
   return (
-    <div ref={ref} style={dropdownWrap}>
-      <button type="button" style={dropdownTrigger} onClick={() => setAbierto((v) => !v)}>
-        <span style={dropdownTriggerLabel}>{seleccionado?.label ?? value}</span>
-        <span style={{ ...chevron, transform: abierto ? 'rotate(180deg)' : 'rotate(0deg)' }}>▾</span>
-      </button>
-
-      {abierto && (
-        <div style={dropdownMenu}>
-          {options.map((o) => (
-            <button
-              key={o.value}
-              type="button"
-              style={{ ...dropdownOption, ...(o.value === value ? dropdownOptionActive : {}) }}
-              onClick={() => {
-                onChange(o.value);
-                setAbierto(false);
-              }}
-            >
-              {o.label}
-            </button>
-          ))}
-        </div>
+    <button
+      type="button"
+      onClick={onToggle}
+      style={activo ? grupoPillActivo : grupoPillInactivo}
+      aria-pressed={activo}
+      title={grupo.nombre}
+    >
+      {icon.family === 'ionicons' ? (
+        <Ionicons name={icon.name} size={14} color={iconColor} />
+      ) : (
+        <MaterialCommunityIcons name={icon.name} size={14} color={iconColor} />
       )}
-    </div>
+      <span>{grupo.nombre}</span>
+    </button>
   );
 }
 
@@ -441,16 +395,8 @@ const sectionLabel: CSSProperties = {
   letterSpacing: 0.8,
 };
 
-const collapsibleHeaderRow: CSSProperties = {
-  display: 'flex',
-  alignItems: 'center',
-  justifyContent: 'space-between',
-  width: '100%',
+const ubicacionHeader: CSSProperties = {
   marginBottom: 8,
-  padding: 0,
-  border: 'none',
-  background: 'none',
-  cursor: 'pointer',
 };
 
 const chevron: CSSProperties = {
@@ -459,81 +405,82 @@ const chevron: CSSProperties = {
   transition: 'transform 150ms',
 };
 
-const clearBtn: CSSProperties = {
-  background: 'none',
+const grupoSectionLabel: CSSProperties = {
+  fontSize: 10,
+  fontWeight: 700,
+  color: 'var(--map-text-muted)',
+  letterSpacing: 0.8,
+  marginTop: 8,
+  marginBottom: 8,
+};
+
+const grupoRow: CSSProperties = {
+  display: 'flex',
+  gap: 8,
+  alignItems: 'stretch',
+};
+
+const prioridadRow: CSSProperties = {
+  display: 'flex',
+  gap: 8,
+  alignItems: 'center',
+  justifyContent: 'space-evenly',
+};
+
+const prioridadDot: CSSProperties = {
+  width: 24,
+  height: 24,
+  minWidth: 24,
+  minHeight: 24,
+  borderRadius: 6,
   border: 'none',
-  fontSize: 12,
-  fontWeight: '600',
-  color: 'var(--map-accent)',
+  padding: 0,
+  boxSizing: 'border-box',
+  cursor: 'pointer',
+  transition: 'opacity 150ms',
+  flexShrink: 0,
+};
+
+const grupoPillBase: CSSProperties = {
+  flex: 1,
+  minWidth: 0,
+  display: 'inline-flex',
+  alignItems: 'center',
+  justifyContent: 'center',
+  gap: 6,
+  padding: '7px 10px',
+  fontSize: 13,
+  fontWeight: 600,
+  borderRadius: 8,
+  cursor: 'pointer',
+  transition: 'background-color 150ms, color 150ms, border-color 150ms',
+};
+
+const grupoPillActivo: CSSProperties = {
+  ...grupoPillBase,
+  backgroundColor: 'var(--map-accent)',
+  color: '#FFFFFF',
+  border: '1px solid var(--map-accent)',
+};
+
+const grupoPillInactivo: CSSProperties = {
+  ...grupoPillBase,
+  backgroundColor: 'var(--map-surface)',
+  color: 'var(--map-text)',
+  border: '1px solid var(--map-border)',
+};
+
+const clearBtn: CSSProperties = {
+  display: 'inline-flex',
+  alignItems: 'center',
+  justifyContent: 'center',
+  width: 26,
+  height: 26,
+  borderRadius: 6,
+  backgroundColor: 'transparent',
+  border: 'none',
   cursor: 'pointer',
   padding: 0,
-};
-
-const fieldLabel: CSSProperties = {
-  fontSize: 11,
-  fontWeight: '600',
-  color: 'var(--map-text-muted)',
-  marginBottom: 4,
-};
-
-const dropdownWrap: CSSProperties = {
-  position: 'relative',
-};
-
-const dropdownTrigger: CSSProperties = {
-  width: '100%',
-  display: 'flex',
-  alignItems: 'center',
-  justifyContent: 'space-between',
-  gap: 8,
-  padding: '8px 10px',
-  border: '1px solid var(--map-border)',
-  borderRadius: 8,
-  fontSize: 13,
-  color: 'var(--map-text)',
-  backgroundColor: 'var(--map-surface)',
-  cursor: 'pointer',
-  textAlign: 'left',
-};
-
-const dropdownTriggerLabel: CSSProperties = {
-  overflow: 'hidden',
-  textOverflow: 'ellipsis',
-  whiteSpace: 'nowrap',
-};
-
-const dropdownMenu: CSSProperties = {
-  position: 'absolute',
-  top: 'calc(100% + 4px)',
-  left: 0,
-  right: 0,
-  backgroundColor: 'var(--map-surface)',
-  border: '1px solid var(--map-border)',
-  borderRadius: 8,
-  boxShadow: '0 4px 16px var(--map-shadow)',
-  padding: 4,
-  zIndex: 20,
-  maxHeight: 240,
-  overflowY: 'auto',
-};
-
-const dropdownOption: CSSProperties = {
-  display: 'block',
-  width: '100%',
-  textAlign: 'left',
-  border: 'none',
-  background: 'none',
-  borderRadius: 6,
-  padding: '7px 8px',
-  fontSize: 13,
-  color: 'var(--map-text)',
-  cursor: 'pointer',
-};
-
-const dropdownOptionActive: CSSProperties = {
-  backgroundColor: 'var(--map-accent-bg)',
-  color: 'var(--map-accent)',
-  fontWeight: 600,
 };
 
 const divider: CSSProperties = {

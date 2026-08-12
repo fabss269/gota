@@ -4,22 +4,25 @@ import { useState } from 'react';
 import { Image, Modal, Pressable, StyleSheet, Text, TouchableWithoutFeedback, View } from 'react-native';
 
 import { useAuth } from '@/auth/AuthContext';
-import { Colors, Radius, Spacing } from '@/constants/theme';
+import { ThemeToggleButton } from '@/components/map/ThemeToggleButton';
+import { Radius, Spacing } from '@/constants/theme';
+import { useThemeColors } from '@/state/themeStore';
 
 type IconName = keyof typeof Ionicons.glyphMap;
 
 const NAV_ITEMS: { href: string; label: string; icon: IconName }[] = [
   { href: '/mapa', label: 'Mapa', icon: 'location-outline' },
   { href: '/dashboard', label: 'Dashboard', icon: 'stats-chart-outline' },
-  { href: '/incidencias', label: 'Incidencias', icon: 'warning-outline' },
 ];
 
 /**
  * Barra de navegación horizontal (vista ancha ≥ 900px). Reemplaza al Drawer con:
  * marca a la izquierda, links centrados con estado activo, y perfil con menú
- * desplegable a la derecha ("Cerrar sesión").
+ * desplegable a la derecha ("Cerrar sesión"). Colores del theme via
+ * useThemeColors() para que el bar completo siga el toggle claro/oscuro.
  */
 export function TopNav() {
+  const c = useThemeColors();
   const router = useRouter();
   const pathname = usePathname();
   const { user, signOut } = useAuth();
@@ -32,7 +35,7 @@ export function TopNav() {
   };
 
   return (
-    <View style={styles.bar}>
+    <View style={[styles.bar, { backgroundColor: c.surface, borderBottomColor: c.border }]}>
       <Image
         source={require('@/assets/images/epsel/epsel-logo.png')}
         style={styles.brandLogo}
@@ -46,15 +49,11 @@ export function TopNav() {
           return (
             <Pressable
               key={item.href}
-              style={[styles.link, active && styles.linkActive]}
+              style={[styles.link, active && { backgroundColor: c.accentBg }]}
               onPress={() => router.push(item.href as never)}
             >
-              <Ionicons
-                name={item.icon}
-                size={18}
-                color={active ? Colors.accent : Colors.textBody}
-              />
-              <Text style={[styles.linkLabel, active && styles.linkLabelActive]}>
+              <Ionicons name={item.icon} size={18} color={active ? c.accent : c.textBody} />
+              <Text style={[styles.linkLabel, { color: active ? c.accent : c.textBody }]}>
                 {item.label}
               </Text>
             </Pressable>
@@ -62,24 +61,31 @@ export function TopNav() {
         })}
       </View>
 
-      <Pressable style={styles.profile} onPress={() => setMenuOpen(true)}>
-        <View style={styles.avatar}>
-          <Text style={styles.avatarText}>{initials(user?.nombre)}</Text>
-        </View>
-        <View style={styles.profileMeta}>
-          <Text style={styles.name} numberOfLines={1}>{user?.nombre ?? 'Usuario'}</Text>
-          <Text style={styles.role} numberOfLines={1}>{user?.rol ?? ''}</Text>
-        </View>
-        <Ionicons name="chevron-down" size={16} color={Colors.textMuted} />
-      </Pressable>
+      <View style={styles.rightGroup}>
+        <ThemeToggleButton />
+        <Pressable style={styles.profile} onPress={() => setMenuOpen(true)}>
+          <View style={[styles.avatar, { backgroundColor: c.primary }]}>
+            <Text style={[styles.avatarText, { color: c.white }]}>{initials(user?.nombre)}</Text>
+          </View>
+          <View style={styles.profileMeta}>
+            <Text style={[styles.name, { color: c.textBody }]} numberOfLines={1}>
+              {user?.nombre ?? 'Usuario'}
+            </Text>
+            <Text style={[styles.role, { color: c.textMuted }]} numberOfLines={1}>
+              {user?.rol ?? ''}
+            </Text>
+          </View>
+          <Ionicons name="chevron-down" size={16} color={c.textMuted} />
+        </Pressable>
+      </View>
 
       <Modal transparent visible={menuOpen} animationType="fade" onRequestClose={() => setMenuOpen(false)}>
         <TouchableWithoutFeedback onPress={() => setMenuOpen(false)}>
           <View style={styles.overlay}>
-            <View style={styles.menu}>
+            <View style={[styles.menu, { backgroundColor: c.surface, borderColor: c.border }]}>
               <Pressable style={styles.menuItem} onPress={handleLogout}>
-                <Ionicons name="log-out-outline" size={18} color={Colors.textBody} />
-                <Text style={styles.menuItemLabel}>Cerrar sesión</Text>
+                <Ionicons name="log-out-outline" size={18} color={c.textBody} />
+                <Text style={[styles.menuItemLabel, { color: c.textBody }]}>Cerrar sesión</Text>
               </Pressable>
             </View>
           </View>
@@ -97,9 +103,7 @@ function initials(nombre?: string) {
 const styles = StyleSheet.create({
   bar: {
     height: 64,
-    backgroundColor: Colors.white,
     borderBottomWidth: 1,
-    borderBottomColor: Colors.border,
     flexDirection: 'row',
     alignItems: 'center',
     paddingHorizontal: Spacing.lg,
@@ -115,9 +119,8 @@ const styles = StyleSheet.create({
     paddingVertical: Spacing.sm,
     borderRadius: Radius.sm,
   },
-  linkActive: { backgroundColor: '#EEF1F6' },
-  linkLabel: { fontSize: 14, fontWeight: '600', color: Colors.textBody },
-  linkLabelActive: { color: Colors.accent },
+  linkLabel: { fontSize: 14, fontWeight: '600' },
+  rightGroup: { flexDirection: 'row', alignItems: 'center', gap: Spacing.xs },
   profile: {
     flexDirection: 'row',
     alignItems: 'center',
@@ -131,24 +134,21 @@ const styles = StyleSheet.create({
     width: 36,
     height: 36,
     borderRadius: 18,
-    backgroundColor: Colors.primary,
     alignItems: 'center',
     justifyContent: 'center',
   },
-  avatarText: { color: Colors.white, fontWeight: '700', fontSize: 13 },
-  name: { fontSize: 13, fontWeight: '700', color: Colors.textBody },
-  role: { fontSize: 11, color: Colors.textMuted },
+  avatarText: { fontWeight: '700', fontSize: 13 },
+  name: { fontSize: 13, fontWeight: '700' },
+  role: { fontSize: 11 },
   overlay: { flex: 1, backgroundColor: 'transparent' },
   menu: {
     position: 'absolute',
     top: 60,
     right: Spacing.lg,
     minWidth: 200,
-    backgroundColor: Colors.white,
     borderRadius: Radius.sm,
     paddingVertical: Spacing.xs,
     borderWidth: 1,
-    borderColor: Colors.border,
     shadowColor: '#000',
     shadowOffset: { width: 0, height: 4 },
     shadowOpacity: 0.1,
@@ -162,5 +162,5 @@ const styles = StyleSheet.create({
     paddingHorizontal: Spacing.md,
     paddingVertical: Spacing.sm,
   },
-  menuItemLabel: { fontSize: 14, color: Colors.textBody, fontWeight: '600' },
+  menuItemLabel: { fontSize: 14, fontWeight: '600' },
 });

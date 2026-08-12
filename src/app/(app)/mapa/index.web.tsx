@@ -7,7 +7,9 @@ import Animated, { useAnimatedStyle, useSharedValue, withTiming } from 'react-na
 import { SafeAreaView } from 'react-native-safe-area-context';
 
 import { DetailPanel } from '@/components/incident-detail/DetailPanel';
+import { BasemapToggle } from '@/components/map/BasemapToggle.web';
 import { CatastroFloatingPanel } from '@/components/map/CatastroFloatingPanel';
+import { Loader } from '@/components/shared/Loader.web';
 import { ClusterListSheet } from '@/components/map/ClusterListSheet';
 import { ElementoInfoPanel } from '@/components/map/ElementoInfoPanel.web';
 import { FiltersSidebar } from '@/components/map/FiltersSidebar';
@@ -117,11 +119,14 @@ export default function MapaScreen() {
         {/* Buscador de dirección / suministro */}
         {!modoVista && <LocationSearchBar />}
 
+        {/* Toggle basemap OSM / Satelital — esquina inferior izquierda */}
+        {!modoVista && <BasemapToggle />}
+
         {/* Capas de catastro (Predio/Alcantarillado/Agua) — panel flotante inferior */}
         {!modoVista && <CatastroFloatingPanel />}
 
         {/* Banners de estado */}
-        {!modoVista && isLoading && <div style={banner}>Cargando incidencias de hoy…</div>}
+        {!modoVista && isLoading && <Loader />}
         {!modoVista && isError && (
           <div
             style={{ ...banner, backgroundColor: 'var(--map-danger-bg)', color: 'var(--map-danger-text)', cursor: 'pointer' }}

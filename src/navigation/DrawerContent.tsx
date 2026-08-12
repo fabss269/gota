@@ -11,7 +11,6 @@ type IconName = keyof typeof Ionicons.glyphMap;
 const ITEMS: { href: string; label: string; icon: IconName }[] = [
   { href: '/mapa', label: 'Mapa', icon: 'location-outline' },
   { href: '/dashboard', label: 'Dashboard', icon: 'stats-chart-outline' },
-  { href: '/incidencias', label: 'Incidencias', icon: 'warning-outline' },
 ];
 
 /**

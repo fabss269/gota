@@ -40,7 +40,8 @@ export default function AppLayout() {
     >
       <Drawer.Screen name="mapa/index" options={{ drawerLabel: 'Mapa' }} />
       <Drawer.Screen name="dashboard/index" options={{ drawerLabel: 'Dashboard' }} />
-      <Drawer.Screen name="incidencias/index" options={{ drawerLabel: 'Incidencias' }} />
+      {/* Incidencias sigue accesible por URL /incidencias, pero se oculta del drawer. */}
+      <Drawer.Screen name="incidencias/index" options={{ drawerItemStyle: { display: 'none' } }} />
     </Drawer>
   );
 }

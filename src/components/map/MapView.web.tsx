@@ -29,6 +29,7 @@ import {
 } from '@/components/map/mapLayers';
 import { SimulacionBorderOverlay } from '@/components/map/SimulacionBorderOverlay.web';
 import { SimulacionControl } from '@/components/map/SimulacionControl.web';
+import { useBasemapStore } from '@/state/basemapStore';
 import { type CapaKey, useCapasStore } from '@/state/capasStore';
 import { useMapSearchStore } from '@/state/mapSearchStore';
 import { useSimulacionStore } from '@/state/simulacionStore';
@@ -202,6 +203,27 @@ export function EpselMapView({ clusters, onPressCluster, onElementClick, element
     canvas.style.filter =
       themeMode === 'dark' ? 'invert(1) hue-rotate(180deg) brightness(0.92) contrast(0.92)' : '';
   }, [themeMode]);
+
+  // Basemap toggle (OSM / Esri World Imagery). Ambas capas están declaradas en
+  // los map-style.*.json; alternamos `layout.visibility` sobre las layer ids
+  // `osm` y `satellite`. Se aplica cuando el estilo terminó de cargar (idle
+  // event) para evitar warnings de MapLibre si el usuario clickea el toggle
+  // antes de que el mapa termine la primera carga.
+  const basemapMode = useBasemapStore((s) => s.mode);
+  useEffect(() => {
+    const map = mapRef.current;
+    if (!map) return;
+    const apply = () => {
+      if (map.getLayer('osm')) {
+        map.setLayoutProperty('osm', 'visibility', basemapMode === 'osm' ? 'visible' : 'none');
+      }
+      if (map.getLayer('satellite')) {
+        map.setLayoutProperty('satellite', 'visibility', basemapMode === 'satellite' ? 'visible' : 'none');
+      }
+    };
+    if (map.isStyleLoaded()) apply();
+    else map.once('idle', apply);
+  }, [basemapMode]);
 
   const capasVisibles = useCapasStore((state) => state.capasVisibles);
 
