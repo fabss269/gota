@@ -333,14 +333,19 @@ export function EpselMapView({ clusters, onPressCluster, onElementClick, element
 
     const applyCatastroSectorFilter = () => {
       const idsActivos = [...sectoresVisibles].map(Number);
+      // ['in', ..., ['literal', []]] no hace falta caso especial: con idsActivos
+      // vacío ya no matchea nada por sí solo — antes (bug real 2026-08-12,
+      // reportado por Edgar tras el fix de incidencias) esto caía a `baseFilter`
+      // sin acotar, mostrando TODO el catastro de la ciudad con ningún sector
+      // visible. "Nada visible = no se ve nada" en TODO el mapa, no solo en la
+      // lista de incidencias.
       const sectorFilter: maplibregl.FilterSpecification = ['in', ['get', 'sectorid'], ['literal', idsActivos]];
 
       for (const { id, baseFilter } of CATASTRO_SECTOR_FILTER_LAYERS) {
         if (!map.getLayer(id)) continue;
-        const desired =
-          idsActivos.length === 0
-            ? ((baseFilter as maplibregl.FilterSpecification | undefined) ?? null)
-            : ((baseFilter ? ['all', baseFilter, sectorFilter] : sectorFilter) as maplibregl.FilterSpecification);
+        const desired = (
+          baseFilter ? ['all', baseFilter, sectorFilter] : sectorFilter
+        ) as maplibregl.FilterSpecification;
         // Mismo guard que applyVisibility/applySectorHighlight: sin esto, este
         // handler (suscrito a 'styledata') retriggerea el evento en cada frame y
         // entra en loop infinito con los otros dos.

@@ -95,13 +95,11 @@ function buildEffectiveStyle(
         next = { ...next, paint: { ...next.paint, [paintProp]: colorMatch } };
       }
     } else if (catastroFilterById.has(layer.id)) {
+      // ['in', ..., ['literal', []]] ya no matchea nada por sí solo con
+      // idsActivos vacío — antes (bug real 2026-08-12) esto caía a `baseFilter`
+      // sin acotar, mostrando TODO el catastro con ningún sector visible.
       const baseFilter = catastroFilterById.get(layer.id);
-      const filter =
-        idsActivos.length === 0
-          ? (baseFilter ?? null)
-          : baseFilter
-            ? ['all', baseFilter, sectorFilter]
-            : sectorFilter;
+      const filter = baseFilter ? ['all', baseFilter, sectorFilter] : sectorFilter;
       next = { ...next, filter };
     }
 
