@@ -4,13 +4,12 @@ import { Pressable, StyleSheet, Text, View } from 'react-native';
 import { Bar, Pie } from 'react-chartjs-2';
 
 import { getDistritos, getProvincias, getSectores } from '@/api/catalogos';
-import type { GrupoRed } from '@/api/dashboardGeo';
-import { makeBarValueLabelsPlugin } from '@/components/dashboard-web/barValueLabelsPlugin';
+import type { GrupoRed, LongitudMaterial } from '@/api/dashboardGeo';
 import { ChartCard, ChartTable, type ChartTableColumn } from '@/components/dashboard-web/ChartCard';
 import { Colors, Spacing } from '@/constants/theme';
 import { useLongitudPorMaterial } from '@/hooks/useDashboardGeo';
 
-import { ensureChartRegistered } from './ChartSetup';
+import { barValueDatalabelsPreset, ensureChartRegistered, pieDatalabelsPreset } from './ChartSetup';
 
 ensureChartRegistered();
 
@@ -19,14 +18,9 @@ function metros(n: number): string {
   return `${n.toFixed(0)} m`;
 }
 
-const valueLabels = makeBarValueLabelsPlugin(metros);
-
-type Row = { material: string; metros: number };
-
-const COLUMNAS: ChartTableColumn<Row>[] = [
-  { header: 'Material', render: (r) => r.material },
-  { header: 'Longitud', align: 'right', render: (r) => metros(r.metros) },
-];
+function pct(n: number): string {
+  return `${n.toFixed(1).replace('.', ',')}%`;
+}
 
 /** Longitud de tubería por material — barra horizontal, filtrable por
  * sector/distrito/provincia y diámetro (solo agua). Muchas categorías
@@ -63,8 +57,12 @@ export function LongitudPorMaterialChart() {
   const { data, isLoading } = useLongitudPorMaterial({
     grupo, distritoId, provinciaId, sectorId, diametro: diametroNum,
   });
-  const rows = [...(data ?? [])].sort((a, b) => b.metros - a.metros);
+  const rows: LongitudMaterial[] = [...(data ?? [])].sort((a, b) => b.metros - a.metros);
   const colorGrupo = grupo === 'agua' ? Colors.agua : Colors.desague;
+  // Total del filtro actual para computar % — solo se usa en la tabla; en la
+  // torta el % ya sale del datalabels preset (que también divide sobre el
+  // total del dataset, así que coinciden).
+  const totalMetros = rows.reduce((s, r) => s + r.metros, 0);
 
   const barData = {
     labels: rows.map((r) => r.material),
@@ -74,14 +72,30 @@ export function LongitudPorMaterialChart() {
     indexAxis: 'y',
     responsive: true,
     maintainAspectRatio: false,
-    layout: { padding: { right: 48 } },
+    layout: { padding: { right: 60 } },
     scales: { x: { beginAtZero: true, grid: { color: '#e5e7eb' } }, y: { grid: { display: false } } },
-    plugins: { legend: { display: false }, tooltip: { callbacks: { label: (ctx: any) => ` ${metros(ctx.parsed.x)}` } } },
+    plugins: {
+      legend: { display: false },
+      tooltip: { callbacks: { label: (ctx: any) => ` ${metros(ctx.parsed.x)}` } },
+      datalabels: {
+        ...barValueDatalabelsPreset,
+        align: 'right' as const,
+        formatter: metros,
+      },
+    },
   };
+
+  // Paleta por slice — antes todas las slices salían del mismo color y no se
+  // distinguían. Se mantiene el color de la categoría (agua/desagüe) como
+  // punto medio con variantes por tono.
+  const paletaAgua = ['#0D2B52', '#0152AC', '#1565C0', '#1E88E5', '#42A5F5', '#64B5F6', '#90CAF9'];
+  const paletaDesague = ['#4E342E', '#5D4037', '#6D4C41', '#795548', '#8D6E63', '#A1887F', '#BCAAA4'];
+  const paletaGrupo = grupo === 'agua' ? paletaAgua : paletaDesague;
+  const coloresSlice = rows.map((_, i) => paletaGrupo[i % paletaGrupo.length]);
 
   const pieData = {
     labels: rows.map((r) => r.material),
-    datasets: [{ data: rows.map((r) => r.metros), backgroundColor: colorGrupo, borderColor: Colors.surface, borderWidth: 2 }],
+    datasets: [{ data: rows.map((r) => r.metros), backgroundColor: coloresSlice, borderColor: Colors.surface, borderWidth: 2 }],
   };
   const pieOptions: any = {
     responsive: true,
@@ -89,8 +103,16 @@ export function LongitudPorMaterialChart() {
     plugins: {
       legend: { position: 'bottom' as const },
       tooltip: { callbacks: { label: (ctx: any) => ` ${ctx.label}: ${metros(ctx.parsed)}` } },
+      datalabels: pieDatalabelsPreset,
     },
   };
+
+  const COLUMNAS: ChartTableColumn<LongitudMaterial>[] = [
+    { header: 'Material', render: (r) => r.material },
+    { header: 'Cantidad', align: 'right', render: (r) => r.cantidad.toLocaleString('es-PE') },
+    { header: 'Longitud', align: 'right', render: (r) => metros(r.metros) },
+    { header: '%', align: 'right', render: (r) => (totalMetros > 0 ? pct((r.metros / totalMetros) * 100) : '—') },
+  ];
 
   const filtros = (
     <View style={styles.filtros}>
@@ -174,7 +196,7 @@ export function LongitudPorMaterialChart() {
     >
       {{
         // @ts-ignore
-        bar: <Bar data={barData} options={barOptions} plugins={[valueLabels]} />,
+        bar: <Bar data={barData} options={barOptions} />,
         // @ts-ignore
         pie: <Pie data={pieData} options={pieOptions} />,
         table: <ChartTable columnas={COLUMNAS} filas={rows} />,

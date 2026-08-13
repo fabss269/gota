@@ -61,6 +61,24 @@ export function useHeatmapSectores() {
   });
 }
 
+/** Puntos crudos para la capa `heatmap` de MapLibre (mancha continua tipo
+ * pronóstico del clima). `soloRobos=true` para el heatmap del tab Robo. */
+export function usePuntosHeatmap(soloRobos = false) {
+  const { grupo, sectorid } = useDashboardFilters();
+  return useQuery({
+    queryKey: ['dashboard-geo', 'puntos-heatmap', soloRobos, grupo, sectorid],
+    queryFn: () =>
+      dashboardGeoApi.puntosHeatmap({
+        solo_robos: soloRobos,
+        grupo: grupoParam(grupo),
+        sectorid: sectorid ?? undefined,
+      }),
+    // Payload de ~5-14k puntos, se cachea 5min para no reventar la red al
+    // cambiar de tab con frecuencia.
+    staleTime: 5 * 60_000,
+  });
+}
+
 export function useTopCalles(limite = 10) {
   const { grupo, sectorid } = useDashboardFilters();
   return useQuery({

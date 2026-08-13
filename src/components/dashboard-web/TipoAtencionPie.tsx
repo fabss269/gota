@@ -5,7 +5,7 @@ import { ChartCard, ChartTable, type ChartTableColumn } from '@/components/dashb
 import { Colors, Spacing } from '@/constants/theme';
 import { useTipoAtencionPie } from '@/hooks/useDashboardGeo';
 
-import { ensureChartRegistered } from './ChartSetup';
+import { barValueDatalabelsPreset, ensureChartRegistered, pieDatalabelsPreset } from './ChartSetup';
 
 ensureChartRegistered();
 
@@ -40,12 +40,18 @@ export function TipoAtencionPie() {
   const pieOptions: any = {
     responsive: true,
     maintainAspectRatio: false,
-    plugins: { legend: { display: false }, tooltip: { callbacks: { label: tooltipLabel } } },
+    plugins: {
+      legend: { display: false },
+      tooltip: { callbacks: { label: tooltipLabel } },
+      datalabels: pieDatalabelsPreset,
+    },
   };
 
+  // Bar mono-color — misma regla que TipoGrupoPie.bar: barras de una sola
+  // dimensión (tipo_atencion) no heredan la paleta multicolor de la torta.
   const barData = {
     labels: rows.map((r) => r.etiqueta),
-    datasets: [{ label: 'Incidencias', data: rows.map((r) => r.n), backgroundColor: colores, borderRadius: 4 }],
+    datasets: [{ label: 'Incidencias', data: rows.map((r) => r.n), backgroundColor: Colors.primary, borderRadius: 4 }],
   };
   const barOptions: any = {
     indexAxis: 'y',
@@ -53,7 +59,11 @@ export function TipoAtencionPie() {
     maintainAspectRatio: false,
     layout: { padding: { right: 36 } },
     scales: { x: { beginAtZero: true, grid: { color: '#e5e7eb' } }, y: { grid: { display: false } } },
-    plugins: { legend: { display: false }, tooltip: { callbacks: { label: tooltipLabel } } },
+    plugins: {
+      legend: { display: false },
+      tooltip: { callbacks: { label: tooltipLabel } },
+      datalabels: { ...barValueDatalabelsPreset, align: 'right' as const },
+    },
   };
 
   const pieConLeyenda = (

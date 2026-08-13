@@ -4,7 +4,6 @@ import { StyleSheet, Text, View } from 'react-native';
 import { Bar } from 'react-chartjs-2';
 
 import { getDistritos, getProvincias } from '@/api/catalogos';
-import { makeBarValueLabelsPlugin } from '@/components/dashboard-web/barValueLabelsPlugin';
 import { Colors, Radius, Spacing } from '@/constants/theme';
 import { useTopSectores } from '@/hooks/useDashboardGeo';
 import { useDashboardFilters } from '@/state/dashboardFilters';
@@ -12,8 +11,6 @@ import { useDashboardFilters } from '@/state/dashboardFilters';
 import { ensureChartRegistered } from './ChartSetup';
 
 ensureChartRegistered();
-
-const valueLabels = makeBarValueLabelsPlugin((n) => n.toLocaleString('es-PE'));
 
 export function TopSectoresBar() {
   const [provinciaId, setProvinciaId] = useState<string | null>(null);
@@ -81,6 +78,20 @@ export function TopSectoresBar() {
           },
         },
       },
+      // Muestra el total de la fila stackeada al extremo derecho. `anchor` y
+      // `align` con 'end' + `clamp` evita que se corte si un valor tira mucho.
+      datalabels: {
+        display: (ctx: any) => ctx.datasetIndex === ctx.chart.data.datasets.length - 1,
+        anchor: 'end' as const,
+        align: 'end' as const,
+        color: '#0D2B52',
+        font: { weight: 700 as const, size: 10 },
+        formatter: (_v: number, ctx: any) => {
+          const datasets = ctx.chart.data.datasets;
+          const total = datasets.reduce((s: number, d: any) => s + (Number(d.data?.[ctx.dataIndex]) || 0), 0);
+          return total.toLocaleString('es-PE');
+        },
+      },
     },
   };
 
@@ -122,7 +133,7 @@ export function TopSectoresBar() {
           <Text style={styles.muted}>Sin datos</Text>
         ) : (
           // @ts-ignore - Bar props typing en react-chartjs-2 con any-options
-          <Bar data={chartData} options={options} plugins={[valueLabels]} />
+          <Bar data={chartData} options={options} />
         )}
       </View>
     </View>

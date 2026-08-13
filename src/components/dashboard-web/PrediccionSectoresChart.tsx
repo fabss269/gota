@@ -81,6 +81,14 @@ export function PrediccionSectoresChart() {
           },
         },
       },
+      datalabels: {
+        display: true,
+        anchor: 'end' as const,
+        align: 'right' as const,
+        color: '#0D2B52',
+        font: { weight: 700 as const, size: 10 },
+        formatter: (v: number) => v?.toFixed(1) ?? '',
+      },
     },
   };
 

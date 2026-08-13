@@ -109,7 +109,8 @@ export type PrediccionSector = {
 
 export type Slice = { etiqueta: string; n: number; pct: number };
 export type DistritoRobo = { distritoid: number | null; distrito: string; n_robos: number };
-export type LongitudMaterial = { material: string; metros: number };
+export type LongitudMaterial = { material: string; metros: number; cantidad: number };
+export type PuntoHeatmap = { lat: number; lon: number; peso: number };
 export type GrupoRed = 'agua' | 'alcantarillado';
 
 // ============ Helpers ============
@@ -148,6 +149,9 @@ export const dashboardGeoApi = {
 
   heatmapSectores: (p: FiltrosBase = {}) =>
     apiFetch<HeatmapSector[]>(`/dashboard-v2/heatmap-sectores${qs(p)}`),
+
+  puntosHeatmap: (p: { solo_robos?: boolean; grupo?: 'agua' | 'desague'; sectorid?: number } = {}) =>
+    apiFetch<PuntoHeatmap[]>(`/dashboard-v2/puntos-heatmap${qs(p)}`),
 
   topCalles: (p: FiltrosBase & { limite?: number } = {}) =>
     apiFetch<TramoRank[]>(`/dashboard-v2/top-calles${qs(p)}`),

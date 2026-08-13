@@ -11,6 +11,7 @@
     "@react-navigation/drawer": "^7.13.2",
     "@tanstack/react-query": "^5.101.2",
     "chart.js": "^4.5.1",
+    "chartjs-plugin-datalabels": "^2.2.0",
     "expo": "~57.0.7",
     "expo-constants": "~57.0.6",
     "expo-device": "~57.0.1",

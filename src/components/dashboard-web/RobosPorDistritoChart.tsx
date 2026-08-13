@@ -1,15 +1,17 @@
 import { Bar, Pie } from 'react-chartjs-2';
 
-import { makeBarValueLabelsPlugin } from '@/components/dashboard-web/barValueLabelsPlugin';
 import { ChartCard, ChartTable, type ChartTableColumn } from '@/components/dashboard-web/ChartCard';
 import { Colors } from '@/constants/theme';
 import { useRobosPorDistrito } from '@/hooks/useDashboardGeo';
 
-import { ensureChartRegistered } from './ChartSetup';
+import { barValueDatalabelsPreset, ensureChartRegistered, pieDatalabelsPreset } from './ChartSetup';
 
 ensureChartRegistered();
 
-const valueLabels = makeBarValueLabelsPlugin((n) => n.toLocaleString('es-PE'));
+// Paleta discreta para el modo torta — antes daban todas del mismo rojo
+// crítico y no se distinguía qué slice era qué distrito. Se mantienen tonos
+// cálidos (rojos/anaranjados) para no perder la lectura "esto es robo".
+const PALETA_ROBOS = ['#B91C1C', '#DC2626', '#EF4444', '#F97316', '#FB923C', '#FDBA74', '#FED7AA'];
 
 type Row = { distritoid: number | null; distrito: string; n_robos: number };
 
@@ -26,6 +28,7 @@ export function RobosPorDistritoChart() {
 
   const barData = {
     labels: rows.map((r) => r.distrito),
+    // Mono-color: barras single-var. Rojo crítico para leer "robos".
     datasets: [{ label: 'Robos de medidor', data: rows.map((r) => r.n_robos), backgroundColor: Colors.statusCritica, borderRadius: 4 }],
   };
   const barOptions: any = {
@@ -34,17 +37,30 @@ export function RobosPorDistritoChart() {
     maintainAspectRatio: false,
     layout: { padding: { right: 36 } },
     scales: { x: { beginAtZero: true, grid: { color: '#e5e7eb' } }, y: { grid: { display: false } } },
-    plugins: { legend: { display: false } },
+    plugins: {
+      legend: { display: false },
+      datalabels: { ...barValueDatalabelsPreset, align: 'right' as const, color: '#7F1D1D' },
+    },
   };
 
   const pieData = {
     labels: rows.map((r) => r.distrito),
-    datasets: [{ data: rows.map((r) => r.n_robos), backgroundColor: Colors.statusCritica, borderColor: Colors.surface, borderWidth: 2 }],
+    datasets: [
+      {
+        data: rows.map((r) => r.n_robos),
+        backgroundColor: rows.map((_, i) => PALETA_ROBOS[i % PALETA_ROBOS.length]),
+        borderColor: Colors.surface,
+        borderWidth: 2,
+      },
+    ],
   };
   const pieOptions: any = {
     responsive: true,
     maintainAspectRatio: false,
-    plugins: { legend: { position: 'bottom' as const } },
+    plugins: {
+      legend: { position: 'bottom' as const },
+      datalabels: pieDatalabelsPreset,
+    },
   };
 
   return (
@@ -58,7 +74,7 @@ export function RobosPorDistritoChart() {
     >
       {{
         // @ts-ignore
-        bar: <Bar data={barData} options={barOptions} plugins={[valueLabels]} />,
+        bar: <Bar data={barData} options={barOptions} />,
         // @ts-ignore
         pie: <Pie data={pieData} options={pieOptions} />,
         table: <ChartTable columnas={COLUMNAS} filas={rows} />,

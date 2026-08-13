@@ -4,7 +4,7 @@ import { ChartCard, ChartTable, type ChartTableColumn } from '@/components/dashb
 import { Colors } from '@/constants/theme';
 import { useTipoGrupoPie } from '@/hooks/useDashboardGeo';
 
-import { ensureChartRegistered } from './ChartSetup';
+import { barValueDatalabelsPreset, ensureChartRegistered, pieDatalabelsPreset } from './ChartSetup';
 
 ensureChartRegistered();
 
@@ -44,18 +44,27 @@ export function TipoGrupoPie() {
     plugins: {
       legend: { position: 'bottom' as const },
       tooltip: { callbacks: { label: tooltipLabel } },
+      datalabels: pieDatalabelsPreset,
     },
   };
 
+  // Bar: mono-color (regla del rediseño 2026-08-13 — barras de una sola
+  // dimensión usan color único; los slots de color multicolor son solo del
+  // pie). Uso primary porque este chart es global "servicio", no específico
+  // de agua/desagüe.
   const barData = {
     labels,
-    datasets: [{ label: 'Incidencias', data: rows.map((r) => r.n), backgroundColor: colores, borderRadius: 4 }],
+    datasets: [{ label: 'Incidencias', data: rows.map((r) => r.n), backgroundColor: Colors.primary, borderRadius: 4 }],
   };
   const barOptions: any = {
     responsive: true,
     maintainAspectRatio: false,
     scales: { y: { beginAtZero: true, grid: { color: '#e5e7eb' } }, x: { grid: { display: false } } },
-    plugins: { legend: { display: false }, tooltip: { callbacks: { label: tooltipLabel } } },
+    plugins: {
+      legend: { display: false },
+      tooltip: { callbacks: { label: tooltipLabel } },
+      datalabels: barValueDatalabelsPreset,
+    },
   };
 
   return (

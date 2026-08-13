@@ -1,4 +1,4 @@
-import { Pressable, StyleSheet, Text, View } from 'react-native';
+import { Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
 
 import { Colors, Spacing } from '@/constants/theme';
 
@@ -8,6 +8,7 @@ export type DashboardTab =
   | 'tendencias'
   | 'composicion'
   | 'predictivo'
+  | 'robo'
   | 'red';
 
 const TABS: { key: DashboardTab; label: string }[] = [
@@ -16,16 +17,23 @@ const TABS: { key: DashboardTab; label: string }[] = [
   { key: 'tendencias', label: 'Tendencias' },
   { key: 'composicion', label: 'Composición' },
   { key: 'predictivo', label: 'Predictivo' },
+  { key: 'robo', label: 'Robo' },
   { key: 'red', label: 'Red y materiales' },
 ];
 
 type Props = { active: DashboardTab; onChange: (tab: DashboardTab) => void };
 
 /** Barra de tabs del dashboard ejecutivo. Mismo look que TabsBar de
- * incident-detail, pero sobre la paleta plana (light-only) de dashboard-web. */
+ * incident-detail, pero sobre la paleta plana (light-only) de dashboard-web.
+ * Scroll horizontal para que los 7 tabs quepan en móvil sin quebrar líneas. */
 export function DashboardTabsBar({ active, onChange }: Props) {
   return (
-    <View style={styles.row}>
+    <ScrollView
+      horizontal
+      showsHorizontalScrollIndicator={false}
+      contentContainerStyle={styles.row}
+      style={styles.scroll}
+    >
       {TABS.map((tab) => {
         const isActive = tab.key === active;
         return (
@@ -35,16 +43,19 @@ export function DashboardTabsBar({ active, onChange }: Props) {
           </Pressable>
         );
       })}
-    </View>
+    </ScrollView>
   );
 }
 
 const styles = StyleSheet.create({
-  row: {
-    flexDirection: 'row',
+  scroll: {
     borderBottomWidth: 1,
     borderBottomColor: Colors.border,
     backgroundColor: Colors.surface,
+    flexGrow: 0,
+  },
+  row: {
+    flexDirection: 'row',
   },
   tab: { alignItems: 'center', gap: 6, paddingVertical: Spacing.sm, paddingHorizontal: Spacing.md },
   label: { fontSize: 13, fontWeight: '500', color: Colors.textMuted },
