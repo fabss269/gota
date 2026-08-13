@@ -6,9 +6,20 @@ import { StyleSheet, Text, View } from 'react-native';
 import { GotaIcon } from '@/icons/GotaIcon';
 import { getStoredSession, isSessionExpired } from '@/auth/session';
 import { Colors, Spacing } from '@/constants/theme';
+import { isMobileWeb, isPWAInstalled } from '@/utils/pwa';
 
 const MIN_MS = 900;
 const MAX_MS = 3000;
+
+// Web mobile no-instalado: si aún no dijeron "continuar en el navegador" en
+// esta pestaña, mostramos el landing /instalar antes que el loader normal.
+// sessionStorage se limpia al cerrar la pestaña, así en la próxima visita
+// vuelve a ofrecer instalar.
+function debeMostrarInstalarLanding(): boolean {
+  if (!isMobileWeb() || isPWAInstalled()) return false;
+  if (typeof sessionStorage === 'undefined') return true;
+  return sessionStorage.getItem('gota:omitir-instalar') !== '1';
+}
 
 /** Splash / Loader (Spec 01). */
 export default function LoaderScreen() {
@@ -16,6 +27,12 @@ export default function LoaderScreen() {
   const navigated = useRef(false);
 
   useEffect(() => {
+    if (debeMostrarInstalarLanding()) {
+      navigated.current = true;
+      router.replace('/instalar');
+      return;
+    }
+
     const start = Date.now();
 
     const decide = async () => {
