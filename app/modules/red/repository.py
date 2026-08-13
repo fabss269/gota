@@ -348,7 +348,9 @@ class SigRedRepository:
         where = " AND ".join(condiciones)
         stmt = text(
             f"""
-            SELECT COALESCE(m.material, 'Sin dato') AS material, SUM(t.distancia) AS metros
+            SELECT COALESCE(m.material, 'Sin dato') AS material,
+                   SUM(t.distancia) AS metros,
+                   COUNT(*) AS cantidad
             FROM sig.{tabla} t
             LEFT JOIN sig.materiales m ON m.materialid = t.materialid
             {join}
@@ -358,7 +360,10 @@ class SigRedRepository:
             """
         )
         result = await self._session.execute(stmt, params)
-        return [{"material": row.material, "metros": float(row.metros or 0)} for row in result]
+        return [
+            {"material": row.material, "metros": float(row.metros or 0), "cantidad": int(row.cantidad or 0)}
+            for row in result
+        ]
 
 
 # ── Escritura sobre sig.* (excepción explícita al read-only, ver

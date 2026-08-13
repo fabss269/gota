@@ -12,6 +12,7 @@ from app.modules.dashboard_geo.schemas import (
     MultiReclamoOut,
     ParentescoSliceOut,
     PrediccionSectorOut,
+    PuntoHeatmapOut,
     ReincidenteOut,
     SectorRankOut,
     SerieMensualOut,
@@ -97,6 +98,20 @@ async def heatmap_sectores(
 ) -> list[HeatmapSectorOut]:
     g = None if grupo == "todos" else grupo
     return await _svc(session).heatmap_sectores(g)
+
+
+@router.get("/puntos-heatmap", response_model=list[PuntoHeatmapOut])
+async def puntos_heatmap(
+    session: PropiaSession,
+    solo_robos: Annotated[bool, Query()] = False,
+    grupo: Annotated[Grupo, Query()] = "todos",
+    sectorid: Annotated[int | None, Query()] = None,
+) -> list[PuntoHeatmapOut]:
+    """Puntos (lat, lon, peso) para la capa `heatmap` de MapLibre — mancha
+    continua tipo pronóstico del clima. `solo_robos=true` filtra a incidentes
+    con `es_robo=true` para el heatmap del tab Robo."""
+    g = None if grupo == "todos" else grupo
+    return await _svc(session).puntos_heatmap(solo_robos=solo_robos, grupo=g, sectorid=sectorid)
 
 
 @router.get("/top-calles", response_model=list[TramoRankOut])

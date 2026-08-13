@@ -250,6 +250,47 @@ class DashboardGeoRepository:
         ).mappings().all()
         return [dict(r) for r in rows]
 
+    async def puntos_heatmap(
+        self,
+        *,
+        solo_robos: bool = False,
+        grupo: str | None = None,
+        sectorid: int | None = None,
+    ) -> list[dict[str, Any]]:
+        """Puntos crudos (lat, lon) para alimentar la capa `heatmap` de MapLibre
+        que hace la mancha continua tipo pronóstico del clima. Filtra por
+        `solo_robos` para el tab Robo. Se agrupan por coordenada
+        redondeada a 5 decimales (~1m) y se devuelve un peso — así 14k
+        incidencias colapsan a ~5k puntos únicos y el payload baja a la mitad
+        sin perder resolución visual (MapLibre respeta el `weight` en el
+        rendering del heatmap)."""
+        gsql, gparams = await self._filtro_grupo_sql(grupo)
+        ssql, sparams = await self._filtro_sector_sql(sectorid)
+        robo_join = (
+            "JOIN gota.incidente i ON i.incidente_id = mv.incidente_id AND i.es_robo = true"
+            if solo_robos else ""
+        )
+        rows = (
+            await self._session.execute(
+                text(
+                    f"""
+                    SELECT
+                        ROUND(mv.latitud::numeric, 5)::float  AS lat,
+                        ROUND(mv.longitud::numeric, 5)::float AS lon,
+                        COUNT(*) AS peso
+                    FROM gota.mv_incidente_enriquecido mv
+                    {robo_join}
+                    WHERE mv.latitud IS NOT NULL AND mv.longitud IS NOT NULL
+                      {gsql.replace('grupo', 'mv.grupo')}
+                      {ssql.replace('sectorid', 'mv.sectorid')}
+                    GROUP BY lat, lon
+                    """
+                ),
+                {**gparams, **sparams},
+            )
+        ).mappings().all()
+        return [dict(r) for r in rows]
+
     async def heatmap_sectores(self, grupo: str | None = None) -> list[dict[str, Any]]:
         """Todos los sectores con su conteo y densidad — para pintar polígonos."""
         gsql, gparams = await self._filtro_grupo_sql(grupo)

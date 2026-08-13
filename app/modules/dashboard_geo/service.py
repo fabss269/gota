@@ -21,6 +21,7 @@ from app.modules.dashboard_geo.schemas import (
     MultiReclamoOut,
     ParentescoSliceOut,
     PrediccionSectorOut,
+    PuntoHeatmapOut,
     ReclamoDetalleOut,
     ReincidenteOut,
     SectorRankOut,
@@ -275,6 +276,14 @@ class DashboardGeoService:
             )
             for r in rows
         ]
+
+    async def puntos_heatmap(
+        self, *, solo_robos: bool, grupo: str | None, sectorid: int | None
+    ) -> list["PuntoHeatmapOut"]:
+        rows = await self._repo.puntos_heatmap(
+            solo_robos=solo_robos, grupo=grupo, sectorid=sectorid
+        )
+        return [PuntoHeatmapOut(lat=r["lat"], lon=r["lon"], peso=r["peso"]) for r in rows]
 
     async def heatmap_sectores(self, grupo: str | None) -> list[HeatmapSectorOut]:
         rows = await self._repo.heatmap_sectores(grupo)

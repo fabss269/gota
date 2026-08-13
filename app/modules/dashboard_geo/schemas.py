@@ -72,6 +72,12 @@ class HeatmapSectorOut(BaseModel):
     densidad_por_km2: float
 
 
+class PuntoHeatmapOut(BaseModel):
+    lat: float
+    lon: float
+    peso: int
+
+
 class TramoRankOut(BaseModel):
     tramo_id: int
     tramo_tipo: str
