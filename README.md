@@ -1,71 +1,67 @@
-# gota-backend
+# GOTA — EPSEL Móvil
 
-Backend FastAPI para GOTA/EPSEL-MOVIL. Integra:
+App (React Native + Expo, TypeScript) para gestión operacional, trazabilidad y atención
+de incidencias de agua y desagüe de EPSEL. Construida a partir del diseño en Penpot
+siguiendo un proceso de **Spec-Driven Development**: ver `specs/`.
 
-- **Esquema `gota`** en `bd_conhydra` — incidentes, reclamos, usuarios, catálogos.
-  Lectura/escritura. Convive con `sig` en el mismo Postgres, se controla con
-  `PROPIA_DB_SCHEMA`. El esquema ya está creado en producción — no hay DDL en este
-  repo ni migrations automáticas, los cambios de estructura se aplican a mano.
-- **`sig`** en `bd_conhydra` — catastro/red de agua y desagüe de EPSEL. Solo lectura.
-  Conexión directa por IP LAN (`172.16.5.222:5432`) en producción (servidor dentro de
-  la red de EPSEL); dev local remoto puede seguir usando un túnel SSH si no está en
-  esa red — solo cambian `DB_HOST`/`DB_PORT`, no el código.
+**La app corre como web responsive (PWA)**, no como build nativo — ver
+`docs/ESTADO_PROYECTO.md` § 2 para el porqué y el detalle completo.
 
-Contrato a satisfacer: [`API.md`](./API.md). Diseño técnico spec-driven en
-[`specs/`](./specs/) — leer `specs/00-arquitectura.md` primero, documenta las
-decisiones transversales (dos motores de BD, sin JOIN cross-DB, patrón
-router/service/repository por módulo) de las que dependen los demás specs.
+## Empezar aquí
 
-## Estado
+1. **`docs/ESTADO_PROYECTO.md`** — léelo primero. Decisiones de infraestructura (por qué
+   web y no nativo), bugs de compatibilidad ya resueltos y cómo se resolvieron, qué está
+   verificado y qué no. Pensado para que cualquier persona o IA que retome el proyecto
+   no tenga que reconstruir el contexto desde cero.
+2. **`specs/00-auditoria-diseno.md`** — qué había en el diseño, qué se corrigió y por
+   qué, y todas las decisiones de producto tomadas con Edgar.
+3. **`specs/01` a `specs/09`** — una Spec por funcionalidad (contexto, requisitos,
+   criterios de aceptación) con su sección **"Solución implementada"** documentando qué
+   se construyó de verdad, qué se simplificó y por qué. **Las 9 specs están
+   implementadas** (ver Estado dentro de cada una para el detalle/simplificaciones).
+4. **`docs/API.md`** — contrato completo de API que necesita el backend (no existe
+   todavía; la app corre sobre datos mock en `src/mocks/`).
+5. **`docs/EMULADOR.md`** — cómo compilar nativo (Android Studio/EAS) si el proyecto
+   retoma esa vía más adelante. No es el camino actual.
 
-Fase 3 (implementación) completa para los 6 módulos del contrato de `API.md`: `auth`,
-`catalogos`, `incidencias`, `usuarios`, `red`, `dashboard` — 18 endpoints, verificados
-end-to-end contra Postgres local + `sig` real (túnel SSH) + Redis. Detalle de decisiones
-tomadas al implementar en la sección "Estado de implementación" de cada `specs/0N-*.md`
-y en `API.md` §10 (cambios de contrato). El esquema `gota` en `bd_conhydra` es la
-fuente de verdad — si necesitás inspeccionar la estructura, `pg_dump --schema-only
--n gota` la vuelca. Cambios de estructura se coordinan con Edgar y se aplican a
-mano (no hay migrations automáticas).
+## Arranque rápido
 
-Gaps reales de datos encontrados (no son bugs de este código, ver specs para detalle):
-`sig.alcantarillado` no tiene columna de diámetro (spec 04), `sig.accesoriotipos` no
-distingue válvulas/hidrantes (spec 07), módulo de alertas no implementado por lo que
-`prioridad` usa un default (spec 03).
-
-## Cómo correr
-
-```bash
-cp .env.example .env   # completar credenciales reales
-pip install -e ".[dev]"
-# Redis (si no hay uno corriendo ya):
-docker run -d --name gota-redis -p 6379:6379 --restart unless-stopped redis:7-alpine
-# Seed de datos de desarrollo (opcional, usa suministro_codigo reales de sig):
-.venv/bin/python -m scripts.seed_dev
-uvicorn app.main:app --reload
+```powershell
+npm install
+npx expo start --web
 ```
 
-Si Redis se vacía o se pierde, reconstruir la caché de incidencias con:
-```bash
-.venv/bin/python -m scripts.rebuild_incidencia_cache
+Login de prueba: `tecnico@epsel.gob.pe` / `epsel2026`.
+
+## Estructura
+
+```
+src/
+  app/            # rutas (Expo Router, file-based) — incluye login, (app)/ (Drawer:
+                  # mapa/dashboard/incidencias) e incidencia/[id] (modal de detalle)
+  auth/           # sesión + contexto de autenticación
+  api/            # cliente HTTP (con refresh de token) — listo para el backend real
+  mocks/          # datos simulados mientras no exista backend
+  components/     # UI por dominio (map/, sheet/, dashboard/, incident-detail/,
+                  # incident-actions/, incidents/) + PhoneFrame (frame responsive web)
+  icons/          # íconos SVG propios (gota, alcantarilla)
+  navigation/     # drawer de navegación
+  state/          # estado global (Zustand)
+  hooks/          # data-fetching (React Query) por pantalla/acción
+  utils/          # clustering de incidencias para el mapa, etc.
+  constants/      # paleta de colores, spacing (derivados de specs/00-auditoria-diseno.md)
+assets/reference/ # PNG originales de íconos (solo referencia, no se usan en runtime)
+specs/            # Specs SDD (una por funcionalidad)
+docs/             # ESTADO_PROYECTO.md, API.md, EMULADOR.md
+patches/          # patch-package — necesario para que react-native-web funcione (ver
+                  # docs/ESTADO_PROYECTO.md § 3.1). No borrar ni saltarse `postinstall`.
 ```
 
-## CI/CD y despliegue
+## Comandos útiles
 
-Dos ramas: `main` (auto-deploy) y `develop`. En cada push/PR a cualquiera de las dos
-corre `.github/workflows/ci.yml` (`ruff check` + build de la imagen Docker). En cada push
-a `main`, `.github/workflows/deploy.yml` construye la imagen, la publica en
-`ghcr.io/ivanedac/epsel-backend` y despliega por SSH al servidor configurado en los
-secrets del repo (`DEPLOY_HOST`/`DEPLOY_PORT`/`DEPLOY_USER`/`DEPLOY_PATH`/`DEPLOY_SSH_KEY`).
-
-El servidor corre `deploy/docker-compose.yml`: `backend` + `postgres` (BD propia) +
-`redis` + `martin` (tiles de `sig`, whitelist explícita de 7 tablas en
-`deploy/martin-config.template.yaml` — Martin no soporta `${VAR}` en su config, el script
-de deploy la renderiza con `envsubst` en el servidor antes de levantar el contenedor). El
-`.env` real con secretos vive **solo en el servidor** (`deploy/.env.example` documenta
-qué variables necesita), nunca en git. `DB_HOST`/`SIG_DATABASE_URL` son configurables
-ahí: IP LAN directa (`172.16.5.222`) si el servidor está dentro de la red de EPSEL, o el
-túnel (`ssh.kasqan.com:15432`) si no — sin tocar código ni la imagen.
-
-Estado actual: probado end-to-end contra un servidor de prueba (`ssh.kasqan.com:2222`).
-Pendiente repetir la configuración de secrets/`.env` contra el servidor real de EPSEL
-cuando esté disponible.
+| Objetivo | Comando |
+|---|---|
+| Correr en web | `npx expo start --web` |
+| Chequeo de tipos | `npx tsc --noEmit` |
+| Lint | `npx expo lint` |
+| Verificar que el bundle nativo empaqueta sin errores | `npx expo export --platform android` |

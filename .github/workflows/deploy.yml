@@ -5,7 +5,7 @@ on:
     branches: [main]
 
 env:
-  IMAGE: ghcr.io/ivanedac/epsel-backend
+  IMAGE: ghcr.io/ivanedac/epsel-movil
 
 jobs:
   build-and-push:
@@ -16,13 +16,13 @@ jobs:
     steps:
       - uses: actions/checkout@v4
 
-      - uses: docker/setup-buildx-action@v3
-
       - uses: docker/login-action@v3
         with:
           registry: ghcr.io
           username: ${{ github.actor }}
           password: ${{ secrets.GITHUB_TOKEN }}
+
+      - uses: docker/setup-buildx-action@v3
 
       - uses: docker/build-push-action@v6
         with:
@@ -34,55 +34,28 @@ jobs:
           cache-from: type=gha
           cache-to: type=gha,mode=max
 
-  # Corre directo en el VPS Contabo (self-hosted runner Linux, sin SSH desde
-  # GitHub — el runner se conecta DE SALIDA, ver deploy/LINUX_RUNNER_SETUP.md).
-  # DEPLOY_PATH es una repo variable (no secreto: es solo una ruta local, ej.
-  # /opt/epsel-deploy) que debe apuntar a la MISMA carpeta que usa el deploy de
-  # EPSEL-MOVIL, porque ahí vive el docker-compose.yml compartido (Postgres +
-  # Redis + Martin + backend + frontend, un solo stack) y el .env real con las
-  # credenciales de producción (nunca en git).
+  # Mismo VPS Contabo que gota-backend (self-hosted runner Linux registrado en
+  # este repo por separado — GitHub no permite compartir runners entre repos de
+  # una cuenta personal, solo en organizaciones). No copia nada: docker-
+  # compose.yml vive en DEPLOY_PATH, puesto ahí por el deploy de gota-backend —
+  # este job solo actualiza la imagen del servicio `frontend`. DEPLOY_PATH debe
+  # apuntar a la MISMA ruta configurada como repo variable en gota-backend.
   deploy:
     needs: build-and-push
     runs-on: [self-hosted, Linux]
     permissions:
-      contents: read
       packages: read
     steps:
-      - uses: actions/checkout@v4
-
-      - name: Copiar archivos de deploy a la carpeta persistente
-        run: |
-          mkdir -p "${{ vars.DEPLOY_PATH }}"
-          cp deploy/docker-compose.yml deploy/martin-config.template.yaml \
-            "${{ vars.DEPLOY_PATH }}/"
-
-      - name: Renderizar martin-config.yaml desde el template (envsubst)
-        working-directory: ${{ vars.DEPLOY_PATH }}
-        run: |
-          set -a
-          source .env
-          set +a
-          envsubst < martin-config.template.yaml > martin-config.yaml
-
-      - name: Desplegar (pull + up)
+      - name: Desplegar (pull + up solo frontend)
         working-directory: ${{ vars.DEPLOY_PATH }}
         env:
-          # secrets.GITHUB_TOKEN no alcanza acá: docker compose pull trae TODAS
-          # las imágenes del compose, incluida epsel-movil (paquete de OTRO
-          # repo) — el token automático solo ve paquetes del propio repo.
-          # GHCR_TOKEN es un PAT con scope read:packages nada más, cargado a
-          # mano como secret (nunca en git).
-          GHCR_TOKEN: ${{ secrets.GHCR_TOKEN }}
+          GHCR_TOKEN: ${{ secrets.GITHUB_TOKEN }}
           GHCR_ACTOR: ${{ github.actor }}
         run: |
           echo "$GHCR_TOKEN" | docker login ghcr.io -u "$GHCR_ACTOR" --password-stdin
 
-          # Igual que antes: siempre el tag del commit actual, nunca :latest, para
-          # saber exactamente qué imagen quedó corriendo. docker compose usa el
-          # .env de esta carpeta para el resto de variables; una variable ya
-          # presente en el proceso (como esta) tiene prioridad sobre el .env.
-          export BACKEND_IMAGE="${{ env.IMAGE }}:${{ github.sha }}"
+          export FRONTEND_IMAGE="${{ env.IMAGE }}:${{ github.sha }}"
 
-          docker compose pull
-          docker compose up -d --remove-orphans
+          docker compose pull frontend
+          docker compose up -d --no-deps frontend
           docker image prune -f
