@@ -1,0 +1,602 @@
+[
+  {
+    "suministro": "01169015",
+    "tipo_grupo": "AGUA",
+    "distrito": "LA VICTORIA"
+  },
+  {
+    "suministro": "01140001",
+    "tipo_grupo": "AGUA",
+    "distrito": "LA VICTORIA"
+  },
+  {
+    "suministro": "06870042",
+    "tipo_grupo": "AGUA",
+    "distrito": "PIMENTEL"
+  },
+  {
+    "suministro": "01412486",
+    "tipo_grupo": "AGUA",
+    "distrito": "JOSE LEONARDO ORTIZ"
+  },
+  {
+    "suministro": "01203483",
+    "tipo_grupo": "AGUA",
+    "distrito": "CHICLAYO"
+  },
+  {
+    "suministro": "01050900",
+    "tipo_grupo": "AGUA",
+    "distrito": "PIMENTEL"
+  },
+  {
+    "suministro": "06823407",
+    "tipo_grupo": "AGUA",
+    "distrito": "CHICLAYO"
+  },
+  {
+    "suministro": "01105917",
+    "tipo_grupo": "AGUA",
+    "distrito": "CHICLAYO"
+  },
+  {
+    "suministro": "01301186",
+    "tipo_grupo": "AGUA",
+    "distrito": "JOSE LEONARDO ORTIZ"
+  },
+  {
+    "suministro": "06887555",
+    "tipo_grupo": "AGUA",
+    "distrito": "PIMENTEL"
+  },
+  {
+    "suministro": "06823101",
+    "tipo_grupo": "AGUA",
+    "distrito": "LA VICTORIA"
+  },
+  {
+    "suministro": "01688873",
+    "tipo_grupo": "AGUA",
+    "distrito": "PIMENTEL"
+  },
+  {
+    "suministro": "06887108",
+    "tipo_grupo": "AGUA",
+    "distrito": "CHICLAYO"
+  },
+  {
+    "suministro": "01566765",
+    "tipo_grupo": "AGUA",
+    "distrito": "CHICLAYO"
+  },
+  {
+    "suministro": "30078629",
+    "tipo_grupo": "AGUA",
+    "distrito": "FERREÑAFE"
+  },
+  {
+    "suministro": "01536292",
+    "tipo_grupo": "AGUA",
+    "distrito": "CHICLAYO"
+  },
+  {
+    "suministro": "06846052",
+    "tipo_grupo": "AGUA",
+    "distrito": "PIMENTEL"
+  },
+  {
+    "suministro": "01484697",
+    "tipo_grupo": "AGUA",
+    "distrito": "CHICLAYO"
+  },
+  {
+    "suministro": "06823621",
+    "tipo_grupo": "AGUA",
+    "distrito": "LA VICTORIA"
+  },
+  {
+    "suministro": "06846386",
+    "tipo_grupo": "AGUA",
+    "distrito": "PIMENTEL"
+  },
+  {
+    "suministro": "01517675",
+    "tipo_grupo": "AGUA",
+    "distrito": "JOSE LEONARDO ORTIZ"
+  },
+  {
+    "suministro": "02021930",
+    "tipo_grupo": "AGUA",
+    "distrito": "PIMENTEL"
+  },
+  {
+    "suministro": "01458026",
+    "tipo_grupo": "AGUA",
+    "distrito": "CHICLAYO"
+  },
+  {
+    "suministro": "06848707",
+    "tipo_grupo": "AGUA",
+    "distrito": "LA VICTORIA"
+  },
+  {
+    "suministro": "01420997",
+    "tipo_grupo": "AGUA",
+    "distrito": "CHICLAYO"
+  },
+  {
+    "suministro": "01678654",
+    "tipo_grupo": "AGUA",
+    "distrito": "CHICLAYO"
+  },
+  {
+    "suministro": "06859064",
+    "tipo_grupo": "AGUA",
+    "distrito": "CHICLAYO"
+  },
+  {
+    "suministro": "01380089",
+    "tipo_grupo": "AGUA",
+    "distrito": "JOSE LEONARDO ORTIZ"
+  },
+  {
+    "suministro": "06860966",
+    "tipo_grupo": "AGUA",
+    "distrito": "CHICLAYO"
+  },
+  {
+    "suministro": "06872434",
+    "tipo_grupo": "AGUA",
+    "distrito": "CHICLAYO"
+  },
+  {
+    "suministro": "01084886",
+    "tipo_grupo": "AGUA",
+    "distrito": "CHICLAYO"
+  },
+  {
+    "suministro": "01256635",
+    "tipo_grupo": "AGUA",
+    "distrito": "CHICLAYO"
+  },
+  {
+    "suministro": "06865978",
+    "tipo_grupo": "AGUA",
+    "distrito": "LA VICTORIA"
+  },
+  {
+    "suministro": "01122225",
+    "tipo_grupo": "AGUA",
+    "distrito": "LA VICTORIA"
+  },
+  {
+    "suministro": "06884978",
+    "tipo_grupo": "AGUA",
+    "distrito": "LA VICTORIA"
+  },
+  {
+    "suministro": "01163791",
+    "tipo_grupo": "AGUA",
+    "distrito": "LA VICTORIA"
+  },
+  {
+    "suministro": "01387860",
+    "tipo_grupo": "AGUA",
+    "distrito": "JOSE LEONARDO ORTIZ"
+  },
+  {
+    "suministro": "01685561",
+    "tipo_grupo": "AGUA",
+    "distrito": "JOSE LEONARDO ORTIZ"
+  },
+  {
+    "suministro": "06864434",
+    "tipo_grupo": "AGUA",
+    "distrito": "LA VICTORIA"
+  },
+  {
+    "suministro": "00753453",
+    "tipo_grupo": "AGUA",
+    "distrito": "CHICLAYO"
+  },
+  {
+    "suministro": "00121619",
+    "tipo_grupo": "AGUA",
+    "distrito": "FERREÑAFE"
+  },
+  {
+    "suministro": "01471125",
+    "tipo_grupo": "AGUA",
+    "distrito": "CHICLAYO"
+  },
+  {
+    "suministro": "06871648",
+    "tipo_grupo": "AGUA",
+    "distrito": "PIMENTEL"
+  },
+  {
+    "suministro": "06822615",
+    "tipo_grupo": "AGUA",
+    "distrito": "CHICLAYO"
+  },
+  {
+    "suministro": "01097621",
+    "tipo_grupo": "AGUA",
+    "distrito": "PIMENTEL"
+  },
+  {
+    "suministro": "01444097",
+    "tipo_grupo": "AGUA",
+    "distrito": "CHICLAYO"
+  },
+  {
+    "suministro": "06860162",
+    "tipo_grupo": "AGUA",
+    "distrito": "LA VICTORIA"
+  },
+  {
+    "suministro": "06869634",
+    "tipo_grupo": "AGUA",
+    "distrito": "PIMENTEL"
+  },
+  {
+    "suministro": "06834491",
+    "tipo_grupo": "AGUA",
+    "distrito": "PIMENTEL"
+  },
+  {
+    "suministro": "06897603",
+    "tipo_grupo": "AGUA",
+    "distrito": "CHICLAYO"
+  },
+  {
+    "suministro": "06861356",
+    "tipo_grupo": "AGUA",
+    "distrito": "PIMENTEL"
+  },
+  {
+    "suministro": "01533222",
+    "tipo_grupo": "AGUA",
+    "distrito": "JOSE LEONARDO ORTIZ"
+  },
+  {
+    "suministro": "01591415",
+    "tipo_grupo": "AGUA",
+    "distrito": "JOSE LEONARDO ORTIZ"
+  },
+  {
+    "suministro": "01371011",
+    "tipo_grupo": "AGUA",
+    "distrito": "JOSE LEONARDO ORTIZ"
+  },
+  {
+    "suministro": "06883615",
+    "tipo_grupo": "AGUA",
+    "distrito": "CHICLAYO"
+  },
+  {
+    "suministro": "01678592",
+    "tipo_grupo": "AGUA",
+    "distrito": "JOSE LEONARDO ORTIZ"
+  },
+  {
+    "suministro": "01687937",
+    "tipo_grupo": "AGUA",
+    "distrito": "JOSE LEONARDO ORTIZ"
+  },
+  {
+    "suministro": "06851191",
+    "tipo_grupo": "AGUA",
+    "distrito": "CHICLAYO"
+  },
+  {
+    "suministro": "01010560",
+    "tipo_grupo": "AGUA",
+    "distrito": "CHICLAYO"
+  },
+  {
+    "suministro": "01683149",
+    "tipo_grupo": "AGUA",
+    "distrito": "CHICLAYO"
+  },
+  {
+    "suministro": "06843786",
+    "tipo_grupo": "DESAGUE",
+    "distrito": "JOSE LEONARDO ORTIZ"
+  },
+  {
+    "suministro": "01266660",
+    "tipo_grupo": "DESAGUE",
+    "distrito": "CHICLAYO"
+  },
+  {
+    "suministro": "01688544",
+    "tipo_grupo": "DESAGUE",
+    "distrito": "CHICLAYO"
+  },
+  {
+    "suministro": "01687769",
+    "tipo_grupo": "DESAGUE",
+    "distrito": "CHICLAYO"
+  },
+  {
+    "suministro": "06842730",
+    "tipo_grupo": "DESAGUE",
+    "distrito": "CHICLAYO"
+  },
+  {
+    "suministro": "06846294",
+    "tipo_grupo": "DESAGUE",
+    "distrito": "CHICLAYO"
+  },
+  {
+    "suministro": "06846787",
+    "tipo_grupo": "DESAGUE",
+    "distrito": "PIMENTEL"
+  },
+  {
+    "suministro": "01130816",
+    "tipo_grupo": "DESAGUE",
+    "distrito": "LA VICTORIA"
+  },
+  {
+    "suministro": "06881001",
+    "tipo_grupo": "DESAGUE",
+    "distrito": "LA VICTORIA"
+  },
+  {
+    "suministro": "01446022",
+    "tipo_grupo": "DESAGUE",
+    "distrito": "CHICLAYO"
+  },
+  {
+    "suministro": "06895679",
+    "tipo_grupo": "DESAGUE",
+    "distrito": "CHICLAYO"
+  },
+  {
+    "suministro": "06891442",
+    "tipo_grupo": "DESAGUE",
+    "distrito": "LA VICTORIA"
+  },
+  {
+    "suministro": "01023883",
+    "tipo_grupo": "DESAGUE",
+    "distrito": "CHICLAYO"
+  },
+  {
+    "suministro": "02016944",
+    "tipo_grupo": "DESAGUE",
+    "distrito": "PIMENTEL"
+  },
+  {
+    "suministro": "30010425",
+    "tipo_grupo": "DESAGUE",
+    "distrito": "FERREÑAFE"
+  },
+  {
+    "suministro": "01161357",
+    "tipo_grupo": "DESAGUE",
+    "distrito": "LA VICTORIA"
+  },
+  {
+    "suministro": "30023839",
+    "tipo_grupo": "DESAGUE",
+    "distrito": "FERREÑAFE"
+  },
+  {
+    "suministro": "01489841",
+    "tipo_grupo": "DESAGUE",
+    "distrito": "CHICLAYO"
+  },
+  {
+    "suministro": "01289076",
+    "tipo_grupo": "DESAGUE",
+    "distrito": "JOSE LEONARDO ORTIZ"
+  },
+  {
+    "suministro": "06889891",
+    "tipo_grupo": "DESAGUE",
+    "distrito": "LA VICTORIA"
+  },
+  {
+    "suministro": "01183239",
+    "tipo_grupo": "DESAGUE",
+    "distrito": "LA VICTORIA"
+  },
+  {
+    "suministro": "06886748",
+    "tipo_grupo": "DESAGUE",
+    "distrito": "LA VICTORIA"
+  },
+  {
+    "suministro": "01180269",
+    "tipo_grupo": "DESAGUE",
+    "distrito": "LA VICTORIA"
+  },
+  {
+    "suministro": "01689778",
+    "tipo_grupo": "DESAGUE",
+    "distrito": "LA VICTORIA"
+  },
+  {
+    "suministro": "01272566",
+    "tipo_grupo": "DESAGUE",
+    "distrito": "CHICLAYO"
+  },
+  {
+    "suministro": "01328450",
+    "tipo_grupo": "DESAGUE",
+    "distrito": "JOSE LEONARDO ORTIZ"
+  },
+  {
+    "suministro": "06820676",
+    "tipo_grupo": "DESAGUE",
+    "distrito": "CHICLAYO"
+  },
+  {
+    "suministro": "02020779",
+    "tipo_grupo": "DESAGUE",
+    "distrito": "PIMENTEL"
+  },
+  {
+    "suministro": "00748194",
+    "tipo_grupo": "DESAGUE",
+    "distrito": "CHICLAYO"
+  },
+  {
+    "suministro": "01686588",
+    "tipo_grupo": "DESAGUE",
+    "distrito": "CHICLAYO"
+  },
+  {
+    "suministro": "00691538",
+    "tipo_grupo": "DESAGUE",
+    "distrito": "CHICLAYO"
+  },
+  {
+    "suministro": "01387177",
+    "tipo_grupo": "DESAGUE",
+    "distrito": "JOSE LEONARDO ORTIZ"
+  },
+  {
+    "suministro": "00749548",
+    "tipo_grupo": "DESAGUE",
+    "distrito": "JOSE LEONARDO ORTIZ"
+  },
+  {
+    "suministro": "06881283",
+    "tipo_grupo": "DESAGUE",
+    "distrito": "CHICLAYO"
+  },
+  {
+    "suministro": "06870381",
+    "tipo_grupo": "DESAGUE",
+    "distrito": "CHICLAYO"
+  },
+  {
+    "suministro": "01077945",
+    "tipo_grupo": "DESAGUE",
+    "distrito": "CHICLAYO"
+  },
+  {
+    "suministro": "06863438",
+    "tipo_grupo": "DESAGUE",
+    "distrito": "CHICLAYO"
+  },
+  {
+    "suministro": "06822320",
+    "tipo_grupo": "DESAGUE",
+    "distrito": "PIMENTEL"
+  },
+  {
+    "suministro": "01318210",
+    "tipo_grupo": "DESAGUE",
+    "distrito": "JOSE LEONARDO ORTIZ"
+  },
+  {
+    "suministro": "01296666",
+    "tipo_grupo": "DESAGUE",
+    "distrito": "JOSE LEONARDO ORTIZ"
+  },
+  {
+    "suministro": "01507640",
+    "tipo_grupo": "DESAGUE",
+    "distrito": "CHICLAYO"
+  },
+  {
+    "suministro": "01615889",
+    "tipo_grupo": "DESAGUE",
+    "distrito": "CHICLAYO"
+  },
+  {
+    "suministro": "06892410",
+    "tipo_grupo": "DESAGUE",
+    "distrito": "PIMENTEL"
+  },
+  {
+    "suministro": "06881069",
+    "tipo_grupo": "DESAGUE",
+    "distrito": "LA VICTORIA"
+  },
+  {
+    "suministro": "01097347",
+    "tipo_grupo": "DESAGUE",
+    "distrito": "PIMENTEL"
+  },
+  {
+    "suministro": "01544930",
+    "tipo_grupo": "DESAGUE",
+    "distrito": "JOSE LEONARDO ORTIZ"
+  },
+  {
+    "suministro": "06859909",
+    "tipo_grupo": "DESAGUE",
+    "distrito": "CHICLAYO"
+  },
+  {
+    "suministro": "06860187",
+    "tipo_grupo": "DESAGUE",
+    "distrito": "LA VICTORIA"
+  },
+  {
+    "suministro": "06834624",
+    "tipo_grupo": "DESAGUE",
+    "distrito": "LA VICTORIA"
+  },
+  {
+    "suministro": "01297112",
+    "tipo_grupo": "DESAGUE",
+    "distrito": "CHICLAYO"
+  },
+  {
+    "suministro": "01353644",
+    "tipo_grupo": "DESAGUE",
+    "distrito": "JOSE LEONARDO ORTIZ"
+  },
+  {
+    "suministro": "01235141",
+    "tipo_grupo": "DESAGUE",
+    "distrito": "CHICLAYO"
+  },
+  {
+    "suministro": "01031407",
+    "tipo_grupo": "DESAGUE",
+    "distrito": "PIMENTEL"
+  },
+  {
+    "suministro": "01340014",
+    "tipo_grupo": "DESAGUE",
+    "distrito": "JOSE LEONARDO ORTIZ"
+  },
+  {
+    "suministro": "01476186",
+    "tipo_grupo": "DESAGUE",
+    "distrito": "CHICLAYO"
+  },
+  {
+    "suministro": "06889105",
+    "tipo_grupo": "DESAGUE",
+    "distrito": "PIMENTEL"
+  },
+  {
+    "suministro": "01596852",
+    "tipo_grupo": "DESAGUE",
+    "distrito": "JOSE LEONARDO ORTIZ"
+  },
+  {
+    "suministro": "02008104",
+    "tipo_grupo": "DESAGUE",
+    "distrito": "PIMENTEL"
+  },
+  {
+    "suministro": "06863866",
+    "tipo_grupo": "DESAGUE",
+    "distrito": "PIMENTEL"
+  },
+  {
+    "suministro": "01091545",
+    "tipo_grupo": "DESAGUE",
+    "distrito": "PIMENTEL"
+  }
+]

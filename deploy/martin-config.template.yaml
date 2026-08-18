@@ -1,0 +1,161 @@
+cache_size_mb: 2048
+# El TTL (cache_expiry/cache_idle_timeout) NO existe como key de este YAML en
+# Martin 1.12 — confirmado en vivo con `martin --save-config -`: "Ignoring
+# unrecognized configuration key 'cache_expiry'". Solo existe como flag de CLI
+# (--cache-expiry), hay que pasarlo en el comando del contenedor (ver
+# docker-compose.yml, servicio `martin`, y deploy/DESPLIEGUE_LOCAL_TUNEL.md).
+# Sin esto, un edit de diámetro/material vía PATCH /red/elemento/... cambia la
+# BD pero el tile servido queda con el valor viejo indefinidamente (confirmado
+# con curl: mismo etag/bytes antes y después del UPDATE) hasta que el
+# contenedor se reinicie.
+
+postgres:
+  connection_string: '${SIG_DATABASE_URL}'
+  auto_publish: false
+  pool_size: 10
+  tables:
+    agua:
+      schema: gota
+      table: agua_2d
+      srid: 32719
+      geometry_column: geom
+      properties:
+        aguaid: int4
+        aguatipoid: int4
+        sectorid: int4
+        diametro: numeric
+    alcantarillado:
+      schema: gota
+      table: alcantarillado_2d
+      srid: 32719
+      geometry_column: geom
+      properties:
+        alcantarilladoid: int4
+        codigo: varchar
+        alcantarilladotipoid: int4
+        materialid: int4
+        primaria: bool
+        sectorid: int4
+        distritoid: int4
+    buzones:
+      schema: sig
+      table: buzones
+      srid: 32719
+      geometry_column: geom
+      properties:
+        buzonid: int4
+        codigo: varchar
+        sectorid: int4
+        distritoid: int4
+    cajaagua:
+      schema: sig
+      table: cajaagua
+      srid: 32719
+      geometry_column: geom
+      properties:
+        cajaaguaid: int4
+        inscripcion: varchar
+        sectorid: int4
+        distritoid: int4
+    cajadesague:
+      schema: sig
+      table: cajadesague
+      srid: 32719
+      geometry_column: geom
+      properties:
+        cajadesagueid: int4
+        inscripcion: varchar
+        sectorid: int4
+        distritoid: int4
+    cajaaguaconexion:
+      schema: sig
+      table: cajaaguaconexion
+      srid: 32719
+      geometry_column: geom
+      properties:
+        cajaaguaid: int4
+        aguaid: int4
+        sectorid: int4
+    cajadesagueconexion:
+      schema: sig
+      table: cajadesagueconexion
+      srid: 32719
+      geometry_column: geom
+      properties:
+        cajadesagueid: int4
+        alcantarilladoid: int4
+        sectorid: int4
+    manzanas:
+      schema: sig
+      table: manzanas
+      srid: 32719
+      geometry_column: geom
+      properties:
+        manzanaid: int4
+        manzana: varchar
+        sectorid: int4
+        distritoid: int4
+    lotes:
+      schema: sig
+      table: lotes
+      srid: 32719
+      geometry_column: geom
+      properties:
+        loteid: int4
+        manzanaid: int4
+        sectorid: int4
+        distritoid: int4
+    sectores:
+      schema: sig
+      table: sectores
+      srid: 32719
+      geometry_column: geom
+      properties:
+        sectorid: int4
+    accesorios:
+      schema: sig
+      table: accesorios
+      srid: 32719
+      geometry_column: geom
+      properties:
+        accesorioid: int4
+        accesoriotipoid: int4
+        sectorid: int4
+        distritoid: int4
+    alcantarillado_flujo:
+      schema: sig
+      table: mv_alcantarilladoflujo
+      srid: 32719
+      geometry_column: geom
+      properties:
+        primaria: bool
+        sectorid: int4
+    reservorios:
+      schema: sig
+      table: reservorios
+      srid: 32719
+      geometry_column: geom
+      properties:
+        reservorioid: int4
+        reservoriotipoid: int4
+        codigo: varchar
+        sectorid: int4
+        distritoid: int4
+    incidencias:
+      # Mapa del Dashboard (DashboardMap.web.tsx) — nunca tuvo esta fuente
+      # configurada en Martin (404 confirmado en vivo 2026-08-09). `geom` ya viene
+      # en SRID 4326 directo desde latitud/longitud, no hace falta ST_Transform.
+      # Whitelist: lo que lee DashboardMap.web.tsx (codigo, grupo, n_reclamos,
+      # es_resolucion_lenta, sectorid) más columnas obvias por si hacen falta.
+      schema: gota
+      table: mv_incidente_enriquecido
+      srid: 4326
+      geometry_column: geom
+      properties:
+        codigo: varchar
+        grupo: varchar
+        n_reclamos: int8
+        es_resolucion_lenta: bool
+        sin_solucion: bool
+        sectorid: int4
+        sig_distritoid: int4

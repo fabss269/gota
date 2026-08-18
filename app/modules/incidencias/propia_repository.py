@@ -1,0 +1,449 @@
+import uuid
+from datetime import date, datetime
+
+from sqlalchemy import Select, and_, any_, case, func, literal_column, or_, select, text
+from sqlalchemy.ext.asyncio import AsyncSession
+
+from app.db.models_propia import (
+    CatalogoEstado,
+    CatalogoPrioridad,
+    CatalogoTipoAtencion,
+    CatalogoTipoGrupo,
+    EstadoIncidenteEvento,
+    Incidente,
+    IncidenteAlertaRegla,
+    Reclamo,
+)
+
+# Umbrales de prioridad calculada por tipo de grupo, en días.
+# Deriva del análisis de percentiles p50/p80 sobre `dias` hasta `fecha_solucion`
+# en la BD real (decisión Fabiana 2026-08-11):
+#   - AGUA:   p50 = 18, p80 = 32
+#   - DESAGUE: p50 =  8, p80 = 22
+# Si un incidente no resuelto lleva ≥ p80 días → 'critica'; si ≥ p50 → 'alerta';
+# si es menor o si ya tiene fecha_solucion → 'a_tiempo'.
+UMBRALES_DIAS_PRIORIDAD: dict[str, tuple[int, int]] = {
+    'agua':    (18, 32),
+    'desague':  (8, 22),
+}
+PRIORIDAD_DEFAULT_UMBRAL = (18, 32)  # fallback para grupos futuros del catálogo
+
+# `gota.catalogo_estado` tiene la fila del estado terminal como 'FINALIZADO'
+# (heredado de scripts/tickets_loader.py, que puebla `estado_incidente_evento`
+# directo contra ese código) — el resto del sistema (transiciones.py, el tipo
+# `EstadoIncidencia` del frontend, toda la UI) usa 'ATENDIDO' en todas partes.
+# Bug real 2026-08-12, auditado en vivo (Edgar): registrar_avance()/
+# cambiar_estado() tiraban KeyError/filtraban vacío al toparse con el código
+# real de la BD. Se traduce en los únicos puntos de contacto con la tabla
+# cruda (mapa_estados, resolver_estado_id(s)) para que 'FINALIZADO' nunca se
+# filtre al resto de la app ni el resto de la app tenga que conocerlo.
+_CODIGO_ESTADO_DB_A_APP = {"FINALIZADO": "ATENDIDO"}
+_CODIGO_ESTADO_APP_A_DB = {v: k for k, v in _CODIGO_ESTADO_DB_A_APP.items()}
+
+
+def traducir_codigo_estado_db_a_app(codigo: str) -> str:
+    return _CODIGO_ESTADO_DB_A_APP.get(codigo, codigo)
+
+
+def _prioridad_codigo_expr():
+    """Expresión SQL que calcula la prioridad de una incidencia al vuelo.
+
+    Escrita SARGable (`creado_en <= NOW() - INTERVAL 'X days'`) para que el
+    planner pueda usar el índice parcial `incidente_creado_no_resueltas_idx`.
+    Usa `CatalogoTipoGrupo.codigo` (requiere que la query esté joined con
+    tipo_atencion → tipo_grupo, cosa que _query_base ya hace cuando aplica).
+    """
+    when_clauses = []
+    for grupo, (dias_alerta, dias_critica) in UMBRALES_DIAS_PRIORIDAD.items():
+        when_clauses.append((
+            and_(
+                CatalogoTipoGrupo.codigo == grupo,
+                Incidente.fecha_solucion.is_(None),
+                Incidente.creado_en <= func.now() - text(f"INTERVAL '{dias_critica} days'"),
+            ),
+            'critica',
+        ))
+        when_clauses.append((
+            and_(
+                CatalogoTipoGrupo.codigo == grupo,
+                Incidente.fecha_solucion.is_(None),
+                Incidente.creado_en <= func.now() - text(f"INTERVAL '{dias_alerta} days'"),
+            ),
+            'alerta',
+        ))
+    return case(*when_clauses, else_=literal_column("'a_tiempo'"))
+
+
+class PropiaIncidenciaRepository:
+    def __init__(self, session: AsyncSession) -> None:
+        self._session = session
+
+    def _ultimo_estado_subquery(self):
+        """Subquery `incidente_id` cuyo evento MÁS RECIENTE tiene un estado dado —
+        mismo patrón de window function que `mapa_prioridad_real`. Reemplaza el
+        índice invertido `idx:estado:*` que vivía en Redis (decisión de Edgar
+        2026-08-10: ese índice solo se llenaba leyendo incidentes uno por uno, así
+        que Redis vacío = filtro por estado devolvía 0 resultados)."""
+        ultimo_evento = (
+            select(
+                EstadoIncidenteEvento.incidente_id,
+                EstadoIncidenteEvento.estado_resultante_id,
+                func.row_number()
+                .over(partition_by=EstadoIncidenteEvento.incidente_id, order_by=EstadoIncidenteEvento.fecha.desc())
+                .label("orden_reciente"),
+            ).subquery()
+        )
+        return ultimo_evento
+
+    def _query_base(
+        self,
+        *,
+        fecha: date | None,
+        fecha_desde: date | None,
+        fecha_hasta: date | None,
+        categorias: list[str] | None,
+        tipo_atencion_codigo: str | None,
+        q: str | None,
+        bbox: tuple[float, float, float, float] | None,
+        resuelto: bool | None,
+        estado_ids: list[int] | None,
+        suministro_codigos: list[str] | None,
+    ) -> Select:
+        # JOIN a tipo_grupo siempre — la expresión de prioridad calculada la
+        # necesita para evaluar los umbrales por grupo, aunque no venga filtro
+        # `categorias`.
+        stmt = select(Incidente).join(Incidente.tipo_atencion).join(CatalogoTipoAtencion.tipo_grupo)
+        condiciones = []
+        if fecha is not None:
+            condiciones.append(func.date(Incidente.creado_en) == fecha)
+        if fecha_desde is not None:
+            condiciones.append(Incidente.creado_en >= fecha_desde)
+        if fecha_hasta is not None:
+            condiciones.append(Incidente.creado_en <= fecha_hasta)
+        if resuelto is not None:
+            condiciones.append(
+                Incidente.fecha_solucion.is_not(None) if resuelto else Incidente.fecha_solucion.is_(None)
+            )
+        if categorias:
+            condiciones.append(CatalogoTipoGrupo.codigo.in_(categorias))
+        if tipo_atencion_codigo is not None:
+            condiciones.append(CatalogoTipoAtencion.codigo == tipo_atencion_codigo)
+        if q:
+            patron = f"%{q}%"
+            condiciones.append(
+                or_(Incidente.direccion.ilike(patron), CatalogoTipoAtencion.nombre.ilike(patron))
+            )
+        if bbox is not None:
+            min_lon, min_lat, max_lon, max_lat = bbox
+            condiciones.append(Incidente.latitud.between(min_lat, max_lat))
+            condiciones.append(Incidente.longitud.between(min_lon, max_lon))
+        if estado_ids is not None:
+            ultimo_evento = self._ultimo_estado_subquery()
+            con_ese_estado = select(ultimo_evento.c.incidente_id).where(
+                ultimo_evento.c.orden_reciente == 1, ultimo_evento.c.estado_resultante_id.in_(estado_ids)
+            )
+            condiciones.append(Incidente.incidente_id.in_(con_ese_estado))
+        if suministro_codigos is not None:
+            # `= ANY(:array)` en vez de `.in_()`: un `distritoId` puede traer
+            # decenas de miles de suministros (todos los cajaagua/cajadesague del
+            # distrito) — `.in_()` expande cada valor como un parámetro bindeado
+            # aparte y asyncpg tiene un límite duro de 32767 parámetros por query
+            # (error real en vivo 2026-08-10: "the number of query arguments
+            # cannot exceed 32767"). `ANY(array)` manda un solo parámetro array.
+            condiciones.append(Incidente.suministro_codigo == any_(suministro_codigos))
+        if condiciones:
+            stmt = stmt.where(and_(*condiciones))
+        return stmt
+
+    async def listar(
+        self,
+        *,
+        fecha: date | None = None,
+        fecha_desde: date | None = None,
+        fecha_hasta: date | None = None,
+        categorias: list[str] | None = None,
+        tipo_atencion_codigo: str | None = None,
+        prioridad_codigos: list[str] | None = None,
+        q: str | None = None,
+        bbox: tuple[float, float, float, float] | None = None,
+        resuelto: bool | None = None,
+        estado_ids: list[int] | None = None,
+        suministro_codigos: list[str] | None = None,
+        page: int = 1,
+        page_size: int = 10,
+    ) -> tuple[list[tuple[Incidente, str]], int]:
+        """Devuelve tuples `(Incidente, prioridad_codigo)`. La prioridad se
+        calcula al vuelo en SQL con `_prioridad_codigo_expr` — no se persiste
+        en la BD ni se cachea en Redis, así que siempre refleja la edad actual
+        del incidente sin necesidad de rebuilds periódicos."""
+        stmt = self._query_base(
+            fecha=fecha,
+            fecha_desde=fecha_desde,
+            fecha_hasta=fecha_hasta,
+            categorias=categorias,
+            tipo_atencion_codigo=tipo_atencion_codigo,
+            q=q,
+            bbox=bbox,
+            resuelto=resuelto,
+            estado_ids=estado_ids,
+            suministro_codigos=suministro_codigos,
+        )
+        prioridad_expr = _prioridad_codigo_expr().label('prioridad_codigo')
+        stmt = stmt.add_columns(prioridad_expr)
+
+        if prioridad_codigos:
+            stmt = stmt.where(prioridad_expr.in_(prioridad_codigos))
+
+        total = (
+            await self._session.scalar(
+                select(func.count()).select_from(stmt.with_only_columns(Incidente.incidente_id).subquery())
+            )
+        ) or 0
+
+        stmt = stmt.order_by(Incidente.creado_en.desc()).limit(page_size).offset((page - 1) * page_size)
+        result = await self._session.execute(stmt)
+        filas: list[tuple[Incidente, str]] = [(row[0], row.prioridad_codigo) for row in result.all()]
+        return filas, total
+
+    async def get_by_codigo(self, codigo: str) -> Incidente | None:
+        stmt = select(Incidente).join(Incidente.tipo_atencion).where(Incidente.codigo == codigo)
+        return await self._session.scalar(stmt)
+
+    async def get_tecnico_asignado(self, incidente_id: uuid.UUID) -> EstadoIncidenteEvento | None:
+        stmt = (
+            select(EstadoIncidenteEvento)
+            .where(
+                EstadoIncidenteEvento.incidente_id == incidente_id,
+                EstadoIncidenteEvento.usuario_id.is_not(None),
+            )
+            .order_by(EstadoIncidenteEvento.fecha.desc())
+            .limit(1)
+        )
+        return await self._session.scalar(stmt)
+
+    async def get_estado_actual(self, incidente_id: uuid.UUID) -> CatalogoEstado | None:
+        stmt = (
+            select(CatalogoEstado)
+            .join(EstadoIncidenteEvento, EstadoIncidenteEvento.estado_resultante_id == CatalogoEstado.estado_id)
+            .where(EstadoIncidenteEvento.incidente_id == incidente_id)
+            .order_by(EstadoIncidenteEvento.fecha.desc())
+            .limit(1)
+        )
+        return await self._session.scalar(stmt)
+
+    async def get_ultimo_reclamo(self, incidente_id: uuid.UUID) -> Reclamo | None:
+        stmt = (
+            select(Reclamo)
+            .join(Reclamo.medio_recepcion)
+            .where(Reclamo.incidente_id == incidente_id)
+            .order_by(Reclamo.fecha_registro.desc())
+            .limit(1)
+        )
+        return await self._session.scalar(stmt)
+
+    async def get_trazabilidad(self, incidente_id: uuid.UUID) -> list[EstadoIncidenteEvento]:
+        stmt = (
+            select(EstadoIncidenteEvento)
+            .where(EstadoIncidenteEvento.incidente_id == incidente_id)
+            .order_by(EstadoIncidenteEvento.fecha)
+        )
+        return list(await self._session.scalars(stmt))
+
+    async def get_predio_reclamos(
+        self, suministro_codigo: str, excluir_incidente_id: uuid.UUID
+    ) -> list[tuple[Reclamo, Incidente]]:
+        """Incidencias históricas del mismo predio — matchea por
+        `Incidente.suministro_codigo` (el predio real, mismo campo que
+        `catastro_enrichment.py`/`dashboard_geo.suministros_reincidentes` usan
+        correctamente). Antes matcheaba por `Reclamo.dni` (la persona que reclama, no
+        el predio) y no deduplicaba por incidente — bug real 2026-08-12, auditado por
+        Edgar: contaba filas de `reclamo`, no incidencias distintas (un incidente
+        puede tener varios reclamos colapsados).
+
+        Un `incidente_id` histórico aporta UNA sola fila acá — su `reclamo` más
+        reciente (vía `ROW_NUMBER()` particionado por `incidente_id`), para que el
+        conteo resultante sea de incidencias, no de reclamos."""
+        reciente_por_incidente = (
+            select(
+                Reclamo.reclamo_id,
+                func.row_number()
+                .over(partition_by=Reclamo.incidente_id, order_by=Reclamo.fecha_registro.desc())
+                .label("orden_reciente"),
+            )
+            .join(Incidente, Reclamo.incidente_id == Incidente.incidente_id)
+            .where(
+                Incidente.suministro_codigo == suministro_codigo,
+                Incidente.incidente_id != excluir_incidente_id,
+            )
+            .subquery()
+        )
+        stmt = (
+            select(Reclamo, Incidente)
+            .join(Incidente, Reclamo.incidente_id == Incidente.incidente_id)
+            .join(Incidente.tipo_atencion)
+            .join(reciente_por_incidente, reciente_por_incidente.c.reclamo_id == Reclamo.reclamo_id)
+            .where(reciente_por_incidente.c.orden_reciente == 1)
+            .order_by(Reclamo.fecha_registro.desc())
+        )
+        result = await self._session.execute(stmt)
+        return [(row.Reclamo, row.Incidente) for row in result]
+
+    async def insertar_evento(
+        self,
+        *,
+        incidente_id: uuid.UUID,
+        estado_resultante_id: int,
+        motivo: str | None = None,
+        nota: str | None = None,
+        usuario_id: uuid.UUID | None = None,
+        area_id: int | None = None,
+        fecha: datetime,
+    ) -> EstadoIncidenteEvento:
+        evento = EstadoIncidenteEvento(
+            incidente_id=incidente_id,
+            estado_resultante_id=estado_resultante_id,
+            motivo=motivo,
+            nota=nota,
+            usuario_id=usuario_id,
+            area_id=area_id,
+            fecha=fecha,
+        )
+        self._session.add(evento)
+        await self._session.commit()
+        await self._session.refresh(evento, attribute_names=["estado_resultante", "usuario", "area"])
+        return evento
+
+    async def mapa_estados(self) -> dict[int, str]:
+        """`catalogo_estado` tiene 4 filas — traerlo entero por request es más simple
+        que cachearlo, mismo criterio que `modules/catalogos` para catálogos chicos."""
+        filas = await self._session.execute(select(CatalogoEstado.estado_id, CatalogoEstado.codigo))
+        return {estado_id: traducir_codigo_estado_db_a_app(codigo) for estado_id, codigo in filas.all()}
+
+    async def mapa_prioridades(self) -> dict[int, str]:
+        filas = await self._session.execute(select(CatalogoPrioridad.prioridad_id, CatalogoPrioridad.codigo))
+        return dict(filas.all())
+
+    async def resolver_estado_id(self, codigo: str) -> int | None:
+        codigo_db = _CODIGO_ESTADO_APP_A_DB.get(codigo, codigo)
+        return await self._session.scalar(
+            select(CatalogoEstado.estado_id).where(CatalogoEstado.codigo == codigo_db)
+        )
+
+    async def resolver_estado_ids(self, codigos: list[str]) -> list[int]:
+        codigos_db = [_CODIGO_ESTADO_APP_A_DB.get(c, c) for c in codigos]
+        filas = await self._session.scalars(
+            select(CatalogoEstado.estado_id).where(CatalogoEstado.codigo.in_(codigos_db))
+        )
+        return list(filas)
+
+    async def resolver_prioridad_ids(self, codigos: list[str]) -> list[int]:
+        filas = await self._session.scalars(
+            select(CatalogoPrioridad.prioridad_id).where(CatalogoPrioridad.codigo.in_(codigos))
+        )
+        return list(filas)
+
+    async def resumen_por_categoria(
+        self, fecha_desde: date | None, fecha_hasta: date | None
+    ) -> dict[str, int]:
+        stmt = (
+            select(CatalogoTipoGrupo.codigo, func.count())
+            .select_from(Incidente)
+            .join(Incidente.tipo_atencion)
+            .join(CatalogoTipoAtencion.tipo_grupo)
+            .group_by(CatalogoTipoGrupo.codigo)
+        )
+        if fecha_desde is not None:
+            stmt = stmt.where(Incidente.creado_en >= fecha_desde)
+        if fecha_hasta is not None:
+            stmt = stmt.where(Incidente.creado_en <= fecha_hasta)
+        filas = await self._session.execute(stmt)
+        return dict(filas.all())
+
+    async def top_tipos_atencion(
+        self, fecha_desde: date | None, fecha_hasta: date | None, limite: int
+    ) -> list[tuple[str, int]]:
+        stmt = (
+            select(CatalogoTipoAtencion.nombre, func.count())
+            .select_from(Incidente)
+            .join(Incidente.tipo_atencion)
+            .group_by(CatalogoTipoAtencion.nombre)
+            .order_by(func.count().desc())
+            .limit(limite)
+        )
+        if fecha_desde is not None:
+            stmt = stmt.where(Incidente.creado_en >= fecha_desde)
+        if fecha_hasta is not None:
+            stmt = stmt.where(Incidente.creado_en <= fecha_hasta)
+        filas = await self._session.execute(stmt)
+        return list(filas.all())
+
+    async def antiguedad_promedio_dias(self, incidente_ids: list[uuid.UUID]) -> float | None:
+        if not incidente_ids:
+            return None
+        promedio = await self._session.scalar(
+            select(func.avg(func.extract("epoch", func.now() - Incidente.creado_en) / 86400)).where(
+                Incidente.incidente_id.in_(incidente_ids)
+            )
+        )
+        return float(promedio) if promedio is not None else None
+
+    async def listar_suministro_y_fecha(self) -> list[tuple[str, datetime]]:
+        """`(suministro_codigo, creado_en)` de todos los incidentes — usado por el
+        dashboard (`prioridadPorSector`) para agrupar por sector en Python contra el
+        mapa de `CatastroEnrichmentService.mapa_suministro_a_sector()`, en vez de un
+        query a Redis por sector (ver decisión de Edgar 2026-08-10 en
+        cache_repository.py)."""
+        filas = await self._session.execute(select(Incidente.suministro_codigo, Incidente.creado_en))
+        return list(filas.all())
+
+    async def listar_suministros_distintos(self) -> list[str]:
+        """`suministro_codigo` distintos entre TODOS los incidentes — bounded por el
+        tamaño de `gota.incidente` (miles, no cientos de miles). Usado por
+        `IncidenciaService.listar()` como "universo" para acotar
+        `catastro.listar_suministros_por_sector()` antes de filtrar incidentes por
+        sector — bug real 2026-08-12, auditado en vivo: togglear una provincia
+        grande (Chiclayo, 42 sectores) resuelve ~119k suministro_codigos en `sig`,
+        y `suministro_codigo = ANY(<119k>)` contra las ~17k filas de
+        `gota.incidente` tardaba ~805ms POR EJECUCIÓN (corre dos veces: count +
+        select). Intersectando primero contra este universo (~11.5k, la mayoría
+        de sectores no reduce mucho el universo en sí, pero SÍ acota el array final
+        a los suministros que realmente importan) baja esa misma consulta a ~44ms."""
+        result = await self._session.execute(select(Incidente.suministro_codigo).distinct())
+        return [row[0] for row in result]
+
+    async def get_prioridad_real(self, incidente_id: uuid.UUID) -> int | None:
+        """Prioridad real del incidente, calculada por el módulo de alertas
+        (`incidente_alerta_regla`, hoy vacía — sin módulo de alertas implementado no
+        hay filas). `None` si no hay ninguna fila: no se inventa un default, para no
+        cachear/mostrar un dato que la BD no tiene."""
+        return await self._session.scalar(
+            select(IncidenteAlertaRegla.prioridad_id)
+            .where(IncidenteAlertaRegla.incidente_id == incidente_id)
+            .order_by(IncidenteAlertaRegla.fecha.desc())
+            .limit(1)
+        )
+
+    async def mapa_prioridad_real(self, incidente_ids: list[uuid.UUID]) -> dict[uuid.UUID, int]:
+        """Igual que `get_prioridad_real` pero en bloque, para no hacer N round-trips
+        al reconstruir la caché completa. La fila más reciente por incidente gana."""
+        if not incidente_ids:
+            return {}
+        fila_mas_reciente = (
+            select(
+                IncidenteAlertaRegla.incidente_id,
+                IncidenteAlertaRegla.prioridad_id,
+                func.row_number()
+                .over(
+                    partition_by=IncidenteAlertaRegla.incidente_id,
+                    order_by=IncidenteAlertaRegla.fecha.desc(),
+                )
+                .label("orden_reciente"),
+            )
+            .where(IncidenteAlertaRegla.incidente_id.in_(incidente_ids))
+            .subquery()
+        )
+        stmt = select(fila_mas_reciente.c.incidente_id, fila_mas_reciente.c.prioridad_id).where(
+            fila_mas_reciente.c.orden_reciente == 1
+        )
+        filas = await self._session.execute(stmt)
+        return {incidente_id: prioridad_id for incidente_id, prioridad_id in filas if prioridad_id is not None}

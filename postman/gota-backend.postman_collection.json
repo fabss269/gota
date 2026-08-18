@@ -1,0 +1,519 @@
+{
+  "info": {
+    "_postman_id": "b5f2a6b0-8e1a-4c9a-9f0e-3a1d2c4e5f6a",
+    "name": "GOTA Backend",
+    "description": "Colección de prueba para gota-backend (API.md). Login guarda el accessToken/refreshToken en variables de colección automáticamente — corré 'Login (técnico)' y/o 'Login (supervisor)' primero, el resto de requests ya quedan autenticados. Requiere el servidor local corriendo (ver README.md) con los datos de scripts/seed_dev.py sembrados.",
+    "schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json"
+  },
+  "auth": {
+    "type": "bearer",
+    "bearer": [{ "key": "token", "value": "{{accessToken}}", "type": "string" }]
+  },
+  "variable": [
+    { "key": "baseUrl", "value": "http://127.0.0.1:8000", "type": "string" },
+    { "key": "accessToken", "value": "", "type": "string" },
+    { "key": "refreshToken", "value": "", "type": "string" },
+    { "key": "supervisorAccessToken", "value": "", "type": "string" },
+    { "key": "incidenciaCodigo", "value": "EPS-00001", "type": "string" },
+    { "key": "tecnicoId", "value": "2df4e4b9-1cd4-47cd-ab9c-18adf8ab8770", "type": "string" },
+    { "key": "areaId", "value": "1", "type": "string" },
+    { "key": "distritoIdChiclayo", "value": "140101", "type": "string" },
+    { "key": "sectorIdAgua", "value": "2", "type": "string" },
+    { "key": "sectorIdDesague", "value": "28", "type": "string" }
+  ],
+  "item": [
+    {
+      "name": "Auth",
+      "item": [
+        {
+          "name": "Login (técnico)",
+          "request": {
+            "auth": { "type": "noauth" },
+            "method": "POST",
+            "header": [{ "key": "Content-Type", "value": "application/json" }],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"correo\": \"tecnico@epsel.gob.pe\",\n  \"password\": \"epsel2026\"\n}"
+            },
+            "url": { "raw": "{{baseUrl}}/auth/login", "host": ["{{baseUrl}}"], "path": ["auth", "login"] }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('200 OK', function () { pm.response.to.have.status(200); });",
+                  "if (pm.response.code === 200) {",
+                  "    var data = pm.response.json();",
+                  "    pm.collectionVariables.set('accessToken', data.accessToken);",
+                  "    pm.collectionVariables.set('refreshToken', data.refreshToken);",
+                  "}"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Login (supervisor)",
+          "request": {
+            "auth": { "type": "noauth" },
+            "method": "POST",
+            "header": [{ "key": "Content-Type", "value": "application/json" }],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"correo\": \"supervisor@epsel.gob.pe\",\n  \"password\": \"epsel2026\"\n}"
+            },
+            "url": { "raw": "{{baseUrl}}/auth/login", "host": ["{{baseUrl}}"], "path": ["auth", "login"] }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('200 OK', function () { pm.response.to.have.status(200); });",
+                  "if (pm.response.code === 200) {",
+                  "    var data = pm.response.json();",
+                  "    pm.collectionVariables.set('supervisorAccessToken', data.accessToken);",
+                  "}"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Login (credenciales inválidas → 401)",
+          "request": {
+            "auth": { "type": "noauth" },
+            "method": "POST",
+            "header": [{ "key": "Content-Type", "value": "application/json" }],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"correo\": \"tecnico@epsel.gob.pe\",\n  \"password\": \"password-incorrecta\"\n}"
+            },
+            "url": { "raw": "{{baseUrl}}/auth/login", "host": ["{{baseUrl}}"], "path": ["auth", "login"] }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('401 CREDENCIALES_INVALIDAS', function () {",
+                  "    pm.response.to.have.status(401);",
+                  "    pm.expect(pm.response.json().error.code).to.eql('CREDENCIALES_INVALIDAS');",
+                  "});"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Refresh",
+          "request": {
+            "auth": { "type": "noauth" },
+            "method": "POST",
+            "header": [{ "key": "Content-Type", "value": "application/json" }],
+            "body": { "mode": "raw", "raw": "{\n  \"refreshToken\": \"{{refreshToken}}\"\n}" },
+            "url": { "raw": "{{baseUrl}}/auth/refresh", "host": ["{{baseUrl}}"], "path": ["auth", "refresh"] }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('200 OK', function () { pm.response.to.have.status(200); });",
+                  "if (pm.response.code === 200) {",
+                  "    var data = pm.response.json();",
+                  "    pm.collectionVariables.set('accessToken', data.accessToken);",
+                  "    pm.collectionVariables.set('refreshToken', data.refreshToken);",
+                  "}"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Logout",
+          "request": {
+            "method": "POST",
+            "url": { "raw": "{{baseUrl}}/auth/logout", "host": ["{{baseUrl}}"], "path": ["auth", "logout"] }
+          }
+        }
+      ]
+    },
+    {
+      "name": "Catálogos",
+      "item": [
+        {
+          "name": "Distritos",
+          "request": {
+            "method": "GET",
+            "url": { "raw": "{{baseUrl}}/catalogos/distritos", "host": ["{{baseUrl}}"], "path": ["catalogos", "distritos"] }
+          }
+        },
+        {
+          "name": "Sectores (por distrito)",
+          "request": {
+            "method": "GET",
+            "url": {
+              "raw": "{{baseUrl}}/catalogos/sectores?distritoId={{distritoIdChiclayo}}",
+              "host": ["{{baseUrl}}"],
+              "path": ["catalogos", "sectores"],
+              "query": [{ "key": "distritoId", "value": "{{distritoIdChiclayo}}" }]
+            }
+          }
+        },
+        {
+          "name": "Tipos de atención",
+          "request": {
+            "method": "GET",
+            "url": { "raw": "{{baseUrl}}/catalogos/tipos-atencion", "host": ["{{baseUrl}}"], "path": ["catalogos", "tipos-atencion"] }
+          }
+        },
+        {
+          "name": "Estados",
+          "request": {
+            "method": "GET",
+            "url": { "raw": "{{baseUrl}}/catalogos/estados", "host": ["{{baseUrl}}"], "path": ["catalogos", "estados"] }
+          }
+        }
+      ]
+    },
+    {
+      "name": "Incidencias",
+      "item": [
+        {
+          "name": "Listar (sin filtros)",
+          "request": {
+            "method": "GET",
+            "url": {
+              "raw": "{{baseUrl}}/incidencias",
+              "host": ["{{baseUrl}}"],
+              "path": ["incidencias"],
+              "query": [
+                { "key": "fecha", "value": "hoy", "disabled": true },
+                { "key": "fechaDesde", "value": "2026-01-01", "disabled": true },
+                { "key": "fechaHasta", "value": "2026-12-31", "disabled": true },
+                { "key": "categoria", "value": "agua,desague", "disabled": true },
+                { "key": "prioridad", "value": "critica,alerta", "disabled": true },
+                { "key": "estado", "value": "EN_PROGRESO,ATENDIDO", "disabled": true },
+                { "key": "distritoId", "value": "{{distritoIdChiclayo}}", "disabled": true },
+                { "key": "sectorId", "value": "{{sectorIdAgua}}", "disabled": true },
+                { "key": "tipoAtencionId", "value": "fuga-agua", "disabled": true },
+                { "key": "q", "value": "fuga", "disabled": true },
+                { "key": "bbox", "value": "-79.85,-6.78,-79.83,-6.77", "disabled": true },
+                { "key": "page", "value": "1", "disabled": true },
+                { "key": "pageSize", "value": "10", "disabled": true }
+              ]
+            }
+          }
+        },
+        {
+          "name": "Detalle",
+          "request": {
+            "method": "GET",
+            "url": {
+              "raw": "{{baseUrl}}/incidencias/{{incidenciaCodigo}}",
+              "host": ["{{baseUrl}}"],
+              "path": ["incidencias", "{{incidenciaCodigo}}"]
+            }
+          }
+        },
+        {
+          "name": "Detalle (no existe → 404)",
+          "request": {
+            "method": "GET",
+            "url": { "raw": "{{baseUrl}}/incidencias/EPS-99999", "host": ["{{baseUrl}}"], "path": ["incidencias", "EPS-99999"] }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('404 NO_ENCONTRADO', function () {",
+                  "    pm.response.to.have.status(404);",
+                  "    pm.expect(pm.response.json().error.code).to.eql('NO_ENCONTRADO');",
+                  "});"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Trazabilidad",
+          "request": {
+            "method": "GET",
+            "url": {
+              "raw": "{{baseUrl}}/incidencias/{{incidenciaCodigo}}/trazabilidad",
+              "host": ["{{baseUrl}}"],
+              "path": ["incidencias", "{{incidenciaCodigo}}", "trazabilidad"]
+            }
+          }
+        },
+        {
+          "name": "Predio",
+          "request": {
+            "method": "GET",
+            "url": {
+              "raw": "{{baseUrl}}/incidencias/{{incidenciaCodigo}}/predio",
+              "host": ["{{baseUrl}}"],
+              "path": ["incidencias", "{{incidenciaCodigo}}", "predio"]
+            }
+          }
+        },
+        {
+          "name": "Transiciones válidas",
+          "request": {
+            "method": "GET",
+            "url": {
+              "raw": "{{baseUrl}}/incidencias/{{incidenciaCodigo}}/transiciones-validas",
+              "host": ["{{baseUrl}}"],
+              "path": ["incidencias", "{{incidenciaCodigo}}", "transiciones-validas"]
+            }
+          }
+        },
+        {
+          "name": "Registrar avance",
+          "request": {
+            "method": "POST",
+            "header": [{ "key": "Content-Type", "value": "application/json" }],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"motivo\": \"CUADRILLA_EN_SITIO\",\n  \"nota\": \"Cuadrilla llegó al sitio\"\n}",
+              "options": {
+                "raw": {
+                  "headerFamily": "json"
+                }
+              }
+            },
+            "description": "motivo ∈ CUADRILLA_EN_SITIO | SE_RESOLVIO | REQUIERE_EQUIPO | DERIVAR_OTRA_AREA | REASIGNAR_TECNICO | EN_ESPERA | NO_SE_PUDO_ATENDER. Devuelve 409 TRANSICION_INVALIDA si el motivo no es válido desde el estado actual (revisar 'Transiciones válidas' antes).",
+            "url": {
+              "raw": "{{baseUrl}}/incidencias/{{incidenciaCodigo}}/avances",
+              "host": ["{{baseUrl}}"],
+              "path": ["incidencias", "{{incidenciaCodigo}}", "avances"]
+            }
+          }
+        },
+        {
+          "name": "Cambiar estado",
+          "request": {
+            "method": "PATCH",
+            "header": [{ "key": "Content-Type", "value": "application/json" }],
+            "body": { "mode": "raw", "raw": "{\n  \"estado\": \"ATENDIDO\"\n}" },
+            "description": "estado destino debe ser una transición válida desde el estado actual — revisar la respuesta de 'Transiciones válidas' (request anterior) y ajustar este body si hace falta. Flujo: CREADO→PENDIENTE→EN_PROGRESO→ATENDIDO, con loop EN_PROGRESO→EN_PROGRESO. Con el seed fresco (scripts/seed_dev.py) EPS-00001 arranca en EN_PROGRESO, por eso 'ATENDIDO' funciona por defecto acá; si ya corriste esta colección antes, la incidencia puede haber quedado en un estado distinto (seed_dev.py no resetea incidentes existentes) — 409 TRANSICION_INVALIDA es la respuesta correcta en ese caso, no un bug.",
+            "url": {
+              "raw": "{{baseUrl}}/incidencias/{{incidenciaCodigo}}/estado",
+              "host": ["{{baseUrl}}"],
+              "path": ["incidencias", "{{incidenciaCodigo}}", "estado"]
+            }
+          }
+        },
+        {
+          "name": "Reasignar responsable (supervisor)",
+          "request": {
+            "auth": { "type": "bearer", "bearer": [{ "key": "token", "value": "{{supervisorAccessToken}}", "type": "string" }] },
+            "method": "PATCH",
+            "header": [{ "key": "Content-Type", "value": "application/json" }],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"tecnicoId\": \"{{tecnicoId}}\",\n  \"areaId\": {{areaId}}\n}"
+            },
+            "description": "Requiere rol supervisor (correr 'Login (supervisor)' primero) — con token de técnico devuelve 403 PERMISOS_INSUFICIENTES. tecnicoId y areaId son ambos opcionales pero se requiere al menos uno.",
+            "url": {
+              "raw": "{{baseUrl}}/incidencias/{{incidenciaCodigo}}/responsable",
+              "host": ["{{baseUrl}}"],
+              "path": ["incidencias", "{{incidenciaCodigo}}", "responsable"]
+            }
+          }
+        },
+        {
+          "name": "Reasignar responsable (sin permiso → 403)",
+          "request": {
+            "method": "PATCH",
+            "header": [{ "key": "Content-Type", "value": "application/json" }],
+            "body": { "mode": "raw", "raw": "{\n  \"tecnicoId\": \"{{tecnicoId}}\"\n}" },
+            "description": "Usa el token de técnico (auth heredado de la colección) contra un endpoint restringido a supervisor — debe devolver 403.",
+            "url": {
+              "raw": "{{baseUrl}}/incidencias/{{incidenciaCodigo}}/responsable",
+              "host": ["{{baseUrl}}"],
+              "path": ["incidencias", "{{incidenciaCodigo}}", "responsable"]
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('403 PERMISOS_INSUFICIENTES', function () {",
+                  "    pm.response.to.have.status(403);",
+                  "    pm.expect(pm.response.json().error.code).to.eql('PERMISOS_INSUFICIENTES');",
+                  "});"
+                ]
+              }
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "name": "Usuarios",
+      "item": [
+        {
+          "name": "Listar (sin filtros)",
+          "request": {
+            "method": "GET",
+            "url": {
+              "raw": "{{baseUrl}}/usuarios",
+              "host": ["{{baseUrl}}"],
+              "path": ["usuarios"],
+              "query": [
+                { "key": "rol", "value": "tecnico,supervisor", "disabled": true },
+                { "key": "sectorId", "value": "{{sectorIdAgua}}", "disabled": true }
+              ]
+            }
+          }
+        },
+        {
+          "name": "Filtrar por rol=tecnico",
+          "request": {
+            "method": "GET",
+            "url": {
+              "raw": "{{baseUrl}}/usuarios?rol=tecnico",
+              "host": ["{{baseUrl}}"],
+              "path": ["usuarios"],
+              "query": [{ "key": "rol", "value": "tecnico" }]
+            }
+          }
+        },
+        {
+          "name": "Filtrar por sectorId",
+          "request": {
+            "method": "GET",
+            "url": {
+              "raw": "{{baseUrl}}/usuarios?sectorId={{sectorIdDesague}}",
+              "host": ["{{baseUrl}}"],
+              "path": ["usuarios"],
+              "query": [{ "key": "sectorId", "value": "{{sectorIdDesague}}" }]
+            }
+          }
+        }
+      ]
+    },
+    {
+      "name": "Red (capas)",
+      "item": [
+        {
+          "name": "Red potable + buzones (sector agua)",
+          "request": {
+            "method": "GET",
+            "url": {
+              "raw": "{{baseUrl}}/red/capas?tipos=red_potable,buzones&sectorId={{sectorIdAgua}}",
+              "host": ["{{baseUrl}}"],
+              "path": ["red", "capas"],
+              "query": [
+                { "key": "tipos", "value": "red_potable,buzones" },
+                { "key": "sectorId", "value": "{{sectorIdAgua}}" },
+                { "key": "distritoId", "value": "{{distritoIdChiclayo}}", "disabled": true }
+              ]
+            }
+          }
+        },
+        {
+          "name": "Red desagüe (primaria + secundaria)",
+          "request": {
+            "method": "GET",
+            "url": {
+              "raw": "{{baseUrl}}/red/capas?tipos=red_primaria_desague,red_secundaria_desague&sectorId={{sectorIdDesague}}",
+              "host": ["{{baseUrl}}"],
+              "path": ["red", "capas"],
+              "query": [
+                { "key": "tipos", "value": "red_primaria_desague,red_secundaria_desague" },
+                { "key": "sectorId", "value": "{{sectorIdDesague}}" }
+              ]
+            }
+          }
+        },
+        {
+          "name": "Válvulas + grifos contra incendio (gap de datos conocido, ver README)",
+          "request": {
+            "method": "GET",
+            "url": {
+              "raw": "{{baseUrl}}/red/capas?tipos=valvulas,grifos_contra_incendio&sectorId={{sectorIdAgua}}",
+              "host": ["{{baseUrl}}"],
+              "path": ["red", "capas"],
+              "query": [
+                { "key": "tipos", "value": "valvulas,grifos_contra_incendio" },
+                { "key": "sectorId", "value": "{{sectorIdAgua}}" }
+              ]
+            },
+            "description": "Con la data real actual de sig.accesoriotipos estas dos capas devuelven FeatureCollection vacía — ver specs/07-capas-red.md, no es un bug."
+          }
+        },
+        {
+          "name": "Tipo inválido (→ 400)",
+          "request": {
+            "method": "GET",
+            "url": {
+              "raw": "{{baseUrl}}/red/capas?tipos=inventado",
+              "host": ["{{baseUrl}}"],
+              "path": ["red", "capas"],
+              "query": [{ "key": "tipos", "value": "inventado" }]
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('400 VALIDACION', function () {",
+                  "    pm.response.to.have.status(400);",
+                  "    pm.expect(pm.response.json().error.code).to.eql('VALIDACION');",
+                  "});"
+                ]
+              }
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "name": "Dashboard",
+      "item": [
+        {
+          "name": "Resumen",
+          "request": {
+            "method": "GET",
+            "url": {
+              "raw": "{{baseUrl}}/dashboard/resumen",
+              "host": ["{{baseUrl}}"],
+              "path": ["dashboard", "resumen"],
+              "query": [
+                { "key": "fechaDesde", "value": "2026-01-01", "disabled": true },
+                { "key": "fechaHasta", "value": "2026-12-31", "disabled": true }
+              ]
+            }
+          }
+        }
+      ]
+    },
+    {
+      "name": "Health",
+      "item": [
+        {
+          "name": "Health check",
+          "request": {
+            "auth": { "type": "noauth" },
+            "method": "GET",
+            "url": { "raw": "{{baseUrl}}/health", "host": ["{{baseUrl}}"], "path": ["health"] }
+          }
+        }
+      ]
+    }
+  ]
+}
